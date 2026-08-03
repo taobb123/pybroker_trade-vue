@@ -1,0 +1,372 @@
+python_executable: python
+project_root: ''
+data_sources:
+  extra_env:
+    TUSHARE_TOKEN: ''
+runner:
+  merged_log_stderr: on_error
+steps:
+- id: market_temperature
+  title: 市场温度计 - 每日仓位报告
+  type: script
+  script: market_temperature_model.py
+  args: []
+  highlight: core
+  frequency: daily
+  frequency_note: V2.3 · 回测校准映射(可选) · 涨跌停P250 + 风险百分位 · 阶梯仓位
+  run_modes:
+  - id: daily
+    label: 每日报告
+  - id: backtest_fast
+    label: 快速回测
+    script: market_temperature_backtest.py
+    args:
+    - --start
+    - '20241101'
+    - --fast
+    - --forward
+    - 5,10,20
+    - --brief
+  - id: backtest_calibrate
+    label: 回测并校准
+    script: market_temperature_backtest.py
+    args:
+    - --start
+    - '20241101'
+    - --fast
+    - --calibrate
+    - --apply
+    - --brief
+  workspace_outputs:
+  - path: market_temperature_latest.csv
+    label: 每日仓位报告
+  - path: market_temperature_backtest.csv
+    label: 回测明细
+  - path: config/market_temperature_calibration.json
+    label: 校准映射
+- id: fetch_a_low_ma5
+  title: 沿 MA5 多头扫描（右侧交易）
+  type: script
+  script: fetch_a_low_ma5.py
+  args: []
+  highlight: core
+  frequency: daily
+  workspace_inputs:
+  - path: stocks_pool.txt
+    label: 股票池列表
+  workspace_outputs:
+  - path: ma5_trend_scan.csv
+    label: MA5 多头扫描表
+- id: fetch_vp_six_combo
+  title: 量价六组合分类（MA5 后）
+  type: script
+  script: fetch_vp_six_combo.py
+  args: []
+  highlight: chain
+  frequency: daily
+  frequency_note: 跟随 fetch_a_low_ma5 · Phase2；watch4/6 滚动≤6交易日、同票留最新；可粘贴列表覆盖
+  symbols_paste: true
+  workspace_inputs:
+  - path: config/fetch_vp_six_combo_symbols.txt
+    label: 自定义股票列表（可选）
+  - path: ma5_trend_scan.csv
+    label: MA5 多头扫描表
+  workspace_outputs:
+  - path: vp_six_combo_scan.csv
+    label: 量价六组合表
+  - path: vp_combo_watch_4.csv
+    label: 上涨放量突破观察表
+  - path: vp_combo_watch_6.csv
+    label: 下跌放量观察表
+  - path: config/fetch_pattern_entry_symbols.txt
+    label: 形态建仓观察代码·combo4
+  - path: config/fetch_pattern_entry_symbols_6.txt
+    label: 形态建仓观察代码·combo6
+- id: fetch_pattern_entry
+  title: 形态建仓信号（突破回踩 / 下跌放量反转）
+  type: script
+  script: fetch_pattern_entry.py
+  args: []
+  highlight: chain
+  frequency: daily
+  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；待选/建仓推东财「量能」；估值Top2→「估值因子」；Q/M+/M-各Top2→「Q」「M加」「M减」；作废码剔除观察池
+  symbols_paste: true
+  symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
+  symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
+  symbols_paste_combo_options:
+  - id: 4
+    label: 4 · 上涨放量突破（形态1）
+  - id: 6
+    label: 6 · 下跌放量反转（形态2）
+  workspace_inputs:
+  - path: config/fetch_pattern_entry_symbols.txt
+    label: 观察代码·combo4（可选）
+  - path: config/fetch_pattern_entry_symbols_6.txt
+    label: 观察代码·combo6（可选）
+  - path: vp_combo_watch_4.csv
+    label: 上涨放量突破观察表
+  - path: vp_combo_watch_6.csv
+    label: 下跌放量观察表
+  workspace_outputs:
+  - path: pattern_entry_scan.csv
+    label: 形态建仓信号表
+  - path: pattern_entry_valuation_rank.csv
+    label: 观察池估值排名表
+  - path: pattern_entry_q_rank.csv
+    label: 观察池Q排名表
+  - path: pattern_entry_mplus_rank.csv
+    label: 观察池M+排名表
+  - path: pattern_entry_mminus_rank.csv
+    label: 观察池M-排名表
+- id: market_neutral
+  title: 市场中性 · 形态/PE/Q/MUD 个股多空
+  type: script
+  script: run_market_neutral.py
+  args:
+  - --start
+  - '2025-06-01'
+  - --rebalance
+  - weekly
+  - --q-rebalance
+  - monthly
+  - --quantile
+  - '0.10'
+  - --variants
+  - A,B,Q,M+,M-
+  highlight: chain
+  frequency: weekly
+  frequency_note: 观察池横截面前10%多/后10%空；A形态 B相对PE Q公司估值(月调) M+/M-动量反转；默认输出 EQ等权 vs ROT轮动(温度控仓)；含 Rank IC
+  run_modes:
+  - id: full
+    label: 全因子周频+Q月调
+    args:
+    - --start
+    - '2025-06-01'
+    - --rebalance
+    - weekly
+    - --q-rebalance
+    - monthly
+    - --quantile
+    - '0.10'
+    - --variants
+    - A,B,Q,M+,M-
+  - id: rotation
+    label: 全因子+轮动EQ/ROT
+    args:
+    - --start
+    - '2025-06-01'
+    - --rebalance
+    - weekly
+    - --q-rebalance
+    - monthly
+    - --quantile
+    - '0.10'
+    - --variants
+    - A,B,Q,M+,M-
+  - id: q_quarterly
+    label: 全因子·Q季调
+    args:
+    - --start
+    - '2025-01-01'
+    - --rebalance
+    - weekly
+    - --q-rebalance
+    - quarterly
+    - --quantile
+    - '0.10'
+    - --variants
+    - A,B,Q,M+,M-
+  - id: mud_only
+    label: 仅 M+/M-
+    args:
+    - --start
+    - '2025-06-01'
+    - --rebalance
+    - weekly
+    - --quantile
+    - '0.10'
+    - --variants
+    - M+,M-
+    - --skip-pattern-history
+  - id: smoke
+    label: 快速冒烟
+    args:
+    - --start
+    - '2025-06-01'
+    - --rebalance
+    - weekly
+    - --q-rebalance
+    - monthly
+    - --quantile
+    - '0.10'
+    - --variants
+    - B,Q,M+,M-
+    - --skip-pattern-history
+    - --skip-gbm
+  workspace_inputs:
+  - path: pattern_entry_scan.csv
+    label: 形态建仓信号表
+  - path: vp_combo_watch_4.csv
+    label: 上涨放量突破观察表
+  - path: vp_combo_watch_6.csv
+    label: 下跌放量观察表
+  - path: market_neutral/archive/watch_pool/index.csv
+    label: 观察池归档索引
+  - path: market_temperature_backtest.csv
+    label: 市场温度历史（轮动用）
+  workspace_outputs:
+  - path: market_neutral/output/latest/summary.md
+    label: 回测摘要
+  - path: market_neutral/output/latest/metrics.csv
+    label: 指标+RankIC表
+  - path: market_neutral/output/latest/equity_curve.png
+    label: 净值曲线
+  - path: market_neutral/output/latest/equity_legs.png
+    label: 多空腿净值拆分
+  - path: market_neutral/output/latest/holdings_latest.csv
+    label: 最新持仓
+  - path: market_neutral/output/latest/rebalance_log.csv
+    label: 调仓明细
+  - path: market_neutral/output/latest/factor_snapshot.csv
+    label: 因子截面
+  - path: market_neutral/output/latest/rotation_weights.csv
+    label: 轮动权重日程
+- id: fetch_dc_concept_ma5
+  title: 东财概念低位×资金热门扫描
+  type: script
+  script: fetch_dc_concept_ma5.py
+  args:
+  - --with-members
+  highlight: core
+  frequency: daily
+  frequency_note: 漏斗=资金预筛Top40→低位硬筛→资金分排序取Top3；无低位则Top2兜底
+  workspace_inputs:
+  - path: stocks_pool.txt
+    label: 股票池列表
+  workspace_outputs:
+  - path: dc_concept_ma5_scan.csv
+    label: 东财概念低位×资金表
+  - path: dc_concept_ma5_members.csv
+    label: 命中概念成分股
+- id: growth_factor
+  title: 按成长因子排序（资产安全、现金流质量）
+  type: script
+  script: factor_growthT_indicator.py
+  args: []
+  highlight: chain
+  frequency: daily
+  frequency_note: 跟随 fetch_a_low_ma5 → fetch_vp_six_combo
+  workspace_inputs:
+  - path: stocks_pool.txt
+    label: 股票池列表
+  workspace_outputs:
+  - path: factor_growth_ranking.csv
+    label: 成长综合得分表
+- id: compute_today
+  title: 做 T 止盈止损
+  type: script
+  script: compute_today_prices.py
+  args: []
+  highlight: daily
+  frequency: daily
+  workspace_inputs:
+  - path: config/train_model_shift_symbols.txt
+    label: 共用股票列表
+  workspace_outputs:
+  - path: prediction_kline_compare.json
+    label: 预测 K 线
+  - path: today_high_low_result.csv
+    label: 当日高低价
+- id: filter_stock_codes
+  title: 股票代码清洗
+  type: frontend_tool
+  tool: filter_stock_codes
+  # 归入「每日」分类，紧挨「做 T 止盈止损」之后；界面仍按小工具样式展示
+  frequency: daily
+  note: 粘贴 6 位代码 → 去重 → 剔除 300/301/688/920 开头
+- id: morning_limit
+  title: 发现异动
+  type: script
+  script: morning_limit_up_news.py
+  args: []
+  highlight: daily
+  frequency: daily
+  workspace_outputs:
+  - glob: morning_limit_up_news_match_*.csv
+    label: 新闻匹配
+    copy_column: news_content
+- id: roc_20
+  title: 20 日 ROC 排序（沪深300、中证A500、中证1000）
+  type: script
+  script: factor_investing_20ROC.py
+  args: []
+  highlight: biweekly
+  frequency: biweekly
+  pool_presets:
+  - label: 沪深300
+    path: C:\Users\111\Desktop\股票池\沪深300.txt
+  - label: 中证A500
+    path: C:\Users\111\Desktop\股票池\中证A500.txt
+  - label: 中证1000
+    path: C:\Users\111\Desktop\股票池\中证1000.txt
+- id: shareholder_trend
+  title: 股东筛选（户数+北向+净利同比+MA120，近一周涨幅展示）
+  type: script
+  script: shareholder_trend.py
+  args: []
+  highlight: chain
+  frequency: daily
+  frequency_note: 跟随 growth_factor
+  workspace_inputs:
+  - path: stocks_pool.txt
+    label: 股票池列表
+  workspace_outputs:
+  - path: shareholder_trend.csv
+    label: 股东变化趋势表
+- id: openbb
+  title: 运行 OpenBB（手动）
+  type: manual
+  note: 参考本地 OpenBB 流程，无统一命令行入口。
+- id: classify_theme
+  title: 按题材分类（AI 算力、有色金属、新能源、化工）
+  type: script
+  script: classify_morning_limit_up.py
+  args:
+  - --output
+  - theme_classify_result.csv
+  workspace_outputs:
+  - path: theme_classify_result.csv
+    label: 题材分类表
+- id: base_cost_search
+  title: 回踩支撑结构 — backtest_sy_base_cost_search
+  type: script
+  script: backtest_sy_base_cost_search.py
+  args: []
+  workspace_inputs:
+  - path: stocks_pool.txt
+    label: 股票池列表
+  - path: config/backtest_sy_threshold.yaml
+    label: 回测区间
+  workspace_outputs:
+  - path: optimal_base_cost.csv
+    label: 最优 base_cost 表
+- id: spot_delayed
+  title: 回踩支撑结构 — 分时对比表
+  type: script
+  script: fetch_a_share_spot_delayed_1m.py
+  args:
+  - --compare-table
+  workspace_outputs:
+  - path: fetch_a_share_spot_compare_prices.csv
+    label: 对比价表
+- id: fetch_a_low
+  title: 验证支撑反弹结构（fetch_a_low）
+  type: script
+  script: fetch_a_low.py
+  args: []
+  workspace_inputs:
+  - path: config/fetch_a_low_symbols.txt
+    label: 自选代码列表
+  workspace_outputs:
+  - path: rebound_support_scan.csv
+    label: 支撑反弹扫描

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>工作流 UI 改版预览 v2 · 三级颜色系统</title>
+  <style>
+    /* ── 一级：背景（结构层，几乎不变） ── */
+    :root {
+      --bg: #111315;
+      --panel: #17191D;
+      --card: #1C1F24;
+      --card-hover: #232730;
+      --border: #2F3540;
+      --border-header: #2E3138;
+      --text-title: #FFFFFF;
+      --text: #C9CDD4;
+      --muted: #8D96A5;
+      --faint: #64748B;
+
+      /* 品牌 / 主操作 */
+      --primary: #6C63FF;
+      --primary-hover: #7B74FF;
+      --btn-secondary-bg: #2A2D33;
+
+      /* 二级：Workflow 类型色（仅 accent border + 分类 Tag） */
+      --cat-core: #F59E0B;
+      --cat-core-tag-bg: #2C241D;
+      --cat-core-tag-text: #F6C177;
+      --cat-chain: #3B82F6;
+      --cat-chain-tag-bg: #1E293B;
+      --cat-chain-tag-text: #93C5FD;
+      --cat-daily: #10B981;
+      --cat-daily-tag-bg: #1A2E28;
+      --cat-daily-tag-text: #6EE7B7;
+      --cat-biweekly: #A855F7;
+      --cat-biweekly-tag-bg: #2A1F3D;
+      --cat-biweekly-tag-text: #C4B5FD;
+      --cat-tool: #64748B;
+      --cat-tool-tag-bg: #24272E;
+      --cat-tool-tag-text: #94A3B8;
+
+      /* 条件 Tag（全灰） */
+      --cond-tag-bg: #24272E;
+      --cond-tag-text: #C0C6D2;
+
+      /* 三级：状态色（运行结果，不与分类混用） */
+      --status-success: #7BC96F;
+      --status-running: #4FC1FF;
+      --status-error: #E06C75;
+      --status-warning: #E5C07B;
+
+      /* 日志 VS Code 风 */
+      --log-bg: #0D1117;
+      --log-text: #C9CDD4;
+      --log-info: #4FC1FF;
+      --log-success: #7BC96F;
+      --log-warning: #E5C07B;
+      --log-error: #E06C75;
+      --log-heading: #E5C07B;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", "Segoe UI", "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .banner { text-align: center; margin-bottom: 28px; }
+    .banner h1 { font-size: 1.2rem; color: var(--text-title); font-weight: 600; }
+    .banner p { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+    .banner .ver {
+      display: inline-block;
+      background: rgba(108, 99, 255, 0.15);
+      color: var(--primary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 999px;
+      margin-left: 6px;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1280px;
+      margin: 0 auto 32px;
+    }
+    @media (max-width: 960px) { .compare { grid-template-columns: 1fr; } }
+
+    .col-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .col-label.v1 { color: #ff7b72; }
+    .col-label.v2 { color: var(--primary); }
+
+    .frame {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .frame-head {
+      padding: 10px 16px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .frame-body { padding: 16px; }
+
+    /* ── v1 全灰（上一版） ── */
+    .v1-step {
+      background: #1C1F24;
+      border: 1px solid #2F3540;
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .v1-step .id { font-size: 0.65rem; color: #64748B; font-family: monospace; }
+    .v1-step .title { font-size: 0.88rem; font-weight: 600; color: #fff; margin: 4px 0 10px; }
+    .v1-tag-gray {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 3px 9px;
+      border-radius: 5px;
+      background: #24272E;
+      color: #C0C6D2;
+      margin: 0 4px 4px 0;
+    }
+    .v1-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid #2E3138; }
+    .v1-btn-primary { background: #6C63FF; color: #fff; font-size: 0.72rem; padding: 6px 14px; border-radius: 6px; }
+    .v1-btn-sec { background: #2A2D33; color: #C9CDD4; font-size: 0.72rem; padding: 5px 12px; border-radius: 6px; border: 1px solid #2F3540; }
+    .v1-btn-ghost { background: none; color: #8D96A5; font-size: 0.72rem; padding: 5px 8px; }
+
+    /* ── v2 三级颜色 ── */
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      transition: background 0.15s;
+    }
+    .step:hover { background: var(--card-hover); }
+
+    .step-header {
+      padding: 16px 18px 14px;
+      border-bottom: 1px solid var(--border-header);
+      border-left: 4px solid var(--accent, var(--cat-daily));
+    }
+    .step-header .id {
+      font-size: 0.68rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+      margin-bottom: 4px;
+    }
+    .step-header .title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-title);
+      margin-bottom: 10px;
+    }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-cat {
+      font-size: 0.68rem;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 5px;
+    }
+    .tag-cond {
+      font-size: 0.68rem;
+      padding: 3px 10px;
+      border-radius: 5px;
+      background: var(--cond-tag-bg);
+      color: var(--cond-tag-text);
+    }
+    .step-body { padding: 12px 18px 16px; }
+    .step-desc { font-size: 0.76rem; color: var(--muted); margin-bottom: 12px; line-height: 1.45; }
+    .step-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .step-actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      font-size: 0.74rem;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: default;
+      font-weight: 500;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: var(--btn-secondary-bg); color: var(--text); border-color: var(--border); }
+    .btn-ghost { background: transparent; color: var(--muted); padding-left: 0; padding-right: 0; }
+
+    /* 类型 accent */
+    .step.core { --accent: var(--cat-core); }
+    .step.core .tag-cat { background: var(--cat-core-tag-bg); color: var(--cat-core-tag-text); }
+    .step.chain { --accent: var(--cat-chain); }
+    .step.chain .tag-cat { background: var(--cat-chain-tag-bg); color: var(--cat-chain-tag-text); }
+    .step.daily { --accent: var(--cat-daily); }
+    .step.daily .tag-cat { background: var(--cat-daily-tag-bg); color: var(--cat-daily-tag-text); }
+    .step.biweekly { --accent: var(--cat-biweekly); }
+    .step.biweekly .tag-cat { background: var(--cat-biweekly-tag-bg); color: var(--cat-biweekly-tag-text); }
+    .step.tool { --accent: var(--cat-tool); }
+    .step.tool .tag-cat { background: var(--cat-tool-tag-bg); color: var(--cat-tool-tag-text); }
+
+    /* 图例 */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i {
+      display: inline-block;
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+    }
+    .legend i.core { background: var(--cat-core); }
+    .legend i.chain { background: var(--cat-chain); }
+    .legend i.daily { background: var(--cat-daily); }
+    .legend i.biweekly { background: var(--cat-biweekly); }
+    .legend i.tool { background: var(--cat-tool); }
+
+    /* 日志 */
+    .log {
+      background: var(--log-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      margin-top: 16px;
+    }
+
+    /* 色板表 */
+    .palette {
+      max-width: 1280px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .palette h3 {
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      color: var(--text-title);
+      border-bottom: 1px solid var(--border);
+    }
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 800px) { .palette-grid { grid-template-columns: 1fr; } }
+    .palette-col { padding: 16px 18px; border-right: 1px solid var(--border); }
+    .palette-col:last-child { border-right: none; }
+    .palette-col h4 {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    .palette-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .swatch.bar { width: 4px; height: 20px; border-radius: 2px; }
+    .palette-row code { font-family: monospace; color: var(--faint); font-size: 0.68rem; }
+  </style>
+</head>
+<body>
+
+  <div class="banner">
+    <h1>工作流 UI 改版预览 <span class="ver">v2 · 三级颜色系统</span></h1>
+    <p>左：v1 全灰（层级不足） · 右：v2 80% 灰 + 20% 类型色（仅 accent border + 分类 Tag）</p>
+  </div>
+
+  <div class="compare">
+    <!-- v1 -->
+    <div>
+      <div class="col-label v1">v1 · 全灰（上一版）</div>
+      <div class="frame">
+        <div class="frame-head">步骤</div>
+        <div class="frame-body">
+          <div class="v1-step">
+            <div class="id">fetch_a_low_ma5</div>
+            <div class="title">沿 MA5 多头扫描（右侧交易）</div>
+            <span class="v1-tag-gray">每日·核心</span>
+            <span class="v1-tag-gray">下沿结构</span>
+            <span class="v1-tag-gray">接近买点</span>
+            <div class="v1-footer">
+              <div><span class="v1-btn-sec">编辑</span> <span class="v1-btn-ghost">查看表格</span></div>
+              <span class="v1-btn-primary">运行本步</span>
+            </div>
+          </div>
+          <div class="v1-step">
+            <div class="id">fetch_trend_pullback</div>
+            <div class="title">主升震荡下沿</div>
+            <span class="v1-tag-gray">每日·链式</span>
+            <div class="v1-footer">
+              <div><span class="v1-btn-sec">编辑</span> <span class="v1-btn-ghost">查看表格</span></div>
+              <span class="v1-btn-primary">运行本步</span>
+            </div>
+          </div>
+          <p style="font-size:0.72rem;color:#8D96A5;margin-top:8px">问题：卡片之间无差异，扫一眼无法区分策略类型</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- v2 -->
+    <div>
+      <div class="col-label v2">v2 · 三级颜色（建议采用）</div>
+      <div class="frame">
+        <div class="frame-head">步骤</div>
+        <div class="frame-body">
+          <div class="legend">
+            <span><i class="core"></i>每日·核心</span>
+            <span><i class="chain"></i>每日·链式</span>
+            <span><i class="daily"></i>每日</span>
+            <span><i class="biweekly"></i>双周</span>
+            <span><i class="tool"></i>工具</span>
+          </div>
+
+          <div class="step core">
+            <div class="step-header">
+              <div class="id">fetch_a_low_ma5</div>
+              <div class="title">沿 MA5 多头扫描（右侧交易）</div>
+              <div class="tags">
+                <span class="tag-cat">每日·核心</span>
+                <span class="tag-cond">下沿结构</span>
+                <span class="tag-cond">接近买点</span>
+              </div>
+            </div>
+            <div class="step-body">
+              <div class="step-desc">扫描 A 股沿 MA5 多头排列、右侧交易信号标的。</div>
+              <div class="step-footer">
+                <div class="step-actions">
+                  <span class="btn btn-secondary">编辑</span>
+                  <span class="btn btn-ghost">查看表格</span>
+                </div>
+                <span class="btn btn-primary">运行本步</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="step chain">
+            <div class="step-header">
+              <div class="id">growth_factor</div>
+              <div class="title">按成长因子排序</div>
+              <div class="tags">
+                <span class="tag-cat">每日·链式</span>
+                <span class="tag-cond">跟随 MA5 扫描</span>
+              </div>
+            </div>
+            <div class="step-body">
+              <div class="step-footer">
+                <div class="step-actions">
+                  <span class="btn btn-secondary">编辑</span>
+                  <span class="btn btn-ghost">查看表格</span>
+                </div>
+                <span class="btn btn-primary">运行本步</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="step daily">
+            <div class="step-header">
+              <div class="id">compute_today</div>
+              <div class="title">做 T 止盈止损</div>
+              <div class="tags"><span class="tag-cat">每日</span></div>
+            </div>
+            <div class="step-body">
+              <div class="step-footer">
+                <div class="step-actions">
+                  <span class="btn btn-secondary">编辑</span>
+                  <span class="btn btn-ghost">查看图表</span>
+                </div>
+                <span class="btn btn-primary">运行本步</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="log"><span style="color:var(--log-success)">本步 exit_code=0</span>
+<span style="color:var(--log-heading)">【买入信号】</span>
+<span style="color:var(--log-text)">600519 贵州茅台  close=1688.00</span>
+<span style="color:var(--log-warning)">⚠ 3 只未通过流动性过滤</span>
+<span style="color:var(--log-info)">→ 结果已写入 pool/latest.csv</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="palette">
+    <h3>三级颜色系统 · Design Tokens</h3>
+    <div class="palette-grid">
+      <div class="palette-col">
+        <h4>一级 · 背景结构</h4>
+        <div class="palette-row"><span class="swatch" style="background:#111315"></span>页面 <code>#111315</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#17191D"></span>Panel <code>#17191D</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#1C1F24"></span>Card <code>#1C1F24</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#232730"></span>Hover <code>#232730</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#2F3540"></span>Border <code>#2F3540</code></div>
+      </div>
+      <div class="palette-col">
+        <h4>二级 · Workflow 类型（仅 accent + Tag）</h4>
+        <div class="palette-row"><span class="swatch bar" style="background:#F59E0B"></span>每日·核心 <code>#F59E0B</code></div>
+        <div class="palette-row"><span class="swatch bar" style="background:#3B82F6"></span>每日·链式 <code>#3B82F6</code></div>
+        <div class="palette-row"><span class="swatch bar" style="background:#10B981"></span>每日 <code>#10B981</code></div>
+        <div class="palette-row"><span class="swatch bar" style="background:#A855F7"></span>双周 <code>#A855F7</code></div>
+        <div class="palette-row"><span class="swatch bar" style="background:#64748B"></span>工具 <code>#64748B</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#6C63FF"></span>运行按钮 <code>#6C63FF</code></div>
+      </div>
+      <div class="palette-col">
+        <h4>三级 · 状态 / 日志（不与分类混用）</h4>
+        <div class="palette-row"><span class="swatch" style="background:#7BC96F"></span>成功 <code>#7BC96F</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#4FC1FF"></span>运行中 / Info <code>#4FC1FF</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#E5C07B"></span>警告 <code>#E5C07B</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#E06C75"></span>错误 <code>#E06C75</code></div>
+        <div class="palette-row"><span class="swatch" style="background:#C9CDD4"></span>日志正文 <code>#C9CDD4</code></div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

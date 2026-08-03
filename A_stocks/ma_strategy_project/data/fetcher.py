@@ -210,25 +210,12 @@ class DataFetcher:
 
     def _call_with_retries(self, fn, code: str, start_date: str, end_date: str, provider_name: str,
                             max_retries: int = 3) -> Optional[pd.DataFrame]:
-        """对单个提供方调用增加指数退避重试，缓解网络抖动与限流。
-        第一次立即调用，随后等待 1s、2s、4s（附带少量随机抖动）。
-        """
-        import time
-        import random
-        attempt = 0
-        backoff = 1.0
-        while attempt < max_retries:
+        """对单个提供方连续重试，不在本地插入延时（仅兜底层异常）。"""
+        for attempt in range(max_retries):
             try:
                 return fn(code, start_date, end_date)
             except Exception as e:
-                # 理论上各提供方内部已做异常捕获；此处兜底
                 logger.warning(f"{provider_name} 调用异常: {e}")
-            attempt += 1
-            if attempt < max_retries:
-                sleep_s = backoff + random.uniform(0, 0.5)
-                logger.debug(f"{provider_name} 第{attempt}次失败，{sleep_s:.1f}s后重试...")
-                time.sleep(sleep_s)
-                backoff *= 2
         return None
     
     def _fetch_from_akshare(self, code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:

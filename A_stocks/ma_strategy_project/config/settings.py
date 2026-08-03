@@ -29,6 +29,9 @@ DATA_CONFIG = {
     # 对ETF代码，'tushare' 会自动切换到 fund_daily。
     # 优先使用 tushare，如果失败则回退到 baostock、akshare、yfinance
     'provider_override': ['tushare', 'baostock', 'akshare', 'yfinance'],
+    # 仅当自行调用 utils.tushare_rate_limit.resolve_tushare_rate_limit 时有效；主流程已不做客户端限流
+    'tushare_max_requests_per_minute': None,
+    'tushare_rate_window_seconds': 60,
 }
 
 # 日志配置

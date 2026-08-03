@@ -3,6 +3,7 @@ import sys
 import pybroker as pyb
 from pybroker import Strategy, StrategyConfig, ExecContext
 import pandas as pd
+from datetime import datetime, timedelta
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -97,7 +98,7 @@ def save_stocks_pool(file_path, symbols):
 
 if __name__ == '__main__':
     # 配置参数：要删除的亏损最大的股票数量
-    max_loss_stocks_to_remove = 10
+    max_loss_stocks_to_remove = 0
     
     # 获取脚本所在目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -137,10 +138,15 @@ if __name__ == '__main__':
     ]
     
     data_source = create_custom_data_source()
+    # 每次运行自动拉取最近日期数据：结束日=今天，开始日=约2年前
+    end_date_d = datetime.now()
+    start_date_d = end_date_d - timedelta(days=2 * 365)
+    start_date = start_date_d.strftime('%Y%m%d')
+    end_date = end_date_d.strftime('%Y%m%d')
     strategy = Strategy(
         data_source,
-        start_date='20240501',
-        end_date='20251208',
+        start_date=start_date,
+        end_date=end_date,
         config=config
     )
     strategy.set_before_exec(rank)

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>流控制台浅色 UI · 三套模板预览</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #e8ecf1;
+      color: #0f172a;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+    .banner h1 {
+      font-size: 1.25rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+    .banner p {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: #64748b;
+      max-width: 52rem;
+    }
+    .banner .note {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: #475569;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: inline-block;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 22px 0 14px;
+    }
+    .tab {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 560;
+      cursor: pointer;
+    }
+    .tab:hover { border-color: #94a3b8; color: #0f172a; }
+    .tab.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 800px) { .meta { grid-template-columns: 1fr; } }
+    .meta-card {
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.78rem;
+      color: #475569;
+    }
+    .meta-card strong {
+      display: block;
+      color: #0f172a;
+      font-size: 0.84rem;
+      margin-bottom: 4px;
+    }
+    .stage-wrap {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .stage { display: none; }
+    .stage.active { display: block; }
+
+    /* ── shared mock shell ── */
+    .mock {
+      height: 620px;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+    .mock-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      flex-shrink: 0;
+    }
+    .mock-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+    .mock-brand h2 {
+      font-size: 0.9rem;
+      color: var(--text-title);
+      font-weight: 600;
+    }
+    .mock-brand span {
+      font-size: 0.7rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .mock-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.76rem;
+      font-weight: 500;
+      cursor: default;
+    }
+    .btn-stop {
+      color: var(--err);
+      border-color: color-mix(in srgb, var(--err) 35%, transparent);
+      background: color-mix(in srgb, var(--err) 6%, transparent);
+    }
+    .btn-run {
+      background: var(--run-bg);
+      border-color: var(--run-border);
+      color: var(--run-text);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.76rem;
+      font-weight: 560;
+    }
+    .btn-run::before { content: "▶ "; font-size: 0.6rem; opacity: 0.8; }
+    .btn-outline {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .mock-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 210px 1fr 340px;
+      gap: 0;
+      background: var(--bg);
+    }
+    @media (max-width: 960px) {
+      .mock { height: auto; }
+      .mock-body { grid-template-columns: 1fr; }
+    }
+    .col {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .col:last-child { border-right: none; }
+    .col-sidebar { background: var(--sidebar); }
+    .col-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-title);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .col-head .count {
+      font-weight: 400;
+      color: var(--faint);
+      font-size: 0.72rem;
+    }
+    .col-scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 10px;
+    }
+    .search {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 0.76rem;
+      margin-bottom: 10px;
+    }
+    .label {
+      font-size: 0.62rem;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 4px 0 6px;
+    }
+    .nav-item, .recent {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.76rem;
+      padding: 7px 8px;
+      border-radius: 6px;
+      margin-bottom: 2px;
+    }
+    .recent { flex-direction: column; align-items: flex-start; gap: 1px; color: var(--text); }
+    .recent small {
+      font-size: 0.62rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .nav-item.active {
+      background: var(--nav-active-bg);
+      color: var(--text-title);
+      box-shadow: var(--nav-active-shadow, none);
+    }
+    .bar {
+      width: 3px;
+      height: 12px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-bar);
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: var(--card-pad);
+      margin-bottom: var(--card-gap);
+    }
+    .card .id {
+      font-size: 0.65rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .card .title {
+      font-size: var(--title-size);
+      font-weight: 650;
+      color: var(--text-title);
+      margin: 3px 0 8px;
+      line-height: 1.35;
+    }
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+    .tag {
+      font-size: 0.66rem;
+      font-weight: 520;
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+    .tag.core { background: var(--tag-core-bg); color: var(--tag-core-fg); }
+    .tag.chain { background: var(--tag-chain-bg); color: var(--tag-chain-fg); }
+    .tag.cond { background: var(--tag-cond-bg); color: var(--tag-cond-fg); }
+    .card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-header);
+      margin-top: 4px;
+    }
+    .link {
+      color: var(--link);
+      font-size: 0.74rem;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .select {
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      border-radius: 5px;
+      font-size: 0.7rem;
+      padding: 3px 6px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .badge.ok {
+      background: var(--badge-ok-bg);
+      color: var(--badge-ok-fg);
+    }
+    .out-summary {
+      font-size: 0.78rem;
+      margin-bottom: 8px;
+      color: var(--ok);
+      font-weight: 560;
+    }
+    .out-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .out-tab {
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      font-weight: 560;
+    }
+    .out-tab.active {
+      background: var(--panel);
+      color: var(--text-title);
+      border-color: var(--text-title);
+    }
+    .log, .table-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--code-bg);
+    }
+    .log {
+      padding: 10px 12px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.72rem;
+      color: var(--log-text);
+      white-space: pre-wrap;
+      line-height: 1.55;
+    }
+    .log .ok { color: var(--ok); }
+    .log .head { color: var(--log-head); font-weight: 650; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      color: var(--muted);
+      font-weight: 600;
+    }
+    td { color: var(--text); font-variant-numeric: tabular-nums; }
+    td.mono { font-family: ui-monospace, Consolas, monospace; }
+
+    /* ── Template A: Shadcn Zinc ── */
+    #stage-a {
+      --bg: #FAFAFA;
+      --panel: #FFFFFF;
+      --sidebar: #FFFFFF;
+      --card: #FFFFFF;
+      --code-bg: #F4F4F5;
+      --border: #E4E4E7;
+      --border-header: #E4E4E7;
+      --text-title: #18181B;
+      --text: #3F3F46;
+      --muted: #71717A;
+      --faint: #A1A1AA;
+      --ok: #059669;
+      --err: #DC2626;
+      --run-bg: #18181B;
+      --run-border: #18181B;
+      --run-text: #FFFFFF;
+      --link: #3F3F46;
+      --nav-active-bg: #F4F4F5;
+      --nav-active-shadow: inset 3px 0 0 #18181B;
+      --radius: 8px;
+      --card-pad: 12px 14px;
+      --card-gap: 10px;
+      --title-size: 0.88rem;
+      --accent-bar: #F59E0B;
+      --tag-core-bg: #FEF3C7; --tag-core-fg: #B45309;
+      --tag-chain-bg: #DBEAFE; --tag-chain-fg: #1D4ED8;
+      --tag-cond-bg: #F4F4F5; --tag-cond-fg: #52525B;
+      --badge-ok-bg: transparent; --badge-ok-fg: #059669;
+      --log-text: #3F3F46; --log-head: #18181B;
+    }
+    #stage-a .mock-body { gap: 0; padding: 0; }
+    #stage-a .col { border-radius: 0; }
+    #stage-a .col-sidebar { border-right: 1px solid var(--border); }
+
+    /* ── Template B: Tremor Analytics ── */
+    #stage-b {
+      --bg: #F8FAFC;
+      --panel: #FFFFFF;
+      --sidebar: #FFFFFF;
+      --card: #FFFFFF;
+      --code-bg: #FFFFFF;
+      --border: #E2E8F0;
+      --border-header: #F1F5F9;
+      --text-title: #0F172A;
+      --text: #334155;
+      --muted: #64748B;
+      --faint: #94A3B8;
+      --ok: #059669;
+      --err: #DC2626;
+      --run-bg: #2563EB;
+      --run-border: #2563EB;
+      --run-text: #FFFFFF;
+      --link: #2563EB;
+      --nav-active-bg: #EFF6FF;
+      --nav-active-shadow: none;
+      --radius: 12px;
+      --card-pad: 16px 18px;
+      --card-gap: 14px;
+      --title-size: 0.98rem;
+      --accent-bar: #3B82F6;
+      --tag-core-bg: #FEF3C7; --tag-core-fg: #B45309;
+      --tag-chain-bg: #DBEAFE; --tag-chain-fg: #1D4ED8;
+      --tag-cond-bg: #F1F5F9; --tag-cond-fg: #475569;
+      --badge-ok-bg: #D1FAE5; --badge-ok-fg: #047857;
+      --log-text: #334155; --log-head: #0F172A;
+    }
+    #stage-b .mock-body { gap: 10px; padding: 10px; }
+    #stage-b .col {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      border-right: 1px solid var(--border);
+    }
+    #stage-b .card { box-shadow: none; }
+
+    /* ── Template C: Slate Ops Desk ── */
+    #stage-c {
+      --bg: #F1F5F9;
+      --panel: #FFFFFF;
+      --sidebar: #E2E8F0;
+      --card: #FFFFFF;
+      --code-bg: #F8FAFC;
+      --border: #CBD5E1;
+      --border-header: #E2E8F0;
+      --text-title: #0F172A;
+      --text: #334155;
+      --muted: #64748B;
+      --faint: #94A3B8;
+      --ok: #059669;
+      --err: #DC2626;
+      --run-bg: #059669;
+      --run-border: #047857;
+      --run-text: #FFFFFF;
+      --link: #047857;
+      --nav-active-bg: rgba(5, 150, 105, 0.1);
+      --nav-active-shadow: inset 3px 0 0 #059669;
+      --radius: 10px;
+      --card-pad: 14px 16px;
+      --card-gap: 12px;
+      --title-size: 0.92rem;
+      --accent-bar: #F59E0B;
+      --tag-core-bg: #FEF3C7; --tag-core-fg: #B45309;
+      --tag-chain-bg: #DBEAFE; --tag-chain-fg: #1D4ED8;
+      --tag-cond-bg: #F1F5F9; --tag-cond-fg: #475569;
+      --badge-ok-bg: #D1FAE5; --badge-ok-fg: #047857;
+      --log-text: #334155; --log-head: #0F172A;
+    }
+    #stage-c .mock-body { gap: 8px; padding: 8px; }
+    #stage-c .col {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      border-right: 1px solid var(--border);
+    }
+    #stage-c .col-output.has-ok {
+      box-shadow: inset 3px 0 0 #059669;
+    }
+
+    .compare-table {
+      margin-top: 28px;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .compare-table h3 {
+      padding: 14px 16px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .compare-table table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .compare-table th, .compare-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    .compare-table th { background: #f8fafc; color: #64748b; font-weight: 600; }
+    .compare-table td { color: #334155; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #047857;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="banner">
+      <h1>流控制台浅色 UI · 三套模板预览</h1>
+      <p>保留「侧栏 · Workflow · 输出」三栏结构。A = Shadcn Zinc 冷静工具台；B = Tremor Analytics 分析工作台；C = Slate Ops Desk 交易运维台（正式页已落地 C）。</p>
+      <div class="note">正式控制台：<code>docs/stock_pool_workflow.html</code> · 当前皮肤：模板 C</div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab active" data-stage="a">A · Shadcn Zinc</button>
+      <button type="button" class="tab" data-stage="b">B · Tremor Analytics</button>
+      <button type="button" class="tab" data-stage="c">C · Slate Ops Desk</button>
+    </div>
+
+    <div class="meta" id="meta">
+      <div class="meta-card"><strong>主操作色</strong><span id="meta-run">近黑 #18181B</span></div>
+      <div class="meta-card"><strong>密度 / 输出</strong><span id="meta-density">紧凑 · 浅色日志</span></div>
+      <div class="meta-card"><strong>气质</strong><span id="meta-vibe">克制工具台，偏 IDE</span></div>
+    </div>
+
+    <div class="stage-wrap">
+      <!-- A -->
+      <div class="stage active" id="stage-a">
+        <div class="mock">
+          <div class="mock-toolbar">
+            <div class="mock-brand"><h2>流控制台</h2><span>config/workflow_runner.yaml</span></div>
+            <div class="mock-actions">
+              <span class="btn btn-stop">停止</span>
+              <span class="btn">重新加载 YAML</span>
+              <span class="btn">保存配置</span>
+            </div>
+          </div>
+          <div class="mock-body">
+            <aside class="col col-sidebar">
+              <div class="col-scroll">
+                <input class="search" readonly value="" placeholder="搜索 Workflow…" />
+                <div class="label">最近使用</div>
+                <div class="recent">20日 ROC 排序<small>roc_20</small></div>
+                <div class="recent">市场温度计<small>market_temperature</small></div>
+                <div class="label">分类</div>
+                <div class="nav-item active"><i class="bar" style="background:#71717A"></i>全部<span style="margin-left:auto;font-size:0.65rem;color:var(--faint)">18</span></div>
+                <div class="nav-item"><i class="bar" style="background:#10B981"></i>每日</div>
+                <div class="nav-item"><i class="bar" style="background:#A855F7"></i>双周</div>
+                <div class="nav-item"><i class="bar" style="background:#64748B"></i>工具</div>
+              </div>
+            </aside>
+            <section class="col">
+              <div class="col-head">Workflow<span class="count">· 18</span></div>
+              <div class="col-scroll">
+                <div class="card" style="--accent-bar:#F59E0B">
+                  <div class="id">market_temperature</div>
+                  <div class="title">市场温度计 - 每日仓位报告</div>
+                  <div class="tags"><span class="tag core">每日·核心</span><span class="tag cond">V2.3</span></div>
+                  <div class="card-foot">
+                    <a class="link" href="#">查看 每日仓位报告</a>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+                <div class="card" style="--accent-bar:#3B82F6">
+                  <div class="id">roc_20</div>
+                  <div class="title">20日 ROC 排序</div>
+                  <div class="tags"><span class="tag chain">链路</span><span class="tag cond">TopN</span></div>
+                  <div class="card-foot">
+                    <select class="select"><option>运行模式 · 默认</option></select>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="col">
+              <div class="col-head">输出</div>
+              <div class="col-scroll" style="display:flex;flex-direction:column">
+                <div class="out-summary">本步 exit_code=0</div>
+                <pre class="log"><span class="head"># roc_20 result</span>
+<span class="ok">OK · 12 rows</span>
+[
+  {"rank": 1, "symbol": "600519", "roc_20": 0.182},
+  {"rank": 2, "symbol": "300750", "roc_20": 0.165}
+]</pre>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="stage" id="stage-b">
+        <div class="mock">
+          <div class="mock-toolbar">
+            <div class="mock-brand"><h2>流控制台</h2><span>config/workflow_runner.yaml</span></div>
+            <div class="mock-actions">
+              <span class="btn btn-stop">停止</span>
+              <span class="btn">重新加载 YAML</span>
+              <span class="btn">保存配置</span>
+            </div>
+          </div>
+          <div class="mock-body">
+            <aside class="col col-sidebar">
+              <div class="col-scroll">
+                <input class="search" readonly placeholder="搜索 Workflow…" />
+                <div class="label">最近使用</div>
+                <div class="recent">20日 ROC 排序<small>roc_20</small></div>
+                <div class="recent">市场温度计<small>market_temperature</small></div>
+                <div class="label">分类</div>
+                <div class="nav-item active"><i class="bar" style="background:#2563EB"></i>全部<span style="margin-left:auto;font-size:0.65rem;color:var(--faint)">18</span></div>
+                <div class="nav-item"><i class="bar" style="background:#10B981"></i>每日</div>
+                <div class="nav-item"><i class="bar" style="background:#A855F7"></i>双周</div>
+              </div>
+            </aside>
+            <section class="col">
+              <div class="col-head">Workflow<span class="count">· 18</span></div>
+              <div class="col-scroll">
+                <div class="card" style="--accent-bar:#F59E0B">
+                  <div class="id">market_temperature</div>
+                  <div class="title">市场温度计 - 每日仓位报告</div>
+                  <div class="tags"><span class="tag core">每日·核心</span><span class="tag cond">V2.3</span></div>
+                  <p style="font-size:0.76rem;color:var(--muted);margin-bottom:8px">先看建议仓位（0/20/40/70/100%），再执行选股与扫描。</p>
+                  <div class="card-foot">
+                    <a class="link" href="#">View 每日仓位报告</a>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+                <div class="card" style="--accent-bar:#3B82F6">
+                  <div class="id">roc_20</div>
+                  <div class="title">20日 ROC 排序</div>
+                  <div class="tags"><span class="tag chain">链路</span><span class="tag cond">TopN</span></div>
+                  <div class="card-foot">
+                    <select class="select"><option>运行模式 · 默认</option></select>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="col">
+              <div class="col-head">输出 <span class="badge ok">exit_code=0</span></div>
+              <div class="col-scroll" style="display:flex;flex-direction:column">
+                <div class="out-tabs">
+                  <span class="out-tab active">表格</span>
+                  <span class="out-tab">日志</span>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>rank</th><th>symbol</th><th>name</th><th>roc_20</th><th>weight</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>1</td><td class="mono">600519</td><td>贵州茅台</td><td>0.182</td><td>0.12</td></tr>
+                      <tr><td>2</td><td class="mono">300750</td><td>宁德时代</td><td>0.165</td><td>0.10</td></tr>
+                      <tr><td>3</td><td class="mono">601318</td><td>中国平安</td><td>0.141</td><td>0.09</td></tr>
+                      <tr><td>4</td><td class="mono">000858</td><td>五粮液</td><td>0.128</td><td>0.08</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="stage" id="stage-c">
+        <div class="mock">
+          <div class="mock-toolbar">
+            <div class="mock-brand"><h2>流控制台</h2><span>config/workflow_runner.yaml</span></div>
+            <div class="mock-actions">
+              <span class="btn btn-stop">停止</span>
+              <span class="btn">重新加载 YAML</span>
+              <span class="btn">保存配置</span>
+            </div>
+          </div>
+          <div class="mock-body">
+            <aside class="col col-sidebar">
+              <div class="col-scroll">
+                <input class="search" readonly placeholder="搜索 Workflow…" />
+                <div class="label">最近使用</div>
+                <div class="recent">20日 ROC 排序<small>roc_20</small></div>
+                <div class="recent">市场温度计<small>market_temperature</small></div>
+                <div class="label">分类</div>
+                <div class="nav-item active"><i class="bar" style="background:#059669"></i>全部<span style="margin-left:auto;font-size:0.65rem;color:var(--faint)">18</span></div>
+                <div class="nav-item"><i class="bar" style="background:#10B981"></i>每日</div>
+                <div class="nav-item"><i class="bar" style="background:#A855F7"></i>双周</div>
+                <div class="nav-item"><i class="bar" style="background:#64748B"></i>工具</div>
+              </div>
+            </aside>
+            <section class="col">
+              <div class="col-head">Workflow<span class="count">· 18</span></div>
+              <div class="col-scroll">
+                <div class="card" style="--accent-bar:#F59E0B">
+                  <div class="id">market_temperature</div>
+                  <div class="title">市场温度计 - 每日仓位报告</div>
+                  <div class="tags"><span class="tag core">每日·核心</span><span class="tag cond">V2.3</span></div>
+                  <div class="card-foot">
+                    <a class="link" href="#">查看 每日仓位报告</a>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+                <div class="card" style="--accent-bar:#3B82F6">
+                  <div class="id">roc_20</div>
+                  <div class="title">20日 ROC 排序</div>
+                  <div class="tags"><span class="tag chain">链路</span><span class="tag cond">TopN</span></div>
+                  <div class="card-foot">
+                    <select class="select"><option>运行模式 · 默认</option></select>
+                    <span class="btn-run">运行</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="col col-output has-ok">
+              <div class="col-head">输出 <span class="badge ok">exit_code=0</span></div>
+              <div class="col-scroll" style="display:flex;flex-direction:column">
+                <div class="out-summary">本步 exit_code=0 · 12 rows</div>
+                <pre class="log"><span class="head"># roc_20 result</span>
+<span class="ok">OK · ranked</span>
+[
+  {"rank": 1, "symbol": "600519", "roc_20": 0.182},
+  {"rank": 2, "symbol": "300750", "roc_20": 0.165}
+]</pre>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="compare-table">
+      <h3>三套对照 <span class="pill">正式页 = C</span></h3>
+      <table>
+        <thead>
+          <tr><th>维度</th><th>A Zinc</th><th>B Tremor</th><th>C Ops Desk</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>页面底</td><td>#FAFAFA</td><td>#F8FAFC</td><td>#F1F5F9</td></tr>
+          <tr><td>主按钮</td><td>近黑</td><td>蓝 #2563EB</td><td>翠绿 #059669</td></tr>
+          <tr><td>密度</td><td>紧</td><td>疏</td><td>中</td></tr>
+          <tr><td>输出默认</td><td>浅色日志</td><td>表格优先 + Tab</td><td>摘要 + 浅色日志</td></tr>
+          <tr><td>侧栏</td><td>白底细边</td><td>白底卡片化</td><td>石板灰分区</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const meta = {
+      a: {
+        run: "近黑 #18181B",
+        density: "紧凑 · 浅色日志",
+        vibe: "克制工具台，偏 IDE / Shadcn Zinc"
+      },
+      b: {
+        run: "实心蓝 #2563EB",
+        density: "疏朗 · 表格优先",
+        vibe: "分析看板，偏 Tremor Dashboard"
+      },
+      c: {
+        run: "翠绿 #059669",
+        density: "中等 · 摘要 + 浅色日志",
+        vibe: "交易运维台（正式页已应用）"
+      }
+    };
+    const tabs = document.querySelectorAll(".tab");
+    const stages = {
+      a: document.getElementById("stage-a"),
+      b: document.getElementById("stage-b"),
+      c: document.getElementById("stage-c")
+    };
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const key = tab.dataset.stage;
+        tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        Object.keys(stages).forEach((k) => stages[k].classList.toggle("active", k === key));
+        document.getElementById("meta-run").textContent = meta[key].run;
+        document.getElementById("meta-density").textContent = meta[key].density;
+        document.getElementById("meta-vibe").textContent = meta[key].vibe;
+      });
+    });
+  </script>
+</body>
+</html>

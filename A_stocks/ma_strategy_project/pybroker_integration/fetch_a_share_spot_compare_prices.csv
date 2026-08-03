@@ -1,0 +1,4 @@
+﻿symbol,stock_name,行业板块,optimal_base_cost,ref_price,quote_date,quote_time,price_source,start_date,end_date,updated_at
+002432,九安医疗,医疗保健,78.59,70.95,20260506,10:23:39,tushare.realtime_quote(sina),2026-01-10,2026-04-25,2026-05-06 10:20:25
+603516,淳中科技,IT设备,146.95,138.81,20260506,10:23:40,tushare.realtime_quote(sina),2026-01-10,2026-04-25,2026-05-06 10:20:29
+000912,泸天化,农药化肥,5.12,4.71,20260506,10:23:39,tushare.realtime_quote(sina),2026-01-10,2026-04-25,2026-05-06 10:20:33

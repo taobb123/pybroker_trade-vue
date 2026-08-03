@@ -1,0 +1,3856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>流控制台 · Workflow Workbench</title>
+  <style>
+    /* 模板 C · Slate Ops Desk · 三级颜色（背景 / 类型 accent / 状态） */
+    :root {
+      --bg: #F1F5F9;
+      --panel: #FFFFFF;
+      --sidebar: #E2E8F0;
+      --card: #FFFFFF;
+      --card-hover: #F8FAFC;
+      --code-bg: #F8FAFC;
+      --border: #CBD5E1;
+      --border-header: #E2E8F0;
+      --text-title: #0F172A;
+      --text: #334155;
+      --muted: #64748B;
+      --faint: #94A3B8;
+      --accent: #059669;
+      --accent-soft: #10B981;
+      --primary: #059669;
+      --ok: #059669;
+      --err: #DC2626;
+      --warn: #D97706;
+      --info: #0284C7;
+      --commit-border: #DC2626;
+      --commit-border-hover: #B91C1C;
+      --commit-fill-bg: rgba(220, 38, 38, 0.08);
+      --commit-fill-bg-hover: rgba(220, 38, 38, 0.14);
+      --commit-fill-border: #F87171;
+      --commit-fill-border-hover: #EF4444;
+      --btn-run-bg: #059669;
+      --btn-run-hover-bg: #047857;
+      --btn-run-border: #047857;
+      --btn-run-text: #FFFFFF;
+      --btn-secondary-bg: #FFFFFF;
+      --btn-secondary-border: #CBD5E1;
+      --cat-core: #F59E0B;
+      --cat-core-tag-bg: #FEF3C7;
+      --cat-core-tag-text: #B45309;
+      --cat-chain: #3B82F6;
+      --cat-chain-tag-bg: #DBEAFE;
+      --cat-chain-tag-text: #1D4ED8;
+      --cat-daily: #10B981;
+      --cat-daily-tag-bg: #D1FAE5;
+      --cat-daily-tag-text: #047857;
+      --cat-biweekly: #A855F7;
+      --cat-biweekly-tag-bg: #F3E8FF;
+      --cat-biweekly-tag-text: #7E22CE;
+      --cat-tool: #64748B;
+      --cat-tool-tag-bg: #F1F5F9;
+      --cat-tool-tag-text: #475569;
+      --cond-tag-bg: #F1F5F9;
+      --cond-tag-text: #475569;
+      --log-text: #334155;
+      --log-success: #059669;
+      --log-warning: #D97706;
+      --log-error: #DC2626;
+      --log-info: #0284C7;
+      --log-heading: #0F172A;
+    }
+    * { box-sizing: border-box; }
+    html {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 0;
+      max-width: none;
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+    h1 {
+      font-size: 0.92rem;
+      margin: 0;
+      color: var(--text-title);
+      font-weight: 600;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
+    }
+    .workbench-toolbar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      padding: 0.45rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .toolbar-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+    .toolbar-sub {
+      font-size: 0.72rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .toolbar-actions {
+      flex: 1 1 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.25rem;
+    }
+    .tb-btn {
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 0.32rem 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .tb-btn:hover:not(:disabled) {
+      background: var(--card-hover);
+      color: var(--text-title);
+      border-color: var(--border);
+    }
+    .tb-btn.tb-stop:hover:not(:disabled) {
+      color: var(--err);
+      border-color: rgba(220, 38, 38, 0.35);
+      background: rgba(220, 38, 38, 0.06);
+    }
+    .tb-btn.tb-save.is-success {
+      color: var(--ok);
+      border-color: rgba(5, 150, 105, 0.35);
+      background: rgba(5, 150, 105, 0.08);
+    }
+    .tb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-top {
+      flex-shrink: 0;
+      padding: 0 0.85rem;
+    }
+    .sub-details {
+      margin: 0 0 0.25rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .sub-details summary {
+      cursor: pointer;
+      color: var(--faint);
+      user-select: none;
+    }
+    .sub-details summary:hover { color: var(--accent-soft); }
+    .sub-details p { margin: 0.25rem 0 0; line-height: 1.4; }
+    .bar {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+      margin-bottom: 0;
+    }
+    .bar button { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.85rem;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent-soft); }
+    button.primary {
+      background: var(--primary);
+      border-color: var(--btn-run-border);
+      color: #fff;
+      box-shadow: none;
+    }
+    button.primary:hover {
+      background: var(--btn-run-hover-bg);
+      border-color: var(--btn-run-hover-bg);
+      color: #fff;
+    }
+    /* 提交型 · 方案 A：幽灵红框（表格复制、弹窗保存） */
+    button.btn-commit {
+      background: transparent;
+      border: 1px solid var(--commit-border);
+      color: var(--commit-border);
+      font-weight: 500;
+      box-shadow: none;
+    }
+    button.btn-commit:hover:not(:disabled) {
+      background: var(--commit-fill-bg);
+      border-color: var(--commit-border-hover);
+      color: var(--commit-border-hover);
+    }
+    button.btn-commit.is-success {
+      border-color: rgba(5, 150, 105, 0.55);
+      color: var(--ok);
+      background: rgba(5, 150, 105, 0.08);
+    }
+    /* 提交型 · 方案 B：微填充红（工具 · 处理） */
+    button.btn-commit-filled {
+      background: var(--commit-fill-bg);
+      border: 1px solid var(--commit-fill-border);
+      color: var(--commit-border);
+      font-weight: 500;
+      box-shadow: none;
+    }
+    button.btn-commit-filled:hover:not(:disabled) {
+      background: var(--commit-fill-bg-hover);
+      border-color: var(--commit-fill-border-hover);
+      color: var(--commit-border-hover);
+      box-shadow: none;
+    }
+    button.btn-commit-filled.is-success {
+      border-color: rgba(5, 150, 105, 0.55);
+      color: var(--ok);
+      background: rgba(5, 150, 105, 0.12);
+    }
+    button.stop {
+      border-color: var(--err);
+      color: var(--err);
+      background: var(--panel);
+    }
+    button.stop:hover:not(:disabled) { border-color: #B91C1C; color: #B91C1C; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .hint code { color: var(--accent-soft); }
+    section { margin-bottom: 1rem; }
+    section h2 {
+      font-size: 0.95rem;
+      margin: 0;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .config-section { flex-shrink: 0; margin-bottom: 0.25rem; }
+    .config-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    .config-head h2 { flex: 1; min-width: 12rem; }
+    button.config-toggle {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.55rem;
+      color: var(--muted);
+    }
+    button.config-toggle:hover { color: var(--accent-soft); }
+    .config-section.collapsed .config-body { display: none; }
+    .workspace-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 0.4rem 0.85rem 0.5rem;
+    }
+    .workbench-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 0.45rem;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .workbench-sidebar {
+      flex: 0 0 220px;
+      min-width: 200px;
+      max-width: 260px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--sidebar);
+      overflow: hidden;
+    }
+    .sidebar-search {
+      flex-shrink: 0;
+      padding: 0.55rem 0.6rem 0.45rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-search input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.78rem;
+      padding: 0.42rem 0.55rem 0.42rem 1.85rem;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2394A3B8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242 1.006a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 0.55rem center;
+    }
+    .sidebar-search input::placeholder { color: var(--faint); }
+    .sidebar-search input:focus {
+      border-color: rgba(5, 150, 105, 0.45);
+      box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.12);
+    }
+    .sidebar-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0.35rem 0.45rem 0.55rem;
+    }
+    .sidebar-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--faint);
+      padding: 0.35rem 0.45rem 0.25rem;
+    }
+    .sidebar-recent {
+      list-style: none;
+      margin: 0 0 0.35rem;
+      padding: 0;
+    }
+    .sidebar-recent li { margin: 0; }
+    .sidebar-recent button {
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 0.76rem;
+      padding: 0.35rem 0.45rem;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-recent button:hover {
+      background: var(--card-hover);
+      color: var(--text-title);
+    }
+    .sidebar-recent .recent-id {
+      display: block;
+      font-size: 0.62rem;
+      color: var(--faint);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .sidebar-recent-empty {
+      font-size: 0.72rem;
+      color: var(--faint);
+      padding: 0.2rem 0.45rem 0.5rem;
+    }
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 0.38rem 0.45rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .nav-item i {
+      display: inline-block;
+      width: 3px;
+      height: 0.85rem;
+      border-radius: 2px;
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+    .nav-item i.all { background: var(--muted); }
+    .nav-item i.daily { background: var(--cat-daily); }
+    .nav-item i.biweekly { background: var(--cat-biweekly); }
+    .nav-item i.tool { background: var(--cat-tool); }
+    .nav-item:hover {
+      background: var(--card-hover);
+      color: var(--text);
+    }
+    .nav-item.active {
+      background: rgba(5, 150, 105, 0.1);
+      color: var(--text-title);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .nav-item .nav-count {
+      margin-left: auto;
+      font-size: 0.65rem;
+      color: var(--faint);
+      font-weight: 400;
+    }
+    .steps li.step-hidden { display: none !important; }
+    .steps li.step-flash {
+      animation: step-flash 1.1s ease;
+    }
+    @keyframes step-flash {
+      0%, 100% { box-shadow: none; }
+      15%, 45% { box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.45); }
+    }
+    .pane-head .step-count {
+      font-size: 0.72rem;
+      color: var(--faint);
+      font-weight: 400;
+      margin-left: 0.35rem;
+    }
+    @media (max-width: 900px) {
+      .workbench-sidebar { flex: 0 0 180px; min-width: 160px; }
+      .workspace-pane-output { flex: 0 0 34%; min-width: 260px; }
+    }
+    @media (max-width: 720px) {
+      .workbench-body { flex-direction: column; }
+      .workbench-sidebar {
+        flex: 0 0 auto;
+        max-width: none;
+        max-height: 38vh;
+      }
+      .workspace-pane-output {
+        flex: 1 1 40%;
+        min-width: 0;
+        max-width: none;
+      }
+    }
+    .workspace-pane {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .workspace-pane-tasks { flex: 1 1 auto; min-width: 0; }
+    .workspace-pane-output {
+      flex: 0 0 38%;
+      min-width: 300px;
+      max-width: 480px;
+    }
+    .workspace-pane-output.has-success {
+      box-shadow: inset 3px 0 0 var(--ok);
+    }
+    .workspace-pane-output.has-error {
+      box-shadow: inset 3px 0 0 var(--err);
+    }
+    #runSummary .status-ok,
+    #runSummary .status-err {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+    #runSummary .status-ok {
+      background: #D1FAE5;
+      color: #047857;
+    }
+    #runSummary .status-err {
+      background: #FEE2E2;
+      color: #B91C1C;
+    }
+    .pane-head {
+      flex-shrink: 0;
+      padding: 0.45rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+    .pane-head h2 { margin: 0; font-size: 0.9rem; }
+    .workspace-pane-tasks .pane-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0.75rem 0.85rem 1rem;
+    }
+    .pane-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 0.5rem 0.65rem 0.65rem;
+    }
+    .pane-output-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0.5rem 0.65rem 0.65rem;
+      gap: 0.35rem;
+      overflow: hidden;
+    }
+    .pane-output-body.kline-fullscreen #runSummary,
+    .pane-output-body.kline-fullscreen #logBox {
+      display: none !important;
+    }
+    .pane-output-body.kline-fullscreen .prediction-kline-panel.visible {
+      flex: 1 1 100%;
+      min-height: 0;
+    }
+    .pane-scroll > .usage-legend {
+      margin-bottom: 0.3rem;
+      gap: 0.35rem 0.55rem;
+      font-size: 0.72rem;
+      line-height: 1.2;
+    }
+    #yamlEditor {
+      width: 100%;
+      min-height: 14rem;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem;
+      resize: vertical;
+    }
+    .steps { list-style: none; padding: 0; margin: 0; }
+    .steps li {
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      border-left: 4px solid var(--cat-accent, var(--border));
+      background: var(--card);
+      overflow: hidden;
+      transition: background 0.15s;
+    }
+    .steps li:hover { background: var(--card-hover); }
+    .steps li.step-core { --cat-accent: var(--cat-core); }
+    .steps li.step-chain { --cat-accent: var(--cat-chain); }
+    .steps li.step-daily { --cat-accent: var(--cat-daily); }
+    .steps li.step-biweekly { --cat-accent: var(--cat-biweekly); }
+    .steps li.step-tool { --cat-accent: var(--cat-tool); }
+    .steps li.steps-compact-tight { margin-bottom: 0.85rem; }
+    .steps li.steps-compact-tight .step-header { padding: 0.85rem 1rem 0.55rem; }
+    .steps li.steps-compact-tight.step-priority .step-header { padding: 1rem 1.1rem 0.55rem; }
+    .steps li.steps-compact-tight .step-body { padding: 0 1rem 0.45rem; }
+    .steps li.steps-compact-tight .step-footer { padding: 0.65rem 1rem 0.85rem; }
+    .steps li.steps-hide-cmd .step-cmd { display: none; }
+    .workspace-pane-tasks .pane-scroll.fit-top-steps-extra > .usage-legend {
+      font-size: 0.66rem;
+      margin-bottom: 0.5rem;
+    }
+    .step-header {
+      padding: 1.25rem 1.5rem 0.75rem;
+      border-bottom: 1px solid var(--border-header);
+    }
+    .steps li.step-priority .step-header { padding: 1.75rem 1.75rem 0.75rem; }
+    .step-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.65rem;
+    }
+    .step-header-left { flex: 1 1 auto; min-width: 0; }
+    .steps .id {
+      font-size: 0.68rem;
+      color: var(--faint);
+      letter-spacing: 0.02em;
+      font-family: ui-monospace, Consolas, monospace;
+      margin-bottom: 0.2rem;
+    }
+    .steps .title {
+      font-weight: 600;
+      color: var(--text-title);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+    .step-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .step-body {
+      padding: 0 1.5rem 0.75rem;
+    }
+    .steps li.step-priority .step-body { padding-left: 1.75rem; padding-right: 1.75rem; }
+    .step-desc, .steps .step-cmd {
+      font-size: 0.76rem;
+      color: var(--muted);
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .steps .step-cmd {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.68rem;
+      margin-top: 0.35rem;
+      opacity: 0.85;
+    }
+    .step-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 1rem 1.5rem 1.25rem;
+      border-top: 1px solid var(--border-header);
+    }
+    .steps li.step-priority .step-footer { padding-left: 1.75rem; padding-right: 1.75rem; }
+    .freq-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      padding: 0.15rem 0.5rem;
+      border-radius: 5px;
+      line-height: 1.35;
+      border: none;
+    }
+    .freq-badge.cat.core { background: var(--cat-core-tag-bg); color: var(--cat-core-tag-text); }
+    .freq-badge.cat.chain { background: var(--cat-chain-tag-bg); color: var(--cat-chain-tag-text); }
+    .freq-badge.cat.daily { background: var(--cat-daily-tag-bg); color: var(--cat-daily-tag-text); }
+    .freq-badge.cat.biweekly { background: var(--cat-biweekly-tag-bg); color: var(--cat-biweekly-tag-text); }
+    .freq-badge.cat.tool { background: var(--cat-tool-tag-bg); color: var(--cat-tool-tag-text); }
+    .freq-badge.cond { background: var(--cond-tag-bg); color: var(--cond-tag-text); }
+    .usage-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem 1rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--border-header);
+    }
+    button.run-one {
+      flex: 0 0 auto;
+      height: 36px;
+      min-width: 5.5rem;
+      max-width: 7.5rem;
+      padding: 0 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      white-space: nowrap;
+      border-radius: 10px;
+      background: var(--btn-run-bg);
+      border: 1px solid var(--btn-run-border);
+      color: var(--btn-run-text);
+      box-shadow: none;
+    }
+    button.run-one::before {
+      content: "▶ ";
+      font-size: 0.62rem;
+      opacity: 0.75;
+    }
+    button.run-one:hover:not(:disabled) {
+      background: var(--btn-run-hover-bg);
+      border-color: var(--btn-run-hover-bg);
+      color: #fff;
+      box-shadow: 0 1px 4px rgba(5, 150, 105, 0.2);
+    }
+    button.run-one:disabled { opacity: 0.45; }
+    .step-footer .code-filter-tool,
+    .step-footer .pool-selector,
+    .step-footer .run-mode-selector {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+    .code-filter-tool {
+      flex: 1 1 100%;
+      display: grid;
+      gap: 0.3rem;
+      min-width: 0;
+    }
+    .code-filter-tool label {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .code-filter-tool textarea {
+      width: 100%;
+      min-height: 3.6rem;
+      max-height: 7rem;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.72rem;
+      background: var(--code-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.45rem;
+      resize: vertical;
+      line-height: 1.35;
+    }
+    .code-filter-tool textarea[readonly] {
+      color: var(--accent-soft);
+    }
+    .code-filter-tool .tool-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      align-items: center;
+    }
+    .code-filter-tool .tool-stats {
+      font-size: 0.66rem;
+      color: var(--faint);
+      flex: 1 1 auto;
+      min-width: 8rem;
+    }
+    .code-filter-tool .symbols-paste-combo-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.6rem;
+      align-items: center;
+    }
+    .code-filter-tool .symbols-paste-combo-row label {
+      margin: 0;
+    }
+    .code-filter-tool .symbols-paste-combo-row select {
+      font-size: 0.72rem;
+      background: var(--code-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.35rem;
+      max-width: 100%;
+    }
+    .usage-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .usage-legend i {
+      display: inline-block;
+      width: 3px;
+      height: 0.85rem;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .usage-legend i.core { background: var(--cat-core); }
+    .usage-legend i.chain { background: var(--cat-chain); }
+    .usage-legend i.daily { background: var(--cat-daily); }
+    .usage-legend i.biweekly { background: var(--cat-biweekly); }
+    .usage-legend i.tool { background: var(--cat-tool); }
+    #logBox {
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.75rem;
+      background: var(--code-bg);
+      color: var(--log-text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      line-height: 1.55;
+    }
+    #logBox .log-ok { color: var(--log-success); }
+    #logBox .log-err { color: var(--log-error); }
+    #logBox .log-warn { color: var(--log-warning); }
+    #logBox .log-info { color: var(--log-info); }
+    #logBox .log-head { color: var(--log-heading); font-weight: 600; }
+    .pane-output-body #runSummary { flex-shrink: 0; margin: 0; }
+    .prediction-kline-panel {
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--code-bg);
+      padding: 0.4rem 0.5rem 0.45rem;
+      display: none;
+      overflow: hidden;
+    }
+    .prediction-kline-panel.visible {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 100%;
+      min-height: 0;
+    }
+    .prediction-kline-panel.visible .prediction-kline-head {
+      flex-shrink: 0;
+    }
+    .prediction-kline-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.6rem;
+      margin-bottom: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .prediction-kline-head .pk-title {
+      font-weight: 600;
+      color: var(--text-title);
+    }
+    .prediction-kline-head .pk-close {
+      margin-left: auto;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .prediction-kline-head .pk-close:hover {
+      color: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .prediction-kline-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-right: 0.45rem;
+    }
+    .prediction-kline-legend i {
+      display: inline-block;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .prediction-kline-legend i.r1 { background: #ffb86c; }
+    .prediction-kline-charts {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding-bottom: 0.5rem;
+    }
+    .prediction-kline-block {
+      border-top: 1px solid var(--border);
+      padding-top: 0.3rem;
+      padding-bottom: 0.25rem;
+    }
+    .prediction-kline-block:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+    .prediction-kline-block .pk-block-head {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.2rem;
+      flex-wrap: wrap;
+    }
+    .prediction-kline-block .pk-pred-badge {
+      flex: 0 0 auto;
+      font-size: 0.82rem;
+      font-weight: 800;
+      padding: 0.16rem 0.55rem;
+      border-radius: 5px;
+      line-height: 1.2;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+    .prediction-kline-block .pk-pred-badge.up {
+      color: #fff;
+      background: linear-gradient(180deg, #f85149 0%, #c62828 100%);
+      border: 1px solid rgba(248, 81, 73, 0.55);
+    }
+    .prediction-kline-block .pk-pred-badge.down {
+      color: #fff;
+      background: linear-gradient(180deg, #3fb950 0%, #2e7d32 100%);
+      border: 1px solid rgba(63, 185, 80, 0.55);
+    }
+    .prediction-kline-block .pk-pred-badge.flat {
+      color: var(--text-title);
+      background: rgba(139, 156, 179, 0.25);
+      box-shadow: none;
+    }
+    .prediction-kline-block .pk-signal-badge {
+      flex: 0 0 auto;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      line-height: 1.2;
+      white-space: nowrap;
+      opacity: 0.92;
+    }
+    .prediction-kline-block .pk-signal-badge.red {
+      color: #B91C1C;
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.28);
+    }
+    .prediction-kline-block .pk-signal-badge.green {
+      color: #047857;
+      background: rgba(5, 150, 105, 0.1);
+      border: 1px solid rgba(5, 150, 105, 0.28);
+    }
+    .prediction-kline-block .pk-signal-badge.flat {
+      color: var(--text-title);
+      background: rgba(139, 156, 179, 0.25);
+    }
+    .prediction-kline-block .pk-block-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-title);
+      margin-bottom: 0;
+    }
+    .prediction-kline-block canvas {
+      display: block;
+      width: 100%;
+      height: 150px;
+    }
+    @media (max-width: 900px) {
+      .workspace-split { flex-direction: column; }
+      .split-gutter {
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: 0.35rem 0;
+        cursor: default;
+        order: -1;
+      }
+      .split-gutter::before { display: none; }
+      .layout-presets { flex-direction: row; }
+      .workspace-pane { min-height: 12rem; }
+      .workspace-split.preset-custom .workspace-pane-tasks,
+      .workspace-split.preset-custom .workspace-pane-output { display: none; }
+      .workspace-split.preset-tasks .workspace-pane-output { display: none !important; }
+      .workspace-split.preset-output .workspace-pane-tasks { display: none !important; }
+      .workspace-split.preset-balanced .workspace-pane-tasks,
+      .workspace-split.preset-balanced .workspace-pane-output {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        width: auto !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        min-height: 10rem;
+      }
+    }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    .msg { font-size: 0.85rem; margin-top: 0.35rem; }
+    .artifacts {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    button.artifact-btn {
+      font-size: 0.72rem;
+      padding: 0.35rem 0.65rem;
+      max-width: 12rem;
+      text-align: left;
+      line-height: 1.3;
+      border-radius: 8px;
+      background: var(--btn-secondary-bg);
+      border-color: var(--btn-secondary-border);
+      color: var(--text);
+    }
+    button.artifact-btn:hover {
+      background: var(--card-hover);
+      border-color: var(--border);
+      color: var(--text-title);
+    }
+    button.artifact-btn.out {
+      background: transparent;
+      border-color: transparent;
+      color: var(--ok);
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
+      max-width: none;
+    }
+    button.artifact-btn.out:hover {
+      background: rgba(5, 150, 105, 0.08);
+      border-color: transparent;
+      color: #047857;
+    }
+    button.artifact-btn.copy {
+      background: var(--btn-secondary-bg);
+      border-color: var(--btn-secondary-border);
+      color: var(--muted);
+    }
+    button.artifact-btn.copy:hover {
+      border-color: var(--border);
+      color: var(--text-title);
+    }
+    .artifact-missing {
+      font-size: 0.65rem;
+      color: var(--faint);
+      line-height: 1.25;
+    }
+    .artifacts-glob {
+      display: contents;
+    }
+    .pool-selector {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.28rem 0.35rem;
+      flex: 1 1 100%;
+      min-width: 12rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .pool-selector label {
+      color: var(--faint);
+      white-space: nowrap;
+    }
+    .pool-selector select {
+      font-size: 0.68rem;
+      padding: 0.2rem 0.35rem;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      max-width: 9rem;
+    }
+    .pool-selector input.pool-custom-input {
+      font-size: 0.68rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      flex: 1 1 14rem;
+      min-width: 10rem;
+      max-width: 22rem;
+    }
+    .run-mode-selector {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.28rem 0.35rem;
+      flex: 1 1 100%;
+      min-width: 12rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .run-mode-selector label {
+      color: var(--faint);
+      white-space: nowrap;
+    }
+    .run-mode-selector select {
+      font-size: 0.68rem;
+      padding: 0.2rem 0.35rem;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--text);
+      max-width: 12rem;
+    }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-width: min(52rem, 100%);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+    .modal-panel h3 {
+      margin: 0;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.95rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-title);
+      font-weight: 600;
+    }
+    .modal-body { padding: 0.65rem 0.85rem; overflow: auto; flex: 1; }
+    .modal-bar {
+      padding: 0.5rem 0.85rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    #fileEditorTa {
+      width: 100%;
+      min-height: 18rem;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem;
+    }
+    .preview-table-wrap { overflow: auto; max-height: 65vh; }
+    .preview-image-wrap {
+      overflow: auto;
+      max-height: 72vh;
+      text-align: center;
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 0.5rem;
+    }
+    .preview-image-wrap img {
+      max-width: 100%;
+      height: auto;
+      vertical-align: middle;
+      border-radius: 4px;
+    }
+    .preview-md-wrap {
+      overflow: auto;
+      max-height: 72vh;
+      text-align: left;
+      background: var(--code-bg);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+    .preview-md-wrap h1,
+    .preview-md-wrap h2,
+    .preview-md-wrap h3 {
+      color: var(--text-title);
+      margin: 0.85rem 0 0.45rem;
+      font-weight: 650;
+      line-height: 1.3;
+    }
+    .preview-md-wrap h1 { font-size: 1.25rem; }
+    .preview-md-wrap h2 { font-size: 1.08rem; }
+    .preview-md-wrap h3 { font-size: 0.98rem; }
+    .preview-md-wrap p { margin: 0.4rem 0; }
+    .preview-md-wrap ul, .preview-md-wrap ol {
+      margin: 0.35rem 0 0.55rem 1.2rem;
+      padding: 0;
+    }
+    .preview-md-wrap li { margin: 0.15rem 0; }
+    .preview-md-wrap hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 0.85rem 0;
+    }
+    .preview-md-wrap code {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.82em;
+      background: #E2E8F0;
+      padding: 0.05rem 0.28rem;
+      border-radius: 3px;
+    }
+    .preview-md-wrap pre {
+      background: #E2E8F0;
+      padding: 0.55rem 0.7rem;
+      border-radius: 6px;
+      overflow: auto;
+      margin: 0.5rem 0;
+    }
+    .preview-md-wrap pre code {
+      background: none;
+      padding: 0;
+    }
+    .preview-md-wrap table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.55rem 0;
+      font-size: 0.8rem;
+    }
+    .preview-md-wrap th,
+    .preview-md-wrap td {
+      border: 1px solid var(--border);
+      padding: 0.28rem 0.45rem;
+      text-align: left;
+    }
+    .preview-md-wrap th {
+      background: #E2E8F0;
+      color: var(--text-title);
+    }
+    .preview-md-wrap a { color: var(--accent-soft); }
+    .preview-md-wrap strong { color: var(--text-title); font-weight: 650; }
+    .preview-text-pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    table.preview-table {
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      width: 100%;
+    }
+    table.preview-table th, table.preview-table td {
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.4rem;
+      text-align: left;
+    }
+    table.preview-table th { background: var(--code-bg); position: sticky; top: 0; color: var(--text-title); }
+    .preview-note { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .table-toolbar {
+      display: none;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 0.45rem;
+    }
+    .table-toolbar.show { display: flex; }
+    .table-toolbar button { font-size: 0.82rem; }
+    #tableModalClipboardFallback {
+      display: none;
+      width: 100%;
+      min-height: 5rem;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.78rem;
+      margin-top: 0.35rem;
+    }
+    #tableModalClipboardFallback.show { display: block; }
+    table.preview-table td, table.preview-table th { user-select: text; }
+  </style>
+</head>
+<body>
+  <header class="workbench-toolbar">
+    <div class="toolbar-brand">
+      <h1>流控制台</h1>
+      <span class="toolbar-sub">config/workflow_runner.yaml</span>
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" class="tb-btn tb-stop" id="btnStop" disabled>停止</button>
+      <button type="button" class="tb-btn" id="btnReloadYaml">重新加载 YAML</button>
+      <button type="button" class="tb-btn tb-save" id="btnSaveYaml">保存配置</button>
+      <span id="busyHint" class="msg" style="display:none;color:var(--accent-soft)">执行中…</span>
+    </div>
+  </header>
+
+  <div class="page-top">
+    <details class="sub-details">
+      <summary>使用说明</summary>
+      <p>FastAPI + YAML：单步运行、合并日志；执行中可点「停止」。须通过本服务打开（勿 file://）。左侧搜索或分类定位 Workflow，右侧输出固定。</p>
+      <p><strong>每日建议顺序：</strong>先运行顶部「市场温度计」查看建议仓位（0/20/40/70/100%），再执行选股与扫描步骤。</p>
+    </details>
+
+    <section class="config-section collapsed" id="configSection">
+      <div class="config-head">
+        <h2>配置（config/workflow_runner.yaml）</h2>
+        <button type="button" class="config-toggle" id="btnToggleYaml" aria-expanded="false" aria-controls="configBody">展开</button>
+      </div>
+      <div class="config-body" id="configBody">
+        <textarea id="yamlEditor" spellcheck="false"></textarea>
+        <p id="saveMsg" class="msg"></p>
+      </div>
+    </section>
+  </div>
+
+  <div class="workspace-main" id="workspaceMain">
+    <div class="workbench-body" id="workbenchBody">
+      <aside class="workbench-sidebar" id="workbenchSidebar" aria-label="Workflow 导航">
+        <div class="sidebar-search">
+          <input type="search" id="stepSearch" placeholder="搜索 Workflow…" autocomplete="off" spellcheck="false" aria-label="搜索 Workflow" />
+        </div>
+        <div class="sidebar-scroll">
+          <div class="sidebar-section" id="recentSection">
+            <div class="sidebar-label">最近使用</div>
+            <ul class="sidebar-recent" id="recentList" aria-label="最近使用的 Workflow"></ul>
+          </div>
+          <div class="sidebar-section">
+            <div class="sidebar-label">分类</div>
+            <nav class="sidebar-nav" id="categoryNav" aria-label="Workflow 分类">
+              <button type="button" class="nav-item active" data-cat="all"><i class="all"></i>全部<span class="nav-count" data-cat-count="all"></span></button>
+              <button type="button" class="nav-item" data-cat="daily"><i class="daily"></i>每日<span class="nav-count" data-cat-count="daily"></span></button>
+              <button type="button" class="nav-item" data-cat="biweekly"><i class="biweekly"></i>双周<span class="nav-count" data-cat-count="biweekly"></span></button>
+              <button type="button" class="nav-item" data-cat="tool"><i class="tool"></i>工具<span class="nav-count" data-cat-count="tool"></span></button>
+            </nav>
+          </div>
+        </div>
+      </aside>
+      <div class="workspace-pane workspace-pane-tasks" id="paneTasks">
+        <div class="pane-head">
+          <h2>Workflow<span class="step-count" id="stepCountLabel"></span></h2>
+        </div>
+        <div class="pane-scroll" id="paneTasksScroll">
+          <ul class="steps" id="stepList"></ul>
+        </div>
+      </div>
+      <div class="workspace-pane workspace-pane-output" id="paneOutput">
+        <div class="pane-head">
+          <h2>输出</h2>
+        </div>
+        <div class="pane-output-body" id="paneOutputBody">
+          <p id="runSummary" class="msg"></p>
+          <pre id="logBox" aria-live="polite"></pre>
+          <div id="predictionKlinePanel" class="prediction-kline-panel" aria-hidden="true">
+            <div class="prediction-kline-head">
+              <span id="predictionKlineTitle" class="pk-title">预测 K 线（结果1+2 综合高低）</span>
+              <span class="prediction-kline-legend">
+                <span><i class="r1"></i>高/低=四数综合区间 · 非真实开收</span>
+                <span style="color:var(--faint)">红涨绿跌 · 末根=未来预测日</span>
+              </span>
+              <button type="button" id="predictionKlineClose" class="pk-close" title="返回日志输出">返回日志</button>
+            </div>
+            <div id="predictionKlineCharts" class="prediction-kline-charts"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="fileModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-panel">
+      <h3 id="fileModalTitle">编辑文件</h3>
+      <div class="modal-body">
+        <textarea id="fileEditorTa" spellcheck="false"></textarea>
+      </div>
+      <div class="modal-bar">
+        <button type="button" class="btn-commit" id="fileModalSave">保存</button>
+        <button type="button" id="fileModalCancel">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tableModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-panel">
+      <h3 id="tableModalTitle">表格预览</h3>
+      <div class="modal-body">
+        <div id="tableModalToolbar" class="table-toolbar">
+          <button type="button" class="btn-commit" id="tableModalCopyCodes">复制股票代码列</button>
+          <button type="button" class="primary" id="tableModalCopyNews" style="display:none">复制 news_content</button>
+        </div>
+        <p id="tableModalNote" class="preview-note"></p>
+        <textarea id="tableModalClipboardFallback" readonly spellcheck="false" placeholder="剪贴板不可用时，在此全选复制"></textarea>
+        <div id="tableModalMount" class="preview-table-wrap"></div>
+        <div id="imageModalMount" class="preview-image-wrap" style="display:none"></div>
+        <div id="mdModalMount" class="preview-md-wrap" style="display:none"></div>
+      </div>
+      <div class="modal-bar">
+        <button type="button" id="tableModalClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var yamlEditor = document.getElementById("yamlEditor");
+      var stepList = document.getElementById("stepList");
+      var logBox = document.getElementById("logBox");
+      var runSummary = document.getElementById("runSummary");
+      var saveMsg = document.getElementById("saveMsg");
+      var busyHint = document.getElementById("busyHint");
+      var cfgCache = null;
+      var fileModalPath = "";
+      var ROC_POOL_STORAGE_KEY = "workflow_roc_20_pool";
+      var ROC_RANK_HISTORY_PREFIX = "workflow_roc_20_rank_history_";
+      var ROC_POOL_CUSTOM_VALUE = "__custom__";
+      var ROC_RANK_JSON_MARKER = "ROC20_RANK_JSON:";
+      var lastRoc20RankCopyText = "";
+      var tableModalRelPath = "";
+      var tableModalLastTable = null;
+      var paneTasks = document.getElementById("paneTasks");
+      var paneTasksScroll = document.getElementById("paneTasksScroll");
+      var paneOutput = document.getElementById("paneOutput");
+      var paneOutputBody = document.getElementById("paneOutputBody");
+      var stepSearch = document.getElementById("stepSearch");
+      var recentList = document.getElementById("recentList");
+      var categoryNav = document.getElementById("categoryNav");
+      var stepCountLabel = document.getElementById("stepCountLabel");
+      var TOP_STEPS_VISIBLE = 4;
+      var configSection = document.getElementById("configSection");
+      var STORAGE_RECENT = "workflow_recent_steps";
+      var RECENT_MAX = 8;
+      var activeCategory = "all";
+      var searchQuery = "";
+      var stepsMeta = {};
+      var PREDICTION_KLINE_JSON = "prediction_kline_compare.json";
+      var predictionKlinePanel = document.getElementById("predictionKlinePanel");
+      var predictionKlineCharts = document.getElementById("predictionKlineCharts");
+      var predictionKlineTitle = document.getElementById("predictionKlineTitle");
+      var predictionKlineClose = document.getElementById("predictionKlineClose");
+      var STORAGE_YAML_COLLAPSED = "workflow_yaml_collapsed";
+
+      function stepNavCategory(step) {
+        var stype = (step.type || "script").toLowerCase();
+        if (stype === "frontend_tool") return "tool";
+        var hl = stepHighlightMeta(step);
+        if (hl && hl.badgeCls === "biweekly") return "biweekly";
+        return "daily";
+      }
+
+      function stepSearchBlob(step, hl, isTool) {
+        var parts = [
+          step.id || "",
+          step.title || "",
+          step.note || "",
+          step.frequency_note || "",
+        ];
+        if (isTool) parts.push("工具");
+        else if (hl) parts.push(hl.badge);
+        return parts.join(" ").toLowerCase();
+      }
+
+      function loadRecentSteps() {
+        try {
+          var raw = localStorage.getItem(STORAGE_RECENT);
+          if (!raw) return [];
+          var arr = JSON.parse(raw);
+          return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveRecentSteps(ids) {
+        try {
+          localStorage.setItem(STORAGE_RECENT, JSON.stringify(ids.slice(0, RECENT_MAX)));
+        } catch (e) { /* ignore */ }
+      }
+
+      function touchRecentStep(stepId) {
+        if (!stepId) return;
+        var ids = loadRecentSteps().filter(function (id) { return id !== stepId; });
+        ids.unshift(stepId);
+        saveRecentSteps(ids);
+        renderRecentList();
+      }
+
+      function renderRecentList() {
+        if (!recentList) return;
+        var ids = loadRecentSteps();
+        recentList.innerHTML = "";
+        if (!ids.length) {
+          var empty = document.createElement("li");
+          empty.className = "sidebar-recent-empty";
+          empty.textContent = "运行后将出现在此";
+          recentList.appendChild(empty);
+          return;
+        }
+        ids.forEach(function (id) {
+          var meta = stepsMeta[id] || { title: id, id: id };
+          var li = document.createElement("li");
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.title = meta.title;
+          btn.innerHTML =
+            escapeHtml(meta.title) +
+            '<span class="recent-id">' +
+            escapeHtml(meta.id) +
+            "</span>";
+          btn.addEventListener("click", function () {
+            revealAndScrollToStep(id);
+          });
+          li.appendChild(btn);
+          recentList.appendChild(li);
+        });
+      }
+
+      function setActiveCategory(cat) {
+        activeCategory = cat || "all";
+        if (categoryNav) {
+          categoryNav.querySelectorAll(".nav-item").forEach(function (btn) {
+            btn.classList.toggle("active", btn.getAttribute("data-cat") === activeCategory);
+          });
+        }
+        applyStepFilter();
+      }
+
+      function updateCategoryCounts() {
+        if (!categoryNav) return;
+        var counts = { all: 0, daily: 0, biweekly: 0, tool: 0 };
+        Object.keys(stepsMeta).forEach(function (id) {
+          var cat = stepsMeta[id].category;
+          counts.all += 1;
+          if (counts[cat] !== undefined) counts[cat] += 1;
+        });
+        categoryNav.querySelectorAll("[data-cat-count]").forEach(function (el) {
+          var key = el.getAttribute("data-cat-count");
+          var n = counts[key];
+          el.textContent = n ? String(n) : "";
+        });
+      }
+
+      function applyStepFilter() {
+        var q = (searchQuery || "").trim().toLowerCase();
+        var items = stepList ? stepList.querySelectorAll("li") : [];
+        var visible = 0;
+        items.forEach(function (li) {
+          var cat = li.getAttribute("data-category") || "daily";
+          var blob = li.getAttribute("data-search") || "";
+          var catOk = activeCategory === "all" || cat === activeCategory;
+          var searchOk = !q || blob.indexOf(q) >= 0;
+          var show = catOk && searchOk;
+          li.classList.toggle("step-hidden", !show);
+          if (show) visible += 1;
+        });
+        if (stepCountLabel) {
+          var total = items.length;
+          stepCountLabel.textContent =
+            total && visible !== total ? " · " + visible + "/" + total : total ? " · " + total : "";
+        }
+      }
+
+      function revealAndScrollToStep(stepId) {
+        if (stepSearch) stepSearch.value = "";
+        searchQuery = "";
+        setActiveCategory("all");
+        requestAnimationFrame(function () {
+          var li = stepList.querySelector('[data-step-id="' + stepId + '"]');
+          if (!li) return;
+          li.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          li.classList.remove("step-flash");
+          void li.offsetWidth;
+          li.classList.add("step-flash");
+        });
+      }
+
+      function initWorkbenchNav() {
+        if (stepSearch) {
+          stepSearch.addEventListener("input", function () {
+            searchQuery = stepSearch.value || "";
+            applyStepFilter();
+          });
+          stepSearch.addEventListener("keydown", function (ev) {
+            if (ev.key === "Escape") {
+              stepSearch.value = "";
+              searchQuery = "";
+              applyStepFilter();
+              stepSearch.blur();
+            }
+          });
+        }
+        if (categoryNav) {
+          categoryNav.querySelectorAll(".nav-item").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+              setActiveCategory(btn.getAttribute("data-cat"));
+            });
+          });
+        }
+        document.addEventListener("keydown", function (ev) {
+          if ((ev.ctrlKey || ev.metaKey) && ev.key === "k" && stepSearch) {
+            ev.preventDefault();
+            stepSearch.focus();
+            stepSearch.select();
+          }
+        });
+        renderRecentList();
+      }
+
+      function flashSaveButton() {
+        var btn = document.getElementById("btnSaveYaml");
+        if (!btn) return;
+        btn.classList.add("is-success");
+        var prev = btn.textContent;
+        btn.textContent = "已保存";
+        setTimeout(function () {
+          btn.classList.remove("is-success");
+          btn.textContent = prev;
+        }, 1800);
+      }
+
+      function initYamlCollapse() {
+        var btn = document.getElementById("btnToggleYaml");
+        var collapsed = true;
+        try {
+          collapsed = localStorage.getItem(STORAGE_YAML_COLLAPSED) !== "0";
+        } catch (e) { /* ignore */ }
+        function setCollapsed(on) {
+          configSection.classList.toggle("collapsed", on);
+          btn.setAttribute("aria-expanded", on ? "false" : "true");
+          btn.textContent = on ? "展开" : "收起";
+          try {
+            localStorage.setItem(STORAGE_YAML_COLLAPSED, on ? "1" : "0");
+          } catch (e) { /* ignore */ }
+        }
+        setCollapsed(collapsed);
+        btn.addEventListener("click", function () {
+          setCollapsed(!configSection.classList.contains("collapsed"));
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              fitTopStepsVisible({ resetScroll: true });
+            });
+          });
+        });
+      }
+
+      function normalizeHeaderCell(h) {
+        return String(h || "")
+          .trim()
+          .replace(/\s/g, "")
+          .toLowerCase();
+      }
+
+      function findNewsContentColumnIndex(headers) {
+        var norm = (headers || []).map(normalizeHeaderCell);
+        var want = normalizeHeaderCell("news_content");
+        var idx = norm.indexOf(want);
+        if (idx >= 0) {
+          return idx;
+        }
+        for (var j = 0; j < norm.length; j++) {
+          if (norm[j].indexOf("news_content") >= 0) {
+            return j;
+          }
+        }
+        return -1;
+      }
+
+      function findStockCodeColumnIndex(headers) {
+        var norm = (headers || []).map(normalizeHeaderCell);
+        var exact = ["股票代码", "code6", "symbol", "ts_code", "代码", "stock_code", "证券代码"];
+        for (var e = 0; e < exact.length; e++) {
+          var want = normalizeHeaderCell(exact[e]);
+          var idx = norm.indexOf(want);
+          if (idx >= 0) {
+            return idx;
+          }
+        }
+        for (var j = 0; j < norm.length; j++) {
+          var h = norm[j];
+          if (!h) {
+            continue;
+          }
+          if (h.indexOf("股票代码") >= 0 || h === "代码" || h.indexOf("证券代码") >= 0) {
+            return j;
+          }
+          if (h === "symbol" || h === "code6" || h.indexOf("ts_code") >= 0) {
+            return j;
+          }
+        }
+        return -1;
+      }
+
+      function cellToStockCode6(cell, headerNorm) {
+        var raw = String(cell == null ? "" : cell).trim();
+        if (!raw) {
+          return "";
+        }
+        if (headerNorm.indexOf("ts_code") >= 0 || raw.indexOf(".") > 0) {
+          var pre = raw.split(".")[0].trim();
+          var dig = pre.replace(/\D/g, "");
+          if (dig.length >= 6) {
+            return dig.slice(-6);
+          }
+        }
+        var digits = raw.replace(/\D/g, "");
+        if (digits.length >= 6) {
+          return digits.slice(-6);
+        }
+        if (digits.length > 0) {
+          return digits.padStart(6, "0");
+        }
+        return raw;
+      }
+
+      function isTodayHighLowTable(relPath) {
+        return String(relPath || "")
+          .replace(/\\/g, "/")
+          .indexOf("today_high_low_result.csv") >= 0;
+      }
+
+      function formatDecimalTwoPlaces(cell) {
+        if (cell == null) return null;
+        var raw = String(cell).trim();
+        if (!raw) return "";
+        if (/[a-zA-Z_%]/.test(raw)) return null;
+        if (
+          !/^[-+]?(?:\d+\.\d+|\.\d+)(?:[eE][-+]?\d+)?$|^[-+]?\d+[eE][-+]?\d+$/.test(
+            raw
+          )
+        ) {
+          return null;
+        }
+        var n = Number(raw);
+        if (!isFinite(n)) return null;
+        return n.toFixed(2);
+      }
+
+      function formatPreviewCell(header, cell, relPath) {
+        var h = normalizeHeaderCell(header);
+        if (isTodayHighLowTable(relPath)) {
+          if (h === "symbol" || h === "code6" || h.indexOf("ts_code") >= 0) {
+            var code = cellToStockCode6(cell, h);
+            return code || String(cell == null ? "" : cell);
+          }
+          if (h === "today_high" || h === "today_low" || h === "high_low_diff") {
+            var n = parseFloat(cell);
+            if (!isNaN(n)) {
+              return n.toFixed(2);
+            }
+          }
+        }
+        var rounded = formatDecimalTwoPlaces(cell);
+        if (rounded != null) return rounded;
+        return cell == null ? "" : String(cell);
+      }
+
+      function tableRowsToCopyText(headers, rows, relPath) {
+        var lines = [(headers || []).join("\t")];
+        (rows || []).forEach(function (row) {
+          var cells = (headers || []).map(function (h, i) {
+            return formatPreviewCell(h, (row || [])[i], relPath);
+          });
+          lines.push(cells.join("\t"));
+        });
+        return lines.join("\n");
+      }
+
+      function setTableToolbarVisible(on, showNewsCopy, copyAllMode) {
+        var tb = document.getElementById("tableModalToolbar");
+        var fb = document.getElementById("tableModalClipboardFallback");
+        var newsBtn = document.getElementById("tableModalCopyNews");
+        var codesBtn = document.getElementById("tableModalCopyCodes");
+        if (on) {
+          tb.classList.add("show");
+          newsBtn.style.display = showNewsCopy ? "" : "none";
+          if (codesBtn) {
+            codesBtn.textContent = copyAllMode ? "复制全部" : "复制股票代码列";
+            codesBtn.setAttribute("data-copy-mode", copyAllMode ? "all" : "codes");
+          }
+        } else {
+          tb.classList.remove("show");
+          fb.classList.remove("show");
+          fb.value = "";
+          newsBtn.style.display = "none";
+        }
+      }
+
+      function copyWorkspaceColumn(relPath, column, onDone) {
+        var q =
+          "/api/workspace/column-text?path=" +
+          encodeURIComponent(relPath) +
+          "&column=" +
+          encodeURIComponent(column) +
+          "&dedupe=1&skip_empty=1";
+        return fetch(q)
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (_ref) {
+            if (!_ref.ok) {
+              var d = _ref.j.detail;
+              throw new Error(typeof d === "string" ? d : JSON.stringify(_ref.j));
+            }
+            var j = _ref.j;
+            if (!j.exists || !j.text) {
+              alert("无有效的 " + column + " 内容可复制。");
+              return;
+            }
+            copyTextToClipboard(j.text, null);
+            if (onDone) {
+              onDone(j.count);
+            }
+          });
+      }
+
+      function flashButtonCopied(btn, baseText) {
+        if (!btn) return;
+        var isCommit =
+          btn.classList.contains("btn-commit") ||
+          btn.classList.contains("btn-commit-filled");
+        if (isCommit) btn.classList.add("is-success");
+        btn.textContent = "已复制";
+        setTimeout(function () {
+          btn.textContent = baseText;
+          if (isCommit) btn.classList.remove("is-success");
+        }, 1600);
+      }
+
+      function refreshGlobArtifactGroup(wrap) {
+        var glob = wrap.getAttribute("data-glob") || "";
+        var copyCol = wrap.getAttribute("data-copy-column") || "news_content";
+        var labelPrefix = wrap.getAttribute("data-label-prefix") || glob;
+        if (!glob) return;
+        fetch("/api/workspace/latest?glob=" + encodeURIComponent(glob))
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (_ref) {
+            wrap.innerHTML = "";
+            if (!_ref.ok) {
+              var miss = document.createElement("span");
+              miss.className = "artifact-missing";
+              miss.textContent = "无法解析最新表";
+              wrap.appendChild(miss);
+              return;
+            }
+            var j = _ref.j;
+            if (!j.exists || !j.rel_path) {
+              var empty = document.createElement("span");
+              empty.className = "artifact-missing";
+              empty.textContent = "尚无产出表";
+              wrap.appendChild(empty);
+              return;
+            }
+            var rel = j.rel_path;
+            var displayName = j.name || rel;
+            var openBtn = document.createElement("button");
+            openBtn.type = "button";
+            openBtn.className = "artifact-btn out";
+            var openLabel = "表格 · " + (labelPrefix ? labelPrefix + " · " : "") + displayName;
+            openBtn.textContent = openLabel;
+            openBtn.title = rel;
+            openBtn.addEventListener("click", function () {
+              openWorkspacePreview(rel);
+            });
+            var copyBtn = document.createElement("button");
+            copyBtn.type = "button";
+            copyBtn.className = "artifact-btn copy";
+            var copyLabel = "复制 " + copyCol;
+            copyBtn.textContent = copyLabel;
+            copyBtn.title = rel;
+            copyBtn.addEventListener("click", function () {
+              copyWorkspaceColumn(rel, copyCol, function () {
+                flashButtonCopied(copyBtn, copyLabel);
+              }).catch(function (e) {
+                alert(String(e));
+              });
+            });
+            wrap.appendChild(openBtn);
+            wrap.appendChild(copyBtn);
+          })
+          .catch(function () {
+            wrap.innerHTML = "";
+            var err = document.createElement("span");
+            err.className = "artifact-missing";
+            err.textContent = "加载产出表失败";
+            wrap.appendChild(err);
+          });
+      }
+
+      function refreshAllGlobArtifacts() {
+        stepList.querySelectorAll(".artifacts-glob").forEach(refreshGlobArtifactGroup);
+      }
+
+      function hidePredictionKlinePanel() {
+        if (!predictionKlinePanel) return;
+        predictionKlinePanel.classList.remove("visible");
+        predictionKlinePanel.setAttribute("aria-hidden", "true");
+        if (predictionKlineCharts) predictionKlineCharts.innerHTML = "";
+        if (paneOutputBody) paneOutputBody.classList.remove("kline-fullscreen");
+      }
+
+      if (predictionKlineClose) {
+        predictionKlineClose.addEventListener("click", hidePredictionKlinePanel);
+      }
+
+      function normalizeKlineChartsData(data) {
+        if (!data) return [];
+        if (data.charts && data.charts.length) return data.charts;
+        if (data.dates && data.dates.length) return [data];
+        return [];
+      }
+
+      function drawPredictionKlineOnCanvas(canvas, chartData, panelWidth) {
+        var dates = chartData.dates;
+        var highs = chartData.highs || [];
+        var lows = chartData.lows || [];
+        var opens = chartData.opens || [];
+        var closes = chartData.closes || [];
+        var isFuture = chartData.is_future || [];
+        var n = dates.length;
+        var ymin = Infinity;
+        var ymax = -Infinity;
+
+        for (var i = 0; i < n; i++) {
+          var hi = highs.length > i ? highs[i] : closes[i];
+          var lo = lows.length > i ? lows[i] : opens[i];
+          if (hi == null && lo == null) continue;
+          if (lo != null) {
+            ymin = Math.min(ymin, lo);
+            ymax = Math.max(ymax, lo);
+          }
+          if (hi != null) {
+            ymin = Math.min(ymin, hi);
+            ymax = Math.max(ymax, hi);
+          }
+        }
+        if (!isFinite(ymin) || !isFinite(ymax)) return false;
+
+        var pad = (ymax - ymin) * 0.12 || 0.5;
+        ymin -= pad;
+        ymax += pad;
+
+        var width = panelWidth || 600;
+        var height = 150;
+        canvas.width = width;
+        canvas.height = height;
+        var ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, width, height);
+
+        var marginL = 44;
+        var marginR = 8;
+        var marginT = 8;
+        var marginB = 44;
+        var plotW = width - marginL - marginR;
+        var plotH = height - marginT - marginB;
+        var plotBottom = marginT + plotH;
+        var dateBaseline = height - 12;
+
+        function yPx(price) {
+          return marginT + plotH * (1 - (price - ymin) / (ymax - ymin));
+        }
+
+        ctx.strokeStyle = "rgba(45, 58, 77, 0.6)";
+        ctx.lineWidth = 1;
+        for (var g = 0; g <= 4; g++) {
+          var gy = marginT + plotH * g / 4;
+          ctx.beginPath();
+          ctx.moveTo(marginL, gy);
+          ctx.lineTo(width - marginR, gy);
+          ctx.stroke();
+          var gv = ymax - (ymax - ymin) * g / 4;
+          ctx.fillStyle = "#8b9cb3";
+          ctx.font = "10px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(gv.toFixed(2), marginL - 4, gy + 3);
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(marginL, marginT, plotW, plotH);
+        ctx.clip();
+
+        var slotW = plotW / n;
+        var bodyW = Math.max(4, Math.min(12, slotW * 0.38));
+        var prevMid = null;
+
+        function drawRangeCandle(cx, low, high, future, up) {
+          if (low == null || high == null) return;
+          var yLo = yPx(low);
+          var yHi = yPx(high);
+          var top = Math.min(yLo, yHi);
+          var h = Math.max(2, Math.abs(yHi - yLo));
+          if (top + h > plotBottom) {
+            h = Math.max(1, plotBottom - top);
+          }
+          var color = up ? "#f85149" : "#3fb950";
+          ctx.strokeStyle = color;
+          ctx.lineWidth = future ? 2 : 1;
+          ctx.beginPath();
+          ctx.moveTo(cx, Math.min(yLo, plotBottom));
+          ctx.lineTo(cx, Math.max(yHi, marginT));
+          ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.globalAlpha = future ? 0.55 : 0.85;
+          ctx.fillRect(cx - bodyW / 2, top, bodyW, h);
+          ctx.globalAlpha = 1;
+        }
+
+        for (var i = 0; i < n; i++) {
+          var x0 = marginL + slotW * i;
+          var cx = x0 + slotW * 0.5;
+          var fut = isFuture.length > i && isFuture[i];
+          var hi = highs.length > i ? highs[i] : closes[i];
+          var lo = lows.length > i ? lows[i] : opens[i];
+          var mid = (hi != null && lo != null) ? (hi + lo) / 2 : hi;
+          var up = prevMid == null ? true : mid >= prevMid;
+          drawRangeCandle(cx, lo, hi, fut, up);
+          if (mid != null) prevMid = mid;
+        }
+        ctx.restore();
+
+        for (var j = 0; j < n; j++) {
+          if (n <= 12 || j % Math.ceil(n / 8) === 0 || j === n - 1) {
+            var x0d = marginL + slotW * j;
+            var cxd = x0d + slotW * 0.5;
+            var futd = isFuture.length > j && isFuture[j];
+            ctx.fillStyle = futd ? "#ffb86c" : "#8b9cb3";
+            ctx.font = futd ? "bold 9px sans-serif" : "9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "alphabetic";
+            var dl = dates[j];
+            if (dl && dl.length >= 10) dl = dl.slice(5);
+            if (futd) dl = dl + "*";
+            ctx.fillText(dl, cxd, dateBaseline);
+          }
+        }
+        return true;
+      }
+
+      function drawPredictionKlineChart(data) {
+        var charts = normalizeKlineChartsData(data);
+        if (!charts.length || !predictionKlinePanel || !predictionKlineCharts) {
+          hidePredictionKlinePanel();
+          return;
+        }
+        predictionKlinePanel.classList.add("visible");
+        predictionKlinePanel.setAttribute("aria-hidden", "false");
+        if (paneOutputBody) paneOutputBody.classList.add("kline-fullscreen");
+        var histN = data.history_days || charts[0].history_days || 20;
+        var modelLabel = data.model_label || charts[0].model_label || "结果1+2 · 综合预测高低";
+        predictionKlineTitle.textContent =
+          "预测 K 线（结果1+2 综合高低）· " + charts.length + " 只 · " + modelLabel + " · " + histN + "+1 根";
+
+        predictionKlineCharts.innerHTML = "";
+        var panelWidth = (predictionKlinePanel.clientWidth - 16) || 600;
+        var drawn = 0;
+
+        charts.forEach(function (chartData) {
+          var block = document.createElement("div");
+          block.className = "prediction-kline-block";
+          var headEl = document.createElement("div");
+          headEl.className = "pk-block-head";
+          var titleEl = document.createElement("div");
+          titleEl.className = "pk-block-title";
+          var displayName =
+            (chartData.signal && chartData.signal.stock_name) ||
+            chartData.symbol_name ||
+            chartData.symbol ||
+            "";
+          var titleText = displayName + " · " + histN + "+1 根";
+          if (chartData.signal) {
+            var sig = chartData.signal;
+            var predDir = sig.predicted_direction || "flat";
+            var predBadgeEl = document.createElement("span");
+            predBadgeEl.className = "pk-pred-badge " + predDir;
+            predBadgeEl.textContent =
+              "预测" + (sig.predicted_direction_label || sig.predicted_direction || "?");
+            headEl.appendChild(predBadgeEl);
+            var barBadgeEl = document.createElement("span");
+            barBadgeEl.className = "pk-signal-badge " + (sig.t1_pred_direction || "flat");
+            barBadgeEl.textContent =
+              "T+1 " + (sig.t1_pred_direction_label || sig.t1_pred_direction || "信号");
+            headEl.appendChild(barBadgeEl);
+            titleText +=
+              "（真实" + (sig.real_sequence || "?") +
+              " vs 预测" + (sig.pred_sequence || "?") +
+              " · 相同 " + (sig.same_count != null ? sig.same_count : "?") + "）";
+          }
+          titleEl.textContent = titleText;
+          headEl.appendChild(titleEl);
+          var canvas = document.createElement("canvas");
+          block.appendChild(headEl);
+          block.appendChild(canvas);
+          predictionKlineCharts.appendChild(block);
+          if (drawPredictionKlineOnCanvas(canvas, chartData, panelWidth)) {
+            drawn += 1;
+          } else {
+            block.remove();
+          }
+        });
+
+        if (!drawn) {
+          hidePredictionKlinePanel();
+        }
+      }
+
+      function loadPredictionKlineChart(relPath) {
+        relPath = relPath || PREDICTION_KLINE_JSON;
+        return fetch("/api/workspace/file?path=" + encodeURIComponent(relPath))
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j.exists || !j.content) {
+              hidePredictionKlinePanel();
+              return null;
+            }
+            var data = JSON.parse(j.content);
+            drawPredictionKlineChart(data);
+            return data;
+          })
+          .catch(function () {
+            hidePredictionKlinePanel();
+            return null;
+          });
+      }
+
+      function copyTextToClipboard(text, hintEl) {
+        function showFallback() {
+          var fb = document.getElementById("tableModalClipboardFallback");
+          fb.value = text;
+          fb.classList.add("show");
+          fb.focus();
+          fb.select();
+          if (hintEl) {
+            hintEl.textContent =
+              (hintEl.textContent ? hintEl.textContent + " · " : "") +
+              "剪贴板不可用，已填入下方文本框，请 Ctrl+C。";
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(
+            function () {
+              if (hintEl) {
+                var base = hintEl.getAttribute("data-base-note") || "";
+                hintEl.textContent = base ? base + " · 已复制到剪贴板" : "已复制到剪贴板";
+              }
+            },
+            function () {
+              showFallback();
+            }
+          );
+        } else {
+          showFallback();
+        }
+      }
+
+      function setBusy(b) {
+        document.getElementById("btnStop").disabled = !b;
+        busyHint.style.display = b ? "inline" : "none";
+        stepList.querySelectorAll("button.run-one").forEach(function (x) { x.disabled = b; });
+      }
+
+      function requestStop() {
+        appendLog("\n>>> POST /api/run/stop\n");
+        fetch("/api/run/stop", { method: "POST" })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, j: j };
+            });
+          })
+          .then(function (_ref) {
+            if (!_ref.ok) {
+              appendLog("[停止请求失败] " + JSON.stringify(_ref.j, null, 2) + "\n");
+              return;
+            }
+            appendLog("已发送终止信号（子进程结束需稍候）。\n");
+          })
+          .catch(function (e) {
+            appendLog("[停止请求异常] " + String(e) + "\n");
+          });
+      }
+
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function colorizeLogLine(line) {
+        var safe = escapeHtml(line);
+        if (/exit_code\s*=\s*0\b/i.test(line)) {
+          return '<span class="log-ok">' + safe + "</span>";
+        }
+        if (/exit_code\s*=\s*(?!0\b)\d+/i.test(line) || /\[失败\]|Traceback|Error:/i.test(line)) {
+          return '<span class="log-err">' + safe + "</span>";
+        }
+        if (/^>>>/.test(line) || /^\[停止|^\[.*异常\]/i.test(line)) {
+          return '<span class="log-info">' + safe + "</span>";
+        }
+        if (/^【.+】/.test(line)) {
+          return '<span class="log-head">' + safe + "</span>";
+        }
+        if (/⚠|警告|warning/i.test(line)) {
+          return '<span class="log-warn">' + safe + "</span>";
+        }
+        if (/^# \[/.test(line) || /^={3,}/.test(line)) {
+          return '<span class="log-info">' + safe + "</span>";
+        }
+        return safe;
+      }
+
+      function appendLog(text) {
+        if (!text) return;
+        var parts = String(text).split("\n");
+        var html = "";
+        for (var i = 0; i < parts.length; i += 1) {
+          if (i > 0) html += "\n";
+          html += colorizeLogLine(parts[i]);
+        }
+        logBox.innerHTML = (logBox.innerHTML || "") + html;
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+
+      function clearLog(text) {
+        if (!text) {
+          logBox.innerHTML = "";
+          return;
+        }
+        logBox.innerHTML = escapeHtml(text);
+      }
+
+      function parseRoc20RankFromLog(log) {
+        if (!log) return null;
+        var idx = log.lastIndexOf(ROC_RANK_JSON_MARKER);
+        if (idx < 0) return null;
+        var jsonPart = log.slice(idx + ROC_RANK_JSON_MARKER.length).split("\n")[0].trim();
+        try {
+          return JSON.parse(jsonPart);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function formatRoc20RankCopyText(data) {
+        if (!data || !data.rows || !data.rows.length) return "";
+        var lines = [];
+        lines.push("20日ROC Top" + data.rows.length);
+        if (data.asof) lines.push("截面交易日: " + data.asof);
+        if (data.pool) lines.push("股票池: " + data.pool);
+        lines.push("");
+        lines.push(["排名", "代码", "名称", "ROC20", "暴露权重"].join("\t"));
+        data.rows.forEach(function (r) {
+          var roc = r.roc_20;
+          var w = r.weight;
+          lines.push(
+            [
+              r.rank,
+              r.symbol,
+              r.name || r.symbol,
+              typeof roc === "number" ? roc.toFixed(4) : roc,
+              typeof w === "number" ? w.toFixed(4) : w,
+            ].join("\t")
+          );
+        });
+        return lines.join("\n");
+      }
+
+      function rocRankHistoryStorageKey(poolPath) {
+        return ROC_RANK_HISTORY_PREFIX + encodeURIComponent(String(poolPath || "").trim());
+      }
+
+      function loadRoc20RankHistory(poolPath) {
+        if (!poolPath) return null;
+        try {
+          var raw = localStorage.getItem(rocRankHistoryStorageKey(poolPath));
+          if (!raw) return null;
+          var data = JSON.parse(raw);
+          if (!data || !data.rows || !data.rows.length) return null;
+          return data;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function saveRoc20RankHistory(poolPath, data) {
+        if (!poolPath || !data || !data.rows || !data.rows.length) return;
+        try {
+          localStorage.setItem(rocRankHistoryStorageKey(poolPath), JSON.stringify(data));
+        } catch (e) { /* ignore */ }
+      }
+
+      /** 与上次同池 Top20 对比：交集且 ROC 下降剔除，新进/持平/上涨保留；保持本次原排名顺序。 */
+      function filterRoc20RankByMomentum(current, previous) {
+        if (!current || !current.rows || !current.rows.length) return current;
+        if (!previous || !previous.rows || !previous.rows.length) return current;
+        var prevMap = {};
+        previous.rows.forEach(function (r) {
+          prevMap[r.symbol] = r.roc_20;
+        });
+        var filteredRows = current.rows.filter(function (r) {
+          if (!Object.prototype.hasOwnProperty.call(prevMap, r.symbol)) return true;
+          var prevRoc = prevMap[r.symbol];
+          var curRoc = r.roc_20;
+          if (typeof curRoc !== "number" || typeof prevRoc !== "number") return true;
+          return curRoc >= prevRoc;
+        });
+        return {
+          asof: current.asof,
+          pool: current.pool,
+          top_n: current.top_n,
+          rows: filteredRows,
+        };
+      }
+
+      function setLastRoc20RankFromLog(log, saveHistory) {
+        var data = parseRoc20RankFromLog(log);
+        if (!data) {
+          lastRoc20RankCopyText = "";
+          syncRoc20CopyButtons();
+          return;
+        }
+        var poolPath = data.pool || "";
+        var previous = loadRoc20RankHistory(poolPath);
+        var filtered = filterRoc20RankByMomentum(data, previous);
+        lastRoc20RankCopyText = formatRoc20RankCopyText(filtered);
+        if (saveHistory) {
+          saveRoc20RankHistory(poolPath, data);
+        }
+        syncRoc20CopyButtons();
+      }
+
+      function syncRoc20CopyButtons() {
+        var enabled = !!lastRoc20RankCopyText;
+        document.querySelectorAll("button.roc-copy-top20").forEach(function (btn) {
+          btn.disabled = !enabled;
+          btn.title = enabled
+            ? "复制动量筛选后的 Top20（与上次同池对比，交集且 ROC 下降已剔除；制表符分隔）"
+            : "请先点击「运行」生成排名";
+        });
+      }
+
+      function copyRoc20Top20Rank(btn) {
+        if (!lastRoc20RankCopyText) {
+          alert("暂无排名可复制，请先运行「20 日 ROC 排序」本步。");
+          return;
+        }
+        copyTextToClipboard(lastRoc20RankCopyText, null);
+        flashButtonCopied(btn, "复制 Top20");
+      }
+
+      var HIGHLIGHT_META = {
+        core: { cls: "step-core", badge: "每日·核心", badgeCls: "core", priority: true },
+        chain: { cls: "step-chain", badge: "每日·链式", badgeCls: "chain" },
+        daily: { cls: "step-daily", badge: "每日", badgeCls: "daily" },
+        biweekly: { cls: "step-biweekly", badge: "双周", badgeCls: "biweekly" },
+      };
+
+      function splitConditionTags(note) {
+        if (!note || !String(note).trim()) return [];
+        return String(note).split("+").map(function (t) {
+          return t.trim();
+        }).filter(Boolean);
+      }
+
+      function appendStepTags(container, hl, frequencyNote, isTool) {
+        if (isTool) {
+          var toolBadge = document.createElement("span");
+          toolBadge.className = "freq-badge cat tool";
+          toolBadge.textContent = "工具";
+          container.appendChild(toolBadge);
+        } else if (hl) {
+          var badge = document.createElement("span");
+          badge.className = "freq-badge cat " + hl.badgeCls;
+          badge.textContent = hl.badge;
+          container.appendChild(badge);
+        }
+        splitConditionTags(frequencyNote).forEach(function (tag) {
+          var cond = document.createElement("span");
+          cond.className = "freq-badge cond";
+          cond.textContent = tag;
+          container.appendChild(cond);
+        });
+      }
+
+      function stepHighlightMeta(step) {
+        var key = String(step.highlight || "").toLowerCase().trim();
+        return HIGHLIGHT_META[key] || null;
+      }
+
+      /** 保证左侧步骤区无需滚动即可看到前 TOP_STEPS_VISIBLE 条（仅布局，不改步骤数据）。 */
+      function fitTopStepsVisible(opts) {
+        opts = opts || {};
+        if (!paneTasksScroll || !stepList) return;
+        var resetScroll = opts.resetScroll === true;
+        var prevScroll = paneTasksScroll.scrollTop;
+        var items = stepList.querySelectorAll("li");
+        var n = Math.min(TOP_STEPS_VISIBLE, items.length);
+        paneTasksScroll.classList.remove("fit-top-steps-extra");
+        items.forEach(function (li) {
+          li.classList.remove("steps-compact-tight", "steps-hide-cmd");
+        });
+        if (n < 1) {
+          return;
+        }
+        function measureFits() {
+          var last = items[n - 1];
+          var scrollRect = paneTasksScroll.getBoundingClientRect();
+          var lastRect = last.getBoundingClientRect();
+          return lastRect.bottom <= scrollRect.bottom + 0.5;
+        }
+        function applyMode(mode) {
+          items.forEach(function (li, idx) {
+            if (idx >= TOP_STEPS_VISIBLE) return;
+            li.classList.toggle("steps-compact-tight", mode >= 1);
+            li.classList.toggle("steps-hide-cmd", mode >= 2);
+          });
+          paneTasksScroll.classList.toggle("fit-top-steps-extra", mode >= 2);
+        }
+        function restoreScroll() {
+          if (resetScroll) {
+            paneTasksScroll.scrollTop = 0;
+          } else if (prevScroll > 0) {
+            paneTasksScroll.scrollTop = prevScroll;
+          } else {
+            paneTasksScroll.scrollTop = 0;
+          }
+        }
+        var mode;
+        for (mode = 0; mode <= 2; mode += 1) {
+          applyMode(mode);
+          if (measureFits()) {
+            restoreScroll();
+            return;
+          }
+        }
+        applyMode(2);
+        restoreScroll();
+      }
+
+      function rocPoolStorageKey(stepId) {
+        return ROC_POOL_STORAGE_KEY + "_" + (stepId || "roc_20");
+      }
+
+      function loadRocPoolSelection(stepId, presets) {
+        try {
+          var raw = localStorage.getItem(rocPoolStorageKey(stepId));
+          if (raw) return raw;
+        } catch (e) { /* ignore */ }
+        if (presets && presets[0] && presets[0].path) return presets[0].path;
+        return "";
+      }
+
+      function saveRocPoolSelection(stepId, value) {
+        try {
+          localStorage.setItem(rocPoolStorageKey(stepId), value);
+        } catch (e) { /* ignore */ }
+      }
+
+      function resolveRocPoolPath(selectEl, customInput) {
+        if (!selectEl) return "";
+        if (selectEl.value === ROC_POOL_CUSTOM_VALUE) {
+          return (customInput && customInput.value ? customInput.value : "").trim();
+        }
+        return (selectEl.value || "").trim();
+      }
+
+      function syncRocPoolUIFromStorage(selectEl, customInput, saved) {
+        if (!selectEl || !saved) return;
+        var matched = false;
+        for (var i = 0; i < selectEl.options.length; i++) {
+          if (selectEl.options[i].value === saved) {
+            selectEl.selectedIndex = i;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          selectEl.value = ROC_POOL_CUSTOM_VALUE;
+          if (customInput) {
+            customInput.style.display = "";
+            customInput.value = saved;
+          }
+        } else if (customInput) {
+          customInput.style.display = "none";
+        }
+      }
+
+      function updateRocCmdLine(cmdEl, cfg, script, poolPath) {
+        if (!cmdEl || !script) return;
+        var py = (cfg && cfg.python_executable) || "python";
+        var parts = [py, script];
+        if (poolPath) {
+          parts.push("--pool", poolPath);
+        }
+        cmdEl.textContent = parts.join(" ");
+      }
+
+      function updateStepCmdLine(cmdEl, cfg, script, args) {
+        if (!cmdEl || !script) return;
+        var py = (cfg && cfg.python_executable) || "python";
+        var parts = [py, script].concat(args || []);
+        cmdEl.textContent = parts.join(" ");
+      }
+
+      function runModeStorageKey(stepId) {
+        return "workflow_run_mode_" + stepId;
+      }
+
+      function loadRunModeSelection(stepId, modes) {
+        try {
+          var saved = localStorage.getItem(runModeStorageKey(stepId));
+          if (saved && modes.some(function (m) { return m.id === saved; })) {
+            return saved;
+          }
+        } catch (e) { /* ignore */ }
+        return modes.length ? (modes[0].id || "") : "";
+      }
+
+      function saveRunModeSelection(stepId, modeId) {
+        try {
+          localStorage.setItem(runModeStorageKey(stepId), modeId || "");
+        } catch (e) { /* ignore */ }
+      }
+
+      function resolveRunMode(step, modeId) {
+        var modes = step.run_modes || [];
+        var baseScript = step.script || "";
+        var baseArgs = step.args || [];
+        if (!modeId) {
+          return { script: baseScript, args: baseArgs.slice() };
+        }
+        var mode = modes.find(function (m) { return m.id === modeId; });
+        if (!mode) {
+          return { script: baseScript, args: baseArgs.slice() };
+        }
+        return {
+          script: mode.script || baseScript,
+          args: mode.args != null ? (mode.args || []).slice() : baseArgs.slice(),
+        };
+      }
+
+      function buildRunModeSelector(step, cfg, cmdEl) {
+        var modes = step.run_modes || [];
+        if (!modes.length) return null;
+        var stepId = step.id || "";
+        var wrap = document.createElement("div");
+        wrap.className = "run-mode-selector";
+        wrap.setAttribute("data-step-id", stepId);
+        wrap.addEventListener("mousedown", function (ev) {
+          ev.stopPropagation();
+        });
+        var lab = document.createElement("label");
+        lab.textContent = "运行模式";
+        wrap.appendChild(lab);
+        var select = document.createElement("select");
+        select.setAttribute("aria-label", "步骤运行模式");
+        modes.forEach(function (item) {
+          var opt = document.createElement("option");
+          opt.value = item.id || "";
+          opt.textContent = item.label || item.id || "";
+          select.appendChild(opt);
+        });
+        var saved = loadRunModeSelection(stepId, modes);
+        select.value = saved;
+        function refreshCmd() {
+          var resolved = resolveRunMode(step, select.value);
+          updateStepCmdLine(cmdEl, cfg, resolved.script, resolved.args);
+        }
+        select.addEventListener("change", function () {
+          saveRunModeSelection(stepId, select.value);
+          refreshCmd();
+        });
+        wrap.appendChild(select);
+        refreshCmd();
+        return wrap;
+      }
+
+      var EXCLUDED_CODE_PREFIXES = ["300", "301", "688", "920"];
+
+      function parsePureSixDigitCodes(text) {
+        var tokens = String(text || "").split(/[\s,;，；\r\n\t]+/);
+        var out = [];
+        tokens.forEach(function (tok) {
+          var s = tok.trim();
+          if (s && /^\d{6}$/.test(s)) {
+            out.push(s);
+          }
+        });
+        return out;
+      }
+
+      function dedupeSixDigitCodes(text) {
+        var seen = {};
+        var result = [];
+        parsePureSixDigitCodes(text).forEach(function (code) {
+          if (seen[code]) return;
+          seen[code] = true;
+          result.push(code);
+        });
+        return result;
+      }
+
+      function filterStockCodes(text) {
+        var tokens = parsePureSixDigitCodes(text);
+        var seen = {};
+        var result = [];
+        var inputCount = tokens.length;
+        var dupSkipped = 0;
+        var prefixSkipped = 0;
+        tokens.forEach(function (code) {
+          if (seen[code]) {
+            dupSkipped += 1;
+            return;
+          }
+          seen[code] = true;
+          var prefix = code.slice(0, 3);
+          if (EXCLUDED_CODE_PREFIXES.indexOf(prefix) >= 0) {
+            prefixSkipped += 1;
+            return;
+          }
+          result.push(code);
+        });
+        return {
+          codes: result,
+          inputCount: inputCount,
+          dupSkipped: dupSkipped,
+          prefixSkipped: prefixSkipped,
+          outputCount: result.length,
+        };
+      }
+
+      function buildCodeFilterTool(step) {
+        var wrap = document.createElement("div");
+        wrap.className = "code-filter-tool";
+        wrap.setAttribute("data-step-id", step.id || "filter_stock_codes");
+        wrap.addEventListener("mousedown", function (ev) {
+          ev.stopPropagation();
+        });
+
+        var inLab = document.createElement("label");
+        inLab.textContent = "粘贴代码（仅识别纯 6 位，空格/逗号/换行分隔）";
+        wrap.appendChild(inLab);
+        var inputTa = document.createElement("textarea");
+        inputTa.className = "code-filter-input";
+        inputTa.placeholder = "600519\n000001\n002821";
+        inputTa.spellcheck = false;
+        wrap.appendChild(inputTa);
+
+        var outLab = document.createElement("label");
+        outLab.textContent = "结果（每行一个）";
+        wrap.appendChild(outLab);
+        var outputTa = document.createElement("textarea");
+        outputTa.className = "code-filter-output";
+        outputTa.readOnly = true;
+        outputTa.placeholder = "点击「处理」后显示";
+        wrap.appendChild(outputTa);
+
+        var actions = document.createElement("div");
+        actions.className = "tool-actions";
+        var statsEl = document.createElement("span");
+        statsEl.className = "tool-stats";
+        statsEl.textContent = "—";
+        actions.appendChild(statsEl);
+
+        var processBtn = document.createElement("button");
+        processBtn.type = "button";
+        processBtn.className = "btn-commit-filled";
+        processBtn.textContent = "处理";
+        processBtn.addEventListener("click", function () {
+          var r = filterStockCodes(inputTa.value);
+          outputTa.value = r.codes.join("\n");
+          statsEl.textContent =
+            "有效 " + r.inputCount +
+            " · 去重 " + r.dupSkipped +
+            " · 剔除 " + r.prefixSkipped +
+            " · 输出 " + r.outputCount;
+        });
+        actions.appendChild(processBtn);
+
+        var copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "artifact-btn copy";
+        copyBtn.textContent = "复制结果";
+        copyBtn.addEventListener("click", function () {
+          if (!outputTa.value.trim()) {
+            alert("请先点击「处理」生成结果。");
+            return;
+          }
+          copyTextToClipboard(outputTa.value, null);
+          flashButtonCopied(copyBtn, "复制结果");
+        });
+        actions.appendChild(copyBtn);
+
+        wrap.appendChild(actions);
+        return wrap;
+      }
+
+      function buildSymbolsPasteInput(step, cfg, cmdEl) {
+        if (!step.symbols_paste) return null;
+        var stepId = step.id || "";
+        var comboOpts = step.symbols_paste_combo_options || [];
+        var wrap = document.createElement("div");
+        wrap.className = "code-filter-tool symbols-paste";
+        wrap.setAttribute("data-step-id", stepId);
+        wrap.addEventListener("mousedown", function (ev) {
+          ev.stopPropagation();
+        });
+        var lab = document.createElement("label");
+        lab.textContent =
+          step.symbols_paste_hint ||
+          "自定义股票列表（可选，粘贴；空则用 MA5 命中股）";
+        wrap.appendChild(lab);
+        var inputTa = document.createElement("textarea");
+        inputTa.className = "symbols-paste-input";
+        inputTa.placeholder = "600519\n000001\n002821  或逗号分隔";
+        inputTa.spellcheck = false;
+        wrap.appendChild(inputTa);
+
+        var comboSelect = null;
+        if (comboOpts.length) {
+          var comboRow = document.createElement("div");
+          comboRow.className = "symbols-paste-combo-row";
+          var comboLab = document.createElement("label");
+          comboLab.textContent = "形态 ID（粘贴列表时必选）";
+          comboRow.appendChild(comboLab);
+          comboSelect = document.createElement("select");
+          comboSelect.className = "symbols-paste-combo-id";
+          comboSelect.setAttribute("aria-label", "自定义列表对应形态 combo-id");
+          var emptyOpt = document.createElement("option");
+          emptyOpt.value = "";
+          emptyOpt.textContent = "— 请选择 —";
+          comboSelect.appendChild(emptyOpt);
+          comboOpts.forEach(function (item) {
+            var opt = document.createElement("option");
+            opt.value = String(item.id);
+            opt.textContent = item.label || String(item.id);
+            comboSelect.appendChild(opt);
+          });
+          comboRow.appendChild(comboSelect);
+          wrap.appendChild(comboRow);
+        }
+
+        var statsEl = document.createElement("span");
+        statsEl.className = "tool-stats";
+        var emptyHint =
+          step.symbols_paste_empty_hint || "未粘贴 → 使用上游 MA5 命中";
+        statsEl.textContent = emptyHint;
+        wrap.appendChild(statsEl);
+
+        function refreshCmdAndStats() {
+          var codes = dedupeSixDigitCodes(inputTa.value);
+          var comboId = comboSelect ? String(comboSelect.value || "") : "";
+          var baseArgs = (step.args || []).slice();
+          if (codes.length) {
+            if (comboOpts.length) {
+              if (comboId) {
+                statsEl.textContent =
+                  "将覆盖运行 " + codes.length + " 只 · combo-id=" + comboId;
+                baseArgs = baseArgs.concat([
+                  "--combo-id",
+                  comboId,
+                  "--symbols",
+                  codes.join(","),
+                ]);
+              } else {
+                statsEl.textContent =
+                  "已粘贴 " + codes.length + " 只 · 请先选择形态 ID";
+              }
+            } else {
+              statsEl.textContent = "将覆盖运行 " + codes.length + " 只";
+              baseArgs = baseArgs.concat(["--symbols", codes.join(",")]);
+            }
+          } else {
+            statsEl.textContent = emptyHint;
+          }
+          updateStepCmdLine(cmdEl, cfg, step.script, baseArgs);
+        }
+        inputTa.addEventListener("input", refreshCmdAndStats);
+        if (comboSelect) {
+          comboSelect.addEventListener("change", refreshCmdAndStats);
+        }
+        refreshCmdAndStats();
+        return wrap;
+      }
+
+      function buildRocPoolSelector(step, cfg, cmdEl) {
+        var presets = step.pool_presets || [];
+        if (!presets.length) return null;
+        var stepId = step.id || "roc_20";
+        var wrap = document.createElement("div");
+        wrap.className = "pool-selector";
+        wrap.setAttribute("data-step-id", stepId);
+        wrap.addEventListener("mousedown", function (ev) {
+          ev.stopPropagation();
+        });
+        var lab = document.createElement("label");
+        lab.textContent = "股票池";
+        wrap.appendChild(lab);
+        var select = document.createElement("select");
+        select.setAttribute("aria-label", "ROC 股票池来源");
+        presets.forEach(function (item) {
+          var opt = document.createElement("option");
+          opt.value = item.path || "";
+          opt.textContent = item.label || item.path || "";
+          select.appendChild(opt);
+        });
+        var customOpt = document.createElement("option");
+        customOpt.value = ROC_POOL_CUSTOM_VALUE;
+        customOpt.textContent = "自定义路径…";
+        select.appendChild(customOpt);
+        var customInput = document.createElement("input");
+        customInput.type = "text";
+        customInput.className = "pool-custom-input";
+        customInput.placeholder = "例如 C:\\股票池\\my_pool.txt";
+        customInput.style.display = "none";
+        var saved = loadRocPoolSelection(stepId, presets);
+        syncRocPoolUIFromStorage(select, customInput, saved);
+        function refreshCmd() {
+          var path = resolveRocPoolPath(select, customInput);
+          updateRocCmdLine(cmdEl, cfg, step.script, path);
+        }
+        function onPoolChange() {
+          if (select.value === ROC_POOL_CUSTOM_VALUE) {
+            customInput.style.display = "";
+            customInput.focus();
+          } else {
+            customInput.style.display = "none";
+            saveRocPoolSelection(stepId, select.value);
+          }
+          refreshCmd();
+        }
+        select.addEventListener("change", onPoolChange);
+        customInput.addEventListener("input", function () {
+          refreshCmd();
+        });
+        customInput.addEventListener("change", function () {
+          var path = resolveRocPoolPath(select, customInput);
+          if (path) saveRocPoolSelection(stepId, path);
+          refreshCmd();
+        });
+        wrap.appendChild(select);
+        wrap.appendChild(customInput);
+        var previewBtn = document.createElement("button");
+        previewBtn.type = "button";
+        previewBtn.className = "artifact-btn";
+        previewBtn.textContent = "预览 · 股票池";
+        previewBtn.addEventListener("click", function () {
+          var path = resolveRocPoolPath(select, customInput);
+          if (!path) {
+            alert("请先选择或填写股票池路径。");
+            return;
+          }
+          openFileEditor(path, "股票池");
+        });
+        wrap.appendChild(previewBtn);
+        var copyRankBtn = document.createElement("button");
+        copyRankBtn.type = "button";
+        copyRankBtn.className = "artifact-btn copy roc-copy-top20";
+        copyRankBtn.textContent = "复制 Top20";
+        copyRankBtn.disabled = !lastRoc20RankCopyText;
+        copyRankBtn.addEventListener("click", function () {
+          copyRoc20Top20Rank(copyRankBtn);
+        });
+        wrap.appendChild(copyRankBtn);
+        refreshCmd();
+        return wrap;
+      }
+
+      function collectStepExtraArgs(stepId) {
+        if (stepId === "roc_20") {
+          var sel = document.querySelector(
+            '.pool-selector[data-step-id="' + stepId + '"]'
+          );
+          if (!sel) return [];
+          var select = sel.querySelector("select");
+          var customInput = sel.querySelector(".pool-custom-input");
+          var path = resolveRocPoolPath(select, customInput);
+          if (!path) {
+            alert("请选择股票池，或填写自定义 txt 路径。");
+            return null;
+          }
+          saveRocPoolSelection(stepId, path);
+          return ["--pool", path];
+        }
+        var pasteWrap = document.querySelector(
+          '.symbols-paste[data-step-id="' + stepId + '"]'
+        );
+        if (pasteWrap) {
+          var ta = pasteWrap.querySelector(".symbols-paste-input");
+          var codes = dedupeSixDigitCodes(ta ? ta.value : "");
+          if (!codes.length) {
+            return [];
+          }
+          var comboSel = pasteWrap.querySelector(".symbols-paste-combo-id");
+          if (comboSel) {
+            var comboId = String(comboSel.value || "").trim();
+            if (!comboId) {
+              alert("已粘贴自定义股票列表，请先选择形态 ID（combo 4 或 6）。");
+              return null;
+            }
+            return ["--combo-id", comboId, "--symbols", codes.join(",")];
+          }
+          return ["--symbols", codes.join(",")];
+        }
+        return [];
+      }
+
+      function collectStepRunPayload(stepId) {
+        var extraArgs = collectStepExtraArgs(stepId);
+        if (extraArgs === null) return null;
+        var modeSel = document.querySelector(
+          '.run-mode-selector[data-step-id="' + stepId + '"] select'
+        );
+        var payload = { extra_args: extraArgs, run_mode: null };
+        if (modeSel && modeSel.value) {
+          payload.run_mode = modeSel.value;
+          saveRunModeSelection(stepId, modeSel.value);
+        }
+        return payload;
+      }
+
+      function renderSteps(cfg) {
+        stepList.innerHTML = "";
+        stepsMeta = {};
+        var steps = cfg.steps || [];
+        steps.forEach(function (s) {
+          var li = document.createElement("li");
+          var hl = stepHighlightMeta(s);
+          var stype = (s.type || "script").toLowerCase();
+          var isTool = stype === "frontend_tool";
+          var navCat = stepNavCategory(s);
+          var sid = s.id || "";
+
+          li.setAttribute("data-step-id", sid);
+          li.setAttribute("data-category", navCat);
+          li.setAttribute("data-search", stepSearchBlob(s, hl, isTool));
+          stepsMeta[sid] = {
+            id: sid,
+            title: s.title || sid,
+            category: navCat,
+          };
+
+          if (hl) {
+            li.classList.add(hl.cls);
+            if (hl.priority) li.classList.add("step-priority");
+          }
+          if (isTool) li.classList.add("step-tool");
+
+          var header = document.createElement("div");
+          header.className = "step-header";
+
+          var headerTop = document.createElement("div");
+          headerTop.className = "step-header-top";
+
+          var headerLeft = document.createElement("div");
+          headerLeft.className = "step-header-left";
+
+          var idEl = document.createElement("div");
+          idEl.className = "id";
+          idEl.textContent = s.id || "";
+          headerLeft.appendChild(idEl);
+
+          var titleEl = document.createElement("div");
+          titleEl.className = "title";
+          titleEl.textContent = s.title || s.id || "";
+          headerLeft.appendChild(titleEl);
+
+          headerTop.appendChild(headerLeft);
+
+          if (!isTool && stype !== "manual") {
+            var runBtn = document.createElement("button");
+            runBtn.type = "button";
+            runBtn.className = "run-one";
+            runBtn.textContent = "运行";
+            runBtn.setAttribute("data-id", s.id || "");
+            runBtn.addEventListener("click", function () { runStep(s.id); });
+            headerTop.appendChild(runBtn);
+          }
+
+          header.appendChild(headerTop);
+
+          var tagsRow = document.createElement("div");
+          tagsRow.className = "step-tags";
+          appendStepTags(tagsRow, hl, s.frequency_note, isTool);
+          if (tagsRow.children.length) {
+            header.appendChild(tagsRow);
+          }
+
+          li.appendChild(header);
+
+          var py = cfg.python_executable || "python";
+          var cmdLine = "";
+          if (stype === "manual") {
+            cmdLine = "（手动）" + (s.note || "");
+          } else if (isTool) {
+            cmdLine = "（前端工具）" + (s.note || "");
+          } else if (s.script) {
+            var parts = [py, s.script].concat(s.args || []);
+            cmdLine = parts.join(" ");
+          }
+
+          var descText = (s.note || "").trim();
+          var body = document.createElement("div");
+          body.className = "step-body";
+          var hasBody = false;
+          var cmdEl = null;
+
+          if (descText && !isTool) {
+            var descEl = document.createElement("div");
+            descEl.className = "step-desc";
+            descEl.textContent = descText;
+            body.appendChild(descEl);
+            hasBody = true;
+          }
+
+          if (cmdLine) {
+            cmdEl = document.createElement("div");
+            cmdEl.className = "step-cmd";
+            cmdEl.textContent = cmdLine;
+          }
+
+          var arts = document.createElement("div");
+          arts.className = "artifacts";
+          var runModeSel = buildRunModeSelector(s, cfg, cmdEl);
+          if (runModeSel) {
+            arts.appendChild(runModeSel);
+          }
+          var poolSel = buildRocPoolSelector(s, cfg, cmdEl);
+          if (poolSel) {
+            arts.appendChild(poolSel);
+          }
+          var symbolsPaste = buildSymbolsPasteInput(s, cfg, cmdEl);
+          if (symbolsPaste) {
+            arts.appendChild(symbolsPaste);
+          }
+          if (isTool && (s.tool || "") === "filter_stock_codes") {
+            arts.appendChild(buildCodeFilterTool(s));
+          }
+          var ins = s.workspace_inputs || [];
+          ins.forEach(function (item) {
+            var bp = item.path || "";
+            if (!bp) return;
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "artifact-btn";
+            b.textContent = "编辑 · " + (item.label || bp);
+            b.addEventListener("click", function () {
+              openFileEditor(bp, item.label || bp);
+            });
+            arts.appendChild(b);
+          });
+          var outs = s.workspace_outputs || [];
+          outs.forEach(function (item) {
+            if (item.glob) {
+              var gwrap = document.createElement("div");
+              gwrap.className = "artifacts-glob";
+              gwrap.setAttribute("data-glob", item.glob);
+              gwrap.setAttribute("data-copy-column", item.copy_column || "news_content");
+              gwrap.setAttribute("data-label-prefix", item.label || "");
+              arts.appendChild(gwrap);
+              refreshGlobArtifactGroup(gwrap);
+              return;
+            }
+            var bp = item.path || "";
+            if (!bp) return;
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "artifact-btn out";
+            if (bp.indexOf("prediction_kline_compare.json") >= 0) {
+              b.textContent = "查看 · " + (item.label || bp);
+              b.addEventListener("click", function () {
+                loadPredictionKlineChart(bp);
+              });
+            } else {
+              b.textContent = "查看 · " + (item.label || bp);
+              b.addEventListener("click", function () {
+                openWorkspacePreview(bp);
+              });
+            }
+            arts.appendChild(b);
+          });
+
+          if (cmdEl) {
+            body.appendChild(cmdEl);
+            hasBody = true;
+          }
+
+          if (arts.children.length) {
+            if (hasBody) {
+              li.appendChild(body);
+            }
+            var footer = document.createElement("div");
+            footer.className = "step-footer";
+            footer.appendChild(arts);
+            li.appendChild(footer);
+          } else if (hasBody) {
+            li.appendChild(body);
+          }
+
+          stepList.appendChild(li);
+        });
+        updateCategoryCounts();
+        renderRecentList();
+        applyStepFilter();
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            fitTopStepsVisible({ resetScroll: false });
+            syncRoc20CopyButtons();
+          });
+        });
+      }
+
+      function openFileEditor(relPath, title) {
+        fileModalPath = relPath;
+        document.getElementById("fileModalTitle").textContent = "编辑：" + title + " (" + relPath + ")";
+        document.getElementById("fileEditorTa").value = "";
+        document.getElementById("fileModal").classList.add("show");
+        fetch("/api/workspace/file?path=" + encodeURIComponent(relPath))
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            document.getElementById("fileEditorTa").value = j.exists ? j.content : "";
+          })
+          .catch(function (e) {
+            alert(String(e));
+          });
+      }
+
+      function closeFileModal() {
+        document.getElementById("fileModal").classList.remove("show");
+        fileModalPath = "";
+      }
+
+      function saveFileModal() {
+        if (!fileModalPath) return;
+        var body = {
+          path: fileModalPath,
+          content: document.getElementById("fileEditorTa").value,
+        };
+        fetch("/api/workspace/file", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+            });
+          })
+          .then(function () {
+            closeFileModal();
+          })
+          .catch(function (e) {
+            alert(String(e));
+          });
+      }
+
+      function isImageWorkspacePath(relPath) {
+        var s = String(relPath || "").toLowerCase();
+        var q = s.indexOf("?");
+        if (q >= 0) s = s.slice(0, q);
+        return (
+          s.endsWith(".png") ||
+          s.endsWith(".jpg") ||
+          s.endsWith(".jpeg") ||
+          s.endsWith(".gif") ||
+          s.endsWith(".webp") ||
+          s.endsWith(".svg")
+        );
+      }
+
+      function isMarkdownWorkspacePath(relPath) {
+        var s = String(relPath || "").toLowerCase();
+        var q = s.indexOf("?");
+        if (q >= 0) s = s.slice(0, q);
+        return s.endsWith(".md") || s.endsWith(".markdown");
+      }
+
+      function isTextWorkspacePath(relPath) {
+        var s = String(relPath || "").toLowerCase();
+        var q = s.indexOf("?");
+        if (q >= 0) s = s.slice(0, q);
+        return s.endsWith(".txt");
+      }
+
+      function resetPreviewMounts(mode) {
+        var tableMount = document.getElementById("tableModalMount");
+        var imageMount = document.getElementById("imageModalMount");
+        var mdMount = document.getElementById("mdModalMount");
+        if (tableMount) {
+          tableMount.innerHTML = "";
+          tableMount.style.display = mode === "table" ? "" : "none";
+        }
+        if (imageMount) {
+          imageMount.innerHTML = "";
+          imageMount.style.display = mode === "image" ? "block" : "none";
+        }
+        if (mdMount) {
+          mdMount.innerHTML = "";
+          mdMount.style.display = mode === "md" ? "block" : "none";
+        }
+      }
+
+      function escapeHtmlText(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderInlineMd(text) {
+        var s = escapeHtmlText(text);
+        s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+        s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        s = s.replace(
+          /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+        return s;
+      }
+
+      function isMdTableSeparator(line) {
+        return /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(line);
+      }
+
+      function splitMdTableRow(line) {
+        var s = String(line || "").trim();
+        if (s.charAt(0) === "|") s = s.slice(1);
+        if (s.charAt(s.length - 1) === "|") s = s.slice(0, -1);
+        return s.split("|").map(function (c) {
+          return c.trim();
+        });
+      }
+
+      function renderMarkdownToHtml(src) {
+        var lines = String(src || "").replace(/\r\n/g, "\n").split("\n");
+        var html = [];
+        var i = 0;
+        var inCode = false;
+        var codeBuf = [];
+        var listType = null;
+
+        function closeList() {
+          if (listType) {
+            html.push(listType === "ol" ? "</ol>" : "</ul>");
+            listType = null;
+          }
+        }
+
+        while (i < lines.length) {
+          var line = lines[i];
+          if (inCode) {
+            if (/^```/.test(line)) {
+              html.push("<pre><code>" + escapeHtmlText(codeBuf.join("\n")) + "</code></pre>");
+              codeBuf = [];
+              inCode = false;
+            } else {
+              codeBuf.push(line);
+            }
+            i += 1;
+            continue;
+          }
+          if (/^```/.test(line)) {
+            closeList();
+            inCode = true;
+            codeBuf = [];
+            i += 1;
+            continue;
+          }
+          if (/^\s*---+\s*$/.test(line) || /^\s*\*\*\*+\s*$/.test(line)) {
+            closeList();
+            html.push("<hr/>");
+            i += 1;
+            continue;
+          }
+          var hm = /^(#{1,3})\s+(.+)$/.exec(line);
+          if (hm) {
+            closeList();
+            var level = hm[1].length;
+            html.push("<h" + level + ">" + renderInlineMd(hm[2]) + "</h" + level + ">");
+            i += 1;
+            continue;
+          }
+          // GFM table: header + separator + rows
+          if (
+            line.indexOf("|") >= 0 &&
+            i + 1 < lines.length &&
+            isMdTableSeparator(lines[i + 1])
+          ) {
+            closeList();
+            var headers = splitMdTableRow(line);
+            i += 2;
+            var rows = [];
+            while (i < lines.length && lines[i].indexOf("|") >= 0 && String(lines[i]).trim()) {
+              if (isMdTableSeparator(lines[i])) {
+                i += 1;
+                continue;
+              }
+              rows.push(splitMdTableRow(lines[i]));
+              i += 1;
+            }
+            html.push("<table><thead><tr>");
+            headers.forEach(function (h) {
+              html.push("<th>" + renderInlineMd(h) + "</th>");
+            });
+            html.push("</tr></thead><tbody>");
+            rows.forEach(function (row) {
+              html.push("<tr>");
+              headers.forEach(function (_h, idx) {
+                html.push("<td>" + renderInlineMd(row[idx] || "") + "</td>");
+              });
+              html.push("</tr>");
+            });
+            html.push("</tbody></table>");
+            continue;
+          }
+          var ul = /^\s*[-*+]\s+(.+)$/.exec(line);
+          if (ul) {
+            if (listType !== "ul") {
+              closeList();
+              html.push("<ul>");
+              listType = "ul";
+            }
+            html.push("<li>" + renderInlineMd(ul[1]) + "</li>");
+            i += 1;
+            continue;
+          }
+          var ol = /^\s*\d+\.\s+(.+)$/.exec(line);
+          if (ol) {
+            if (listType !== "ol") {
+              closeList();
+              html.push("<ol>");
+              listType = "ol";
+            }
+            html.push("<li>" + renderInlineMd(ol[1]) + "</li>");
+            i += 1;
+            continue;
+          }
+          if (!String(line).trim()) {
+            closeList();
+            i += 1;
+            continue;
+          }
+          closeList();
+          html.push("<p>" + renderInlineMd(line) + "</p>");
+          i += 1;
+        }
+        closeList();
+        if (inCode) {
+          html.push("<pre><code>" + escapeHtmlText(codeBuf.join("\n")) + "</code></pre>");
+        }
+        return html.join("\n");
+      }
+
+      function openWorkspacePreview(relPath) {
+        if (isImageWorkspacePath(relPath)) {
+          openImagePreview(relPath);
+          return;
+        }
+        if (isMarkdownWorkspacePath(relPath)) {
+          openMarkdownPreview(relPath);
+          return;
+        }
+        if (isTextWorkspacePath(relPath)) {
+          openTextPreview(relPath);
+          return;
+        }
+        openTablePreview(relPath);
+      }
+
+      function openImagePreview(relPath) {
+        tableModalRelPath = relPath;
+        tableModalLastTable = null;
+        setTableToolbarVisible(false, false);
+        var noteEl = document.getElementById("tableModalNote");
+        var imageMount = document.getElementById("imageModalMount");
+        document.getElementById("tableModalTitle").textContent = "图形：" + relPath;
+        noteEl.textContent = "加载中…";
+        noteEl.removeAttribute("data-base-note");
+        resetPreviewMounts("image");
+        document.getElementById("tableModal").classList.add("show");
+
+        var url =
+          "/api/workspace/media?path=" +
+          encodeURIComponent(relPath) +
+          "&_t=" +
+          String(Date.now());
+        fetch(url)
+          .then(function (r) {
+            if (!r.ok) {
+              return r.json().catch(function () {
+                return { detail: "HTTP " + r.status };
+              }).then(function (j) {
+                var msg =
+                  typeof j.detail === "string"
+                    ? j.detail
+                    : j.detail
+                      ? JSON.stringify(j.detail)
+                      : "HTTP " + r.status;
+                noteEl.textContent =
+                  "无法加载图片：" +
+                  msg +
+                  "。若尚未生成，请先运行对应脚本。";
+                imageMount.innerHTML = "";
+              });
+            }
+            return r.blob().then(function (blob) {
+              var objUrl = URL.createObjectURL(blob);
+              var img = document.createElement("img");
+              img.alt = relPath;
+              img.addEventListener("load", function () {
+                noteEl.textContent =
+                  "净值/图形预览 · " +
+                  (img.naturalWidth || "?") +
+                  "×" +
+                  (img.naturalHeight || "?") +
+                  "px。可右键另存。";
+              });
+              img.addEventListener("error", function () {
+                noteEl.textContent = "图片解码失败。";
+                imageMount.innerHTML = "";
+                URL.revokeObjectURL(objUrl);
+              });
+              img.src = objUrl;
+              imageMount.appendChild(img);
+            });
+          })
+          .catch(function (e) {
+            noteEl.textContent = String(e);
+          });
+      }
+
+      function openMarkdownPreview(relPath) {
+        tableModalRelPath = relPath;
+        tableModalLastTable = null;
+        setTableToolbarVisible(false, false);
+        var noteEl = document.getElementById("tableModalNote");
+        var mdMount = document.getElementById("mdModalMount");
+        document.getElementById("tableModalTitle").textContent = "文档：" + relPath;
+        noteEl.textContent = "加载中…";
+        noteEl.removeAttribute("data-base-note");
+        resetPreviewMounts("md");
+        document.getElementById("tableModal").classList.add("show");
+
+        fetch("/api/workspace/file?path=" + encodeURIComponent(relPath))
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, status: r.status, j: j };
+            });
+          })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var j = _ref.j;
+            if (!ok) {
+              noteEl.textContent =
+                typeof j.detail === "string"
+                  ? j.detail
+                  : "HTTP " + _ref.status + " " + JSON.stringify(j);
+              return;
+            }
+            if (!j.exists) {
+              noteEl.textContent = "文件尚未生成或不存在，请先运行对应脚本。";
+              return;
+            }
+            var raw = String(j.content || "");
+            mdMount.innerHTML = renderMarkdownToHtml(raw);
+            noteEl.textContent =
+              "Markdown 预览 · " + raw.split(/\r?\n/).length + " 行。";
+          })
+          .catch(function (e) {
+            noteEl.textContent = String(e);
+          });
+      }
+
+      function openTextPreview(relPath) {
+        tableModalRelPath = relPath;
+        tableModalLastTable = null;
+        setTableToolbarVisible(false, false);
+        var noteEl = document.getElementById("tableModalNote");
+        var mdMount = document.getElementById("mdModalMount");
+        document.getElementById("tableModalTitle").textContent = "文本：" + relPath;
+        noteEl.textContent = "加载中…";
+        noteEl.removeAttribute("data-base-note");
+        resetPreviewMounts("md");
+        document.getElementById("tableModal").classList.add("show");
+
+        fetch("/api/workspace/file?path=" + encodeURIComponent(relPath))
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, status: r.status, j: j };
+            });
+          })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var j = _ref.j;
+            if (!ok) {
+              noteEl.textContent =
+                typeof j.detail === "string"
+                  ? j.detail
+                  : "HTTP " + _ref.status + " " + JSON.stringify(j);
+              return;
+            }
+            if (!j.exists) {
+              noteEl.textContent = "文件尚未生成或不存在，请先运行对应脚本。";
+              return;
+            }
+            var raw = String(j.content || "");
+            var pre = document.createElement("pre");
+            pre.className = "preview-text-pre";
+            pre.textContent = raw || "（空文件）";
+            mdMount.innerHTML = "";
+            mdMount.appendChild(pre);
+            noteEl.textContent =
+              "文本预览 · " + raw.split(/\r?\n/).length + " 行。";
+          })
+          .catch(function (e) {
+            noteEl.textContent = String(e);
+          });
+      }
+
+      function openTablePreview(relPath) {
+        // 误调表格接口时自动分流到 md/png/txt 预览
+        if (
+          isImageWorkspacePath(relPath) ||
+          isMarkdownWorkspacePath(relPath) ||
+          isTextWorkspacePath(relPath)
+        ) {
+          openWorkspacePreview(relPath);
+          return;
+        }
+        tableModalRelPath = relPath;
+        tableModalLastTable = null;
+        setTableToolbarVisible(false, false);
+        var noteEl = document.getElementById("tableModalNote");
+        var tableMount = document.getElementById("tableModalMount");
+        document.getElementById("tableModalTitle").textContent = "表格：" + relPath;
+        noteEl.textContent = "加载中…";
+        noteEl.removeAttribute("data-base-note");
+        resetPreviewMounts("table");
+        document.getElementById("tableModal").classList.add("show");
+        var q =
+          "/api/workspace/table?path=" +
+          encodeURIComponent(relPath) +
+          "&max_rows=2000";
+        fetch(q)
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, status: r.status, j: j };
+            });
+          })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var j = _ref.j;
+            if (!ok) {
+              document.getElementById("tableModalNote").textContent =
+                typeof j.detail === "string"
+                  ? j.detail
+                  : "HTTP " + _ref.status + " " + JSON.stringify(j);
+              return;
+            }
+            if (
+              j.preview_kind === "image" ||
+              j.preview_kind === "markdown" ||
+              j.preview_kind === "text"
+            ) {
+              openWorkspacePreview(relPath);
+              return;
+            }
+            if (!j.exists) {
+              document.getElementById("tableModalNote").textContent =
+                "文件尚未生成或不存在，请先运行对应脚本。";
+              return;
+            }
+            if (j.preview_unsupported) {
+              document.getElementById("tableModalNote").textContent =
+                (j.preview_note && String(j.preview_note).trim()) ||
+                "当前文件格式无法在网页内预览，请在本机用表格软件打开。";
+              return;
+            }
+            tableModalLastTable = {
+              headers: j.headers || [],
+              rows: j.rows || [],
+            };
+            var note =
+              "共 " +
+              j.rows.length +
+              " 行（预览最多 2000 行）";
+            if (j.truncated) {
+              note += "，已截断；复制时仍仅含已加载行";
+            }
+            if (isTodayHighLowTable(relPath)) {
+              note += "。可选中表格单元格复制，或使用上方「复制全部」。";
+            } else {
+              note += "。可选中表格单元格复制，或使用上方「复制股票代码列」。";
+            }
+            noteEl.textContent = note;
+            noteEl.setAttribute("data-base-note", note);
+            var hasNewsCol = findNewsContentColumnIndex(j.headers || []) >= 0;
+            setTableToolbarVisible(true, hasNewsCol, isTodayHighLowTable(relPath));
+            var tbl = document.createElement("table");
+            tbl.className = "preview-table";
+            var thead = document.createElement("thead");
+            var trh = document.createElement("tr");
+            (j.headers || []).forEach(function (h) {
+              var th = document.createElement("th");
+              th.textContent = h;
+              trh.appendChild(th);
+            });
+            thead.appendChild(trh);
+            tbl.appendChild(thead);
+            var tbody = document.createElement("tbody");
+            (j.rows || []).forEach(function (row) {
+              var tr = document.createElement("tr");
+              (j.headers || []).forEach(function (h, idx) {
+                var td = document.createElement("td");
+                td.textContent = formatPreviewCell(h, row[idx], relPath);
+                tr.appendChild(td);
+              });
+              tbody.appendChild(tr);
+            });
+            tbl.appendChild(tbody);
+            tableMount.appendChild(tbl);
+          })
+          .catch(function (e) {
+            document.getElementById("tableModalNote").textContent = String(e);
+          });
+      }
+
+      function tableModalDoCopyCodes() {
+        var noteEl = document.getElementById("tableModalNote");
+        var codesBtn = document.getElementById("tableModalCopyCodes");
+        var copyAll =
+          codesBtn &&
+          codesBtn.getAttribute("data-copy-mode") === "all";
+        if (!tableModalRelPath) {
+          return;
+        }
+        function extractFromJson(j) {
+          var headers = j.headers || [];
+          var rows = j.rows || [];
+          if (copyAll) {
+            var allText = tableRowsToCopyText(headers, rows, tableModalRelPath);
+            if (!allText) {
+              alert("表格无内容可复制。");
+              return;
+            }
+            copyTextToClipboard(allText, noteEl);
+            flashButtonCopied(codesBtn, "复制全部");
+            return;
+          }
+          var col = findStockCodeColumnIndex(headers);
+          if (col < 0) {
+            alert("未找到「股票代码」类列，请在表格中手动选择该列复制。");
+            return;
+          }
+          var hn = normalizeHeaderCell(headers[col]);
+          var lines = [];
+          for (var r = 0; r < rows.length; r++) {
+            var row = rows[r] || [];
+            var c = row[col];
+            var code = cellToStockCode6(c, hn);
+            if (code) {
+              lines.push(code);
+            }
+          }
+          var text = lines.join("\n");
+          if (!text) {
+            alert("该列无有效代码。");
+            return;
+          }
+          copyTextToClipboard(text, noteEl);
+        }
+        if (tableModalLastTable && tableModalLastTable.headers.length) {
+          extractFromJson({
+            headers: tableModalLastTable.headers,
+            rows: tableModalLastTable.rows,
+          });
+          return;
+        }
+        var q =
+          "/api/workspace/table?path=" +
+          encodeURIComponent(tableModalRelPath) +
+          "&max_rows=2000";
+        fetch(q)
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (j) {
+            if (!j.exists || j.preview_unsupported) {
+              alert("无法读取表格数据。");
+              return;
+            }
+            extractFromJson(j);
+          })
+          .catch(function (e) {
+            alert(String(e));
+          });
+      }
+
+      function tableModalDoCopyNews() {
+        var noteEl = document.getElementById("tableModalNote");
+        if (!tableModalRelPath) {
+          return;
+        }
+        copyWorkspaceColumn(tableModalRelPath, "news_content", function () {
+          if (noteEl) {
+            var base = noteEl.getAttribute("data-base-note") || "";
+            noteEl.textContent = base ? base + " · 已复制 news_content" : "已复制 news_content";
+          }
+        }).catch(function (e) {
+          alert(String(e));
+        });
+      }
+
+      function closeTableModal() {
+        document.getElementById("tableModal").classList.remove("show");
+        setTableToolbarVisible(false, false);
+        tableModalRelPath = "";
+        tableModalLastTable = null;
+        resetPreviewMounts("table");
+      }
+
+      function loadYamlRaw() {
+        return fetch("/api/config/raw").then(function (r) {
+          if (!r.ok) throw new Error("加载 raw 失败 " + r.status);
+          return r.text();
+        });
+      }
+
+      function loadJsonConfig() {
+        return fetch("/api/config").then(function (r) {
+          if (!r.ok) throw new Error("加载 config 失败 " + r.status);
+          return r.json();
+        });
+      }
+
+      function setOutputPaneStatus(kind) {
+        if (!paneOutput) return;
+        paneOutput.classList.remove("has-success", "has-error");
+        if (kind === "ok") paneOutput.classList.add("has-success");
+        if (kind === "err") paneOutput.classList.add("has-error");
+      }
+
+      function refreshAll() {
+        saveMsg.textContent = "";
+        runSummary.textContent = "";
+        setOutputPaneStatus("");
+        return loadYamlRaw().then(function (text) {
+          yamlEditor.value = text;
+          return loadJsonConfig();
+        }).then(function (cfg) {
+          cfgCache = cfg;
+          renderSteps(cfg);
+        }).catch(function (e) {
+          runSummary.innerHTML = '<span class="status-err">' + String(e) + "</span>";
+          setOutputPaneStatus("err");
+        });
+      }
+
+      function runStep(stepId) {
+        var payload = collectStepRunPayload(stepId);
+        if (payload === null) return;
+        touchRecentStep(stepId);
+        setBusy(true);
+        runSummary.textContent = "";
+        setOutputPaneStatus("");
+        appendLog("\n>>> POST /api/run/step/" + stepId + "\n");
+        var fetchInit = { method: "POST" };
+        var body = {};
+        if (payload.extra_args && payload.extra_args.length) {
+          body.extra_args = payload.extra_args;
+        }
+        if (payload.run_mode) {
+          body.run_mode = payload.run_mode;
+        }
+        if (Object.keys(body).length) {
+          fetchInit.headers = { "Content-Type": "application/json" };
+          fetchInit.body = JSON.stringify(body);
+        }
+        fetch("/api/run/step/" + encodeURIComponent(stepId), fetchInit)
+          .then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, status: r.status, j: j };
+            });
+          })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var status = _ref.status;
+            var j = _ref.j;
+            if (!ok) {
+              appendLog("\n[HTTP 错误] " + JSON.stringify(j, null, 2) + "\n");
+              if (status === 409) {
+                runSummary.innerHTML = '<span class="status-err">已有任务在执行，请先停止</span>';
+              } else {
+                runSummary.innerHTML = '<span class="status-err">失败</span>';
+              }
+              setOutputPaneStatus("err");
+              return;
+            }
+            var merged = j.merged_log || "";
+            appendLog(merged);
+            if (stepId === "roc_20") {
+              setLastRoc20RankFromLog(merged, j.exit_code === 0);
+            }
+            if (j.exit_code === 0) {
+              runSummary.innerHTML = '<span class="status-ok">本步 exit_code=0</span>';
+              setOutputPaneStatus("ok");
+              if (stepId === "compute_today") {
+                loadPredictionKlineChart(PREDICTION_KLINE_JSON);
+              }
+            } else {
+              runSummary.innerHTML = '<span class="status-err">本步 exit_code=' + j.exit_code + "</span>";
+              setOutputPaneStatus("err");
+            }
+          })
+          .catch(function (e) {
+            appendLog("\n" + String(e) + "\n");
+            runSummary.innerHTML = '<span class="status-err">请求异常</span>';
+            setOutputPaneStatus("err");
+          })
+          .finally(function () {
+            setBusy(false);
+            refreshAllGlobArtifacts();
+          });
+      }
+
+      function saveYaml() {
+        saveMsg.textContent = "保存中…";
+        fetch("/api/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yaml_text: yamlEditor.value }),
+        })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+              return j;
+            });
+          })
+          .then(function () {
+            saveMsg.innerHTML = '<span class="status-ok">已写入 config/workflow_runner.yaml</span>';
+            flashSaveButton();
+            return refreshAll();
+          })
+          .catch(function (e) {
+            saveMsg.innerHTML = '<span class="status-err">' + String(e) + "</span>";
+          });
+      }
+
+      initWorkbenchNav();
+      initYamlCollapse();
+
+      var fitStepsTimer = null;
+      window.addEventListener("resize", function () {
+        clearTimeout(fitStepsTimer);
+        fitStepsTimer = setTimeout(function () {
+          fitTopStepsVisible({ resetScroll: false });
+        }, 80);
+      });
+
+      if (window.location.protocol === "file:") {
+        clearLog(
+          "请使用 python -m uvicorn workflow_server:app --host 127.0.0.1 --port 8765 启动后通过 http://127.0.0.1:8765/ 打开本页；file:// 无法调用 API。"
+        );
+      } else {
+        refreshAll();
+      }
+
+      document.getElementById("btnStop").addEventListener("click", requestStop);
+      document.getElementById("btnReloadYaml").addEventListener("click", function () {
+        refreshAll();
+      });
+      document.getElementById("btnSaveYaml").addEventListener("click", saveYaml);
+      document.getElementById("fileModalSave").addEventListener("click", saveFileModal);
+      document.getElementById("fileModalCancel").addEventListener("click", closeFileModal);
+      document.getElementById("tableModalClose").addEventListener("click", closeTableModal);
+      document.getElementById("tableModalCopyCodes").addEventListener("click", tableModalDoCopyCodes);
+      document.getElementById("tableModalCopyNews").addEventListener("click", tableModalDoCopyNews);
+      document.getElementById("fileModal").addEventListener("click", function (ev) {
+        if (ev.target.id === "fileModal") {
+          closeFileModal();
+        }
+      });
+      document.getElementById("tableModal").addEventListener("click", function (ev) {
+        if (ev.target.id === "tableModal") {
+          closeTableModal();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

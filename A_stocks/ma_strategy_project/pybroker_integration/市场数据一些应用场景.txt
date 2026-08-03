@@ -1,0 +1,1289 @@
+Thshare 官方接口权限:
+- 基础数据（股票列表）
+- 低频行情（日、周、月）
+- 财务数据（三大报表）
+- 宏观经济
+- ST股票列表
+- 沪港通股票列表
+- 参考数据
+     质押、解禁、回购、增减持
+     龙虎榜
+     融资融券
+
+================================================================================
+【Rotation 文档规则】全局约定（确立规则阶段；实现时新策略文件以 rotation 开头）
+================================================================================
+
+一、策略主标签（扩展五类，模块/函数须标明其一）
+  - 中长线：财报/估值/慢频趋势为主。
+  - 中短线：日频价量、龙虎榜、融资序列等为主。
+  - 事件驱动：公告/解禁/回购等事件日为锚。
+  - 市场结构：指数/风格/跨境池与宽基层配置。
+  - 风控（横切）：池过滤与标志位，可被多策略复用。
+
+二、时点与成交（不做分钟；与「披露后再入场」一致）
+  - 信号所依据的信息须在评估日 T 的收盘时刻已合法可得；财报/事件以披露日/公告日界定可得性。
+  - 默认成交：在 T 日产生并通过全部门控的指令，于 T+1 日开盘价执行（全文档统一，不混用收盘价除非另立策略特例）。
+
+三、接口风格
+  - 细粒度扁平函数名（全小写 snake_case），策略逻辑仅做组合调用与参数覆盖。
+  - 函数优先纯函数（无副作用），便于单测；输入为表/序列+trade_date+参数，输出为 list/Series/bool/DataFrame。
+
+四、数据共享
+  - 原始表（日线 OHLCV、财务带 ann_date、ST 表等）全项目一份字段定义。
+  - 风控/基本面产出为按 trade_date 对齐的标的集合或 bool 向量，多策略复用。
+
+================================================================================
+
+一些可能的应用场景：
+
+# 一、低频 + 基本面：中长期选股策略（核心稳定器）
+
+### ✅ 场景1：成长股趋势增强策略
+
+**策略主标签：** 中长线
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* 利润表/指标表（年报或经公告日对齐的年频）：symbol、end_date（报告期末日）、ann_date（披露日）、revenue（营业收入）、n_income（净利润）、grossprofit_margin 或可由营收与毛利推算的毛利率。
+* 日线行情：trade_date、open、high、low、close、volume（复权方式全局约定一种，如后复权）。
+* ST 状态：trade_date、symbol、is_st（bool）。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. 剔除 ST
+2. 最近 3 个完整财年：营业收入同比、净利润同比均 > 15%（同比为相邻财年，共 3 个同比值；参数可调）。
+3. 毛利率：最近 3 个财年「非递减」或波动不超过给定阈值（参数二选一）。
+4. 技术：T 日收盘满足 close > SMA60 > SMA120（参数可调）。
+5. 调仓：仅在「月度调仓日」做全量再筛选；非调仓日维持持仓规则由 exec 层另定（默认持有至下次调仓再评估）。
+
+---
+
+#### 场景1 · 接口规格（扁平函数，可写单元测试）
+
+以下函数均为场景1或共用风控模块的约定签名；**实现时归入独立 rotation_*.py，不修改既有策略文件。**
+
+---
+
+**函数名：** risk_st_exclude  
+**主标签：** 风控（横切）
+
+* **用途：** 从候选集中剔除 T 日为 ST 的标的。
+* **输入：**
+  - `st_flags`: DataFrame，列至少 `[trade_date, symbol, is_st]`，is_st 为 bool。
+  - `trade_date`: Timestamp，评估日 T。
+  - `universe_symbols`: Optional[list[str]]，候选代码列表；若为 None，则对 `st_flags` 中 trade_date==T 的所有 symbol 评估。
+* **输出：** `allowed: list[str]`，T 日视角允许进入下游筛选的代码。
+* **参数：** 无。
+* **时点：** 仅使用 `trade_date <= T` 且 is_st 已在当日收盘可知的行。
+
+---
+
+**函数名：** fund_filter_announced_rows  
+**主标签：** 中长线
+
+* **用途：** 财务行裁剪为「截至 T 已披露」。
+* **输入：**
+  - `fund_df`: DataFrame，每行一条报告期记录，至少含 `symbol, end_date, ann_date` 及后续指标列。
+  - `trade_date`: Timestamp，T。
+* **输出：** `df_ann: DataFrame`，`ann_date <= trade_date.normalize()` 的子集。
+* **参数：** `ann_col: str = "ann_date"`。
+* **时点：** 无 ann_date 的行不得进入回测（实现时可断言或丢弃）。
+
+---
+
+**函数名：** fund_take_last_n_fiscal_per_symbol  
+**主标签：** 中长线
+
+* **用途：** 每只股票按报告期 `end_date` 取最近 n 条年报记录（已披露子集内）。
+* **输入：**
+  - `df_ann`: DataFrame，已通过 `fund_filter_announced_rows`。
+  - `n_rows: int`，如取 4 行用于计算 3 个财年同比。
+* **输出：** `df_tail: DataFrame`，每 symbol 最多 n_rows 行，按 end_date 降序后截取。
+* **参数：** `symbol_col: str = "symbol"`，`end_col: str = "end_date"`。
+
+---
+
+**函数名：** fund_yoy_chain_all_above  
+**主标签：** 中长线
+
+* **用途：** 对每 symbol，在最近 `n_compare` 个相邻财年对上，营业收入与净利润的同比增长率是否均 >= 阈值。
+* **输入：**
+  - `df_tail`: DataFrame，每 symbol 已按 end_date 升序排列的连续年报行，行数 >= n_compare+1。
+  - 列名：`rev_col`（营业收入），`profit_col`（净利润）。
+* **输出：** `passed: pd.Series`，index=symbol，dtype=bool。
+* **参数：**
+  - `n_compare: int = 3`（表示检验 3 个年度同比段，需至少 4 个财年数据点）。
+  - `min_yoy_rev: float = 0.15`
+  - `min_yoy_profit: float = 0.15`
+* **定义：** 第 i 个同比：YoY_rev_i = rev[i]/rev[i-1]-1，利润同理；要求 i=1..n_compare 均满足 >= 对应阈值。
+
+---
+
+**函数名：** fund_margin_non_decreasing_last_k  
+**主标签：** 中长线
+
+* **用途：** 毛利率趋势门控（对应「稳定或提升」的默认可操作定义：最近 k 个财年非递减）。
+* **输入：**
+  - `df_fiscal_asc`: DataFrame，每 symbol 按 end_date 升序的最近 k 行，含 `margin_col`。
+* **输出：** `passed: pd.Series`，index=symbol，dtype=bool。
+* **参数：**
+  - `k: int = 3`
+  - `margin_col: str = "grossprofit_margin"`（或项目统一毛利率列名）
+* **可选扩展（参数互斥，文档约定默认用非递减）：** `stable_max_spread: Optional[float] = None`，若非 None，则改为 (max-min)<=stable_max_spread 为 True。
+
+---
+
+**函数名：** tech_close_above_sma_stack  
+**主标签：** 中长线
+
+* **用途：** T 日收盘是否满足 close > SMA(short) > SMA(long)。
+* **输入：**
+  - `bars: DataFrame`，单标的日频，索引为 trade_date 升序，含 `close`。
+  - `trade_date`: Timestamp，T。
+* **输出：** `ok: bool`。数据不足（长度 < long+1 或存在 NaN）时约定返回 False。
+* **参数：** `short: int = 60`，`long: int = 120`。
+
+---
+
+**函数名：** exec_is_monthly_rebalance_day  
+**主标签：** 中长线
+
+* **用途：** 判断 T 是否为月度调仓审查日（与业务摘要「月度调仓」对齐）。
+* **输入：**
+  - `trading_days: pd.DatetimeIndex` 或升序去重的 trade_date 列表（全市场交易日历）。
+  - `trade_date`: Timestamp，T。
+* **输出：** `is_rebalance: bool`。
+* **参数：** `rule: str = "first_trading_day_of_month"`，可选 `"last_trading_day_of_month"`（实现二选一，默认首交易日）。
+
+---
+
+**函数名：** rotation_s1_eligible_symbols（场景1组合入口，供集成测试；单元测试可拆测上游各函数）
+
+**主标签：** 中长线
+
+* **用途：** 在调仓日 T 上串联风控+基本面+技术门控，输出可下单标的列表（实际成交仍为 T+1 开盘）。
+* **输入：**
+  - `trade_date`, `universe_symbols`, `st_flags`, `fund_df`, `bars_by_symbol: dict[str, DataFrame]`（或 MultiIndex 长表，实现任选，文档以 dict 为准便于单测注入）。
+* **输出：** `eligible: list[str]`。
+* **参数：** 透传上述各函数的参数（yoy 阈值、均线窗口、月调规则、margin 模式等）。
+* **组合顺序（固定）：**
+  1. `risk_st_exclude`
+  2. `fund_filter_announced_rows` → `fund_take_last_n_fiscal_per_symbol` → `fund_yoy_chain_all_above` → `fund_margin_non_decreasing_last_k`（标的取交集）
+  3. 对剩余标的逐个 `tech_close_above_sma_stack`
+  4. 若 `exec_is_monthly_rebalance_day(...)` 为 False，约定本函数返回「不在此日改仓」的语义：实现可选用 `eligible_unchanged` 或返回 None 并由上层持有逻辑处理——**文档约定：** 非调仓日本函数不返回新池，由调用方保留前次持仓集合（单测需覆盖两种分支）。
+
+---
+
+**场景1 与 Tushare 数据映射提示（非接口）：** 年频财务需带 `ann_date`；若无单独 ann 字段则需用公告接口合并。日线需与全局复权约定一致。
+
+👉 本质：**基本面选股 + 趋势确认（类似机构打法）**
+
+---
+
+### ✅ 场景2：高现金流价值回归策略
+
+**策略主标签：** 中长线
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* 资产负债表：symbol、end_date、ann_date、total_liab（负债合计）、total_assets（资产总计）等。
+* 现金流量表：symbol、end_date、ann_date、n_cashflow_act（经营现金流净额）、c_pay_acq_const（购建固定资产等支付的现金，或其它约定的资本支出列）等。
+* 利润表（季报）：symbol、end_date、ann_date、n_income（净利润），用于滚动 TTM 盈利。
+* 日行情：trade_date、close；股本：float_share 或 total_share（与全局约定一致），用于 T 日市值。
+* PE 历史：可由数据层预计算为「每标的、每个 trade_date 的 TTM_PE」序列；本场景接口接收已对齐序列以免单测绑定复杂管线。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. 自由现金流率：FCF / 市值 ≥ 阈值（默认 5%）。FCF 默认定义为「经营现金流净额 − 资本支出」，资本支出列符号若与 Tushare 约定相反，用参数修正（见 `fund_fcf_yield_ok`）。
+2. 资产负债率：total_liab / total_assets < 0.6（参数可调）。
+3. PE：在 T 日由「已披露季报滚动 TTM 净利润」与「T 日收盘市值」计算 TTM_PE；相对该标的**自身**过去一段交易日的 TTM_PE 分布，处于低位分位数（默认：当前 PE ≤ 历史样本的 20% 分位数）。历史窗口长度参数化，历史序列不含未来数据。
+4. 技术：T 日收盘相对 SMA(20) 的偏离满足「跌破均线至少 3%」，即 (SMA20 − close) / SMA20 ≥ 0.03（与「错杀」语义一致；参数可调）。
+5. 成交：仍遵守全局约定——通过门控的指令 T+1 开盘价执行。
+6. 可选：与场景1相同先调用 `risk_st_exclude`（文档默认**建议**组合时启用，参数 `use_st_filter: bool = True`）。
+
+**复用场景1函数（不在此重复全文）：** `risk_st_exclude`、`fund_filter_announced_rows`。
+
+---
+
+#### 场景2 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** fund_stmt_latest_merged_asof  
+**主标签：** 中长线
+
+* **用途：** 在截至 T 已披露前提下，为每只股票取**同一报告期 end_date** 下资产负债表与现金流量表合并行（避免两张表各取「最新」导致 end_date 错配）。
+* **输入：**
+  - `bs_df`, `cf_df`: DataFrame，均至少含 `symbol, end_date, ann_date` 及各自字段列。
+  - `trade_date`: Timestamp，T。
+* **输出：** `merged: DataFrame`，index 可为 range，每行对应一个 (symbol, end_date)，同时含 bs 与 cf 列。
+* **参数：**
+  - `ann_col: str = "ann_date"`
+  - `join_keys: tuple = ("symbol", "end_date")`
+* **规则（文档约束）：** 仅保留 `ann_date <= T` 的行；对每张表按 symbol 分组取「end_date 最大」的一期，再对两表按 `join_keys` inner join；若某 symbol 缺一侧，该 symbol 不出现在 merged 中。
+
+---
+
+**函数名：** fund_fcf_yield_ok  
+**主标签：** 中长线
+
+* **用途：** 根据合并后的现金流字段与 T 日市值，计算 FCF 率并筛选。
+* **输入：**
+  - `merged_stmt: DataFrame`，含经营现金流、资本支出相关列。
+  - `mcap_at_t: pd.Series`，index=symbol，值为 T 日总市值（由 close×股本在外部计算后传入）。
+  - `symbol_col: str = "symbol"`
+* **输出：** `passed: pd.Series`，index=symbol，dtype=bool。
+* **参数：**
+  - `ocf_col: str = "n_cashflow_act"`
+  - `capex_col: str = "c_pay_acq_const"`
+  - `capex_sign: str = "positive_is_outflow"`（默认：表中 capex 为正表示现金流出，则 `fcf = ocf - capex`；若为 `"negative_is_outflow"`，则 `fcf = ocf + capex`）
+  - `min_fcf_yield: float = 0.05`
+* **约定：** 若 mcap<=0 或 fcf 为 NaN，该 symbol 记为 False。
+
+---
+
+**函数名：** fund_debt_ratio_below  
+**主标签：** 中长线
+
+* **用途：** 资产负债率门控。
+* **输入：**
+  - `merged_stmt: DataFrame`，含 `total_liab`, `total_assets`（列名可参数化）。
+* **输出：** `passed: pd.Series`，index=symbol，dtype=bool。
+* **参数：**
+  - `liab_col: str = "total_liab"`
+  - `asset_col: str = "total_assets"`
+  - `max_debt_ratio: float = 0.6`
+* **约定：** total_assets<=0 或缺失 → False。
+
+---
+
+**函数名：** val_income_quarterly_ttm_net_asof  
+**主标签：** 中长线
+
+* **用途：** 在 T 日仅使用已披露季报，计算每标的滚动四季度净利润 TTM。
+* **输入：**
+  - `income_q_df`: DataFrame，至少 `symbol, end_date, ann_date, n_income`（单季净利润）。
+  - `trade_date`: Timestamp，T。
+* **输出：** `ttm_net: pd.Series`，index=symbol。
+* **参数：** `ann_col: str = "ann_date"`。
+* **规则：** 先 `ann_date <= T`；每 symbol 按 `end_date` 升序取最近 4 条季报求和；不足 4 条则该 symbol 输出 NaN（下游视为不满足 PE 条件）。
+
+---
+
+**函数名：** val_mcap_from_close_and_shares  
+**主标签：** 中长线
+
+* **用途：** T 日市值。
+* **输入：**
+  - `close_at_t: pd.Series`，index=symbol，T 日收盘价。
+  - `shares: pd.Series`，index=symbol，与 close 对齐的股本（流通或总股本由全局约定）。
+* **输出：** `mcap: pd.Series`。
+* **参数：** 无。
+
+---
+
+**函数名：** val_pe_ttm  
+**主标签：** 中长线
+
+* **用途：** TTM 市盈率。
+* **输入：** `mcap: pd.Series`，`ttm_net: pd.Series`，对齐相同 index。
+* **输出：** `pe: pd.Series`；`ttm_net <= 0` 或缺失处为 NaN。
+* **参数：** `eps_floor: float = 1e-9`（防止除零，实现可选用）。
+
+---
+
+**函数名：** val_pe_at_historical_low_quantile  
+**主标签：** 中长线
+
+* **用途：** 判断当前 PE 是否处于自身历史低位（分位数定义可操作化）。
+* **输入：**
+  - `current_pe: float`
+  - `historical_pe: pd.Series`，索引为历史 trade_date，**全部 < T 日**（或 ≤ T-1 交易日），值为同日算出的 TTM_PE，长度由数据层保证 ≥ `min_hist_points`。
+* **输出：** `is_low: bool`；历史样本不足时约定返回 False。
+* **参数：**
+  - `low_quantile: float = 0.2`（当前 PE ≤ historical_pe.quantile(low_quantile) 为 True）
+  - `min_hist_points: int = 60`
+* **时点：** `historical_pe` 不得包含使用 T 日之后财报或 T 日之后价格算出的 PE；单测通过注入序列验证。
+
+---
+
+**函数名：** val_pe_histories_by_symbol  
+**主标签：** 中长线（数据准备约定，可为纯数据结构说明）
+
+* **用途：** 说明数据层向 `rotation_s2` 提供的形状；**可选实现为独立加载函数**。
+* **输入/输出约定：** `dict[str, pd.Series]`，key=symbol，Series 为过去窗口的 TTM_PE（index=trade_date），供 `val_pe_at_historical_low_quantile` 使用。窗口长度参数 `lookback_trading_days: int` 默认 `252*3`（可配置）。
+
+---
+
+**函数名：** tech_close_below_sma_by_pct  
+**主标签：** 中长线
+
+* **用途：** 「跌破 20 日均线 −3%」的日线可操作定义。
+* **输入：**
+  - `bars: DataFrame`，单标的日频，索引升序，含 `close`。
+  - `trade_date`: Timestamp，T。
+* **输出：** `ok: bool`。
+* **参数：**
+  - `window: int = 20`
+  - `min_below_pct: float = 0.03` 表示 (SMA − close) / SMA ≥ min_below_pct。
+* **约定：** 数据不足或 SMA 为 NaN → False。
+
+---
+
+**函数名：** rotation_s2_eligible_symbols（场景2组合入口）
+
+**主标签：** 中长线
+
+* **用途：** 串联 ST 过滤（可选）、报表合并、现金流率与杠杆、PE 低位、技术错杀门控，得到 T 日收盘视角合格标的（下单仍 T+1 开盘）。
+* **输入：**
+  - `trade_date`
+  - `universe_symbols: list[str]`
+  - `st_flags`（当 use_st_filter）
+  - `bs_df`, `cf_df`, `income_q_df`
+  - `close_at_t: pd.Series`, `shares: pd.Series`
+  - `pe_history_by_symbol: dict[str, pd.Series]`（或由 `val_pe_histories_by_symbol` 产出）
+  - `bars_by_symbol: dict[str, DataFrame]`
+* **输出：** `eligible: list[str]`。
+* **参数：** 透传各函数阈值；`use_st_filter: bool = True`。
+* **组合顺序（固定）：**
+  1. `risk_st_exclude`（若 use_st_filter）
+  2. `fund_stmt_latest_merged_asof` → `fund_fcf_yield_ok` ∩ `fund_debt_ratio_below`
+  3. `val_income_quarterly_ttm_net_asof` → `val_mcap_from_close_and_shares` → `val_pe_ttm`；对每个剩余 symbol：`val_pe_at_historical_low_quantile(current_pe, pe_history_by_symbol[s])`
+  4. `tech_close_below_sma_by_pct` 逐标的筛选
+  5. 全程对齐 symbol 取交集
+
+---
+
+**场景2 与 Tushare 映射提示（非接口）：** 资本支出列名因接口版本可能不同；PE 历史若在线计算成本高，建议离线表 `symbol, trade_date, pe_ttm` 供读取。资产负债与现金流须带 `ann_date`。
+
+👉 本质：**价值股“被错杀”反弹**
+
+---
+
+# 二、中短线：资金驱动策略（收益弹性来源）
+
+### ✅ 场景3：龙虎榜跟随策略（游资行为）
+
+**策略主标签：** 中短线（龙虎榜为日频事件触发，可归「资金/榜单」副标签）
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* 龙虎榜明细：需能汇总为「交易日 trade_date、标的 symbol、单日净买入金额 net_buy」（机构+营业部方向由数据层先聚合，接口见 `event_dragon_daily_net_buy`）。
+* 日线行情：trade_date、open、high、low、close、volume、**turnover_rate**（换手率，% 或小数由参数 `turnover_is_pct` 统一）。
+* 融资融券（可选门控）：trade_date、symbol、rzye（融资余额）等，用于扩展过滤。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. **T 日（上榜日）收盘后可知：** 标的当日在龙虎榜汇总中，且 `net_buy >=` 阈值（默认 5000 万）。
+2. **不做分钟数据：**「次日低开或小幅高开（<2%）」操作化为：**T+1 日开盘价**相对 **T 日收盘价** 的相对跳空 `(O_{T+1} - C_T) / C_T < max_gap_up_pct`（默认 0.02）；低开（负跳空）自然满足上界。若跳空 ≥ 阈值则**不在 T+1 开盘买入**（放弃信号）。
+3. **成交：** 满足跳空条件时，**T+1 日开盘价**买入；与全局「T 盘后信号 / T+1 开盘成交」一致（此处 T 为上榜日；跳空判定在 T+1 开盘时刻用当日 open 与昨收，无分钟仍用日线 open）。
+4. **持有：** 买入后持有 `hold_trading_days` 个交易日（默认 3，允许配置 2~5），在 **届满日开盘价** 全部卖出（参数可改为收盘价，须显式改策略特例）。
+5. **优化项（默认建议开启，可参数关闭）：** 剔除「连续涨停」超阈值标的；换手率落在给定区间内。
+
+**复用（仅引用）：** `risk_st_exclude`（若全市场榜单需先与可选 universe 交集）。
+
+---
+
+#### 场景3 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** event_dragon_daily_net_buy  
+**主标签：** 中短线
+
+* **用途：** 将龙虎榜原始明细聚合为「每交易日每标的」一行净买入（数据清洗层可单独测）。
+* **输入：**
+  - `dragon_raw: DataFrame`，至少含 `trade_date, symbol, amount` 或买卖方向字段（实现定义如何轧差为净买入）。
+* **输出：** `dragon_daily: DataFrame`，列 `trade_date, symbol, net_buy`（float）。
+* **参数：** `date_col`, `symbol_col`, 及轧差规则相关列名（实现文档化即可）。
+
+---
+
+**函数名：** event_dragon_net_buy_screen  
+**主标签：** 中短线
+
+* **用途：** T 日上榜且净买入达标。
+* **输入：**
+  - `dragon_daily: DataFrame`，已聚合。
+  - `trade_date`: Timestamp，T（上榜日）。
+  - `universe_symbols: Optional[list[str]]`，若为 None 则不过滤池。
+* **输出：** `symbols: list[str]`。
+* **参数：**
+  - `min_net_buy: float = 50_000_000.0`
+  - `net_buy_col: str = "net_buy"`
+  - `date_col: str = "trade_date"`
+  - `symbol_col: str = "symbol"`
+
+---
+
+**函数名：** tech_consecutive_limit_up_streak  
+**主标签：** 中短线
+
+* **用途：** 计算截至 **T 日（含）** 结束的「连续涨停」天数（向过去回溯，遇非涨停则断）。
+* **输入：**
+  - `bars: DataFrame`，单标的日频，索引或列含 trade_date 升序，含 `close`；若有 `pct_chg` 可优先使用。
+* **输出：** `streak: int`（0 表示 T 日非涨停）。
+* **参数：**
+  - `trade_date`: Timestamp，T。
+  - `limit_pct: float = 0.098`（普通股票近似涨停；ST 用单独参数 `st_limit_pct` 或调用方换参）。
+  - `price_col: str = "close"`，用当日涨幅时用 `(close / prev_close - 1) >= limit_pct` 判定涨停。
+* **约定：** 数据不足或无法算前收 → streak 视为 0 或 False（实现选一种并写单测）。
+
+---
+
+**函数名：** risk_exclude_hot_streak_limit_up  
+**主标签：** 风控（横切）或 中短线（与场景3绑定时标中短线）
+
+* **用途：** 「剔除连续涨停」：若 streak ≥ `min_streak_exclude` 则剔除（例如已连续 2 个涨停则剔除，参数可调）。
+* **输入：**
+  - `streak: int`（来自 `tech_consecutive_limit_up_streak`）。
+* **输出：** `allowed: bool`（True 表示未触发剔除，可进入候选）。
+* **参数：** `min_streak_exclude: int = 2`（表示从第 2 个连续涨停开始剔除；若语义改为「≥3 连板才剔除」则设为 3）。
+
+---
+
+**函数名：** tech_turnover_between  
+**主标签：** 中短线
+
+* **用途：** 换手率过滤（优化项）。
+* **输入：**
+  - `bars: DataFrame`，单标的，含 `turnover_rate` 或等价列。
+  - `trade_date`: Timestamp，T（通常用上榜日换手）。
+* **输出：** `ok: bool`。
+* **参数：**
+  - `turnover_col: str = "turnover_rate"`
+  - `min_turnover: Optional[float] = None`，`max_turnover: Optional[float] = None`（闭区间或半开由实现约定，文档默认 inclusive）
+  - `turnover_is_pct: bool = True`（若为 True，则 1.5 表示 1.5%）
+
+---
+
+**函数名：** flow_margin_balance_flat_or_down  
+**主标签：** 中短线
+
+* **用途：** 可选：融资余额相对前一日不增（情绪不过热）；不用则组合层跳过。
+* **输入：**
+  - `margin_by_symbol: DataFrame`，多行含 `trade_date, symbol, rzye`（融资余额）。
+  - `trade_date`: Timestamp，T。
+* **输出：** `ok: bool`。
+* **参数：** `symbol`, `lookback_days: int = 1`（与 T-1 比较，rzye_T <= rzye_{T-1}）。
+
+---
+
+**函数名：** exec_overnight_gap_below_pct  
+**主标签：** 中短线
+
+* **用途：** 无分钟下的「次日低开或小幅高开 <2%」：用 T+1.open 与 T.close。
+* **输入：**
+  - `prior_close: float`，T 日收盘价。
+  - `open_t1: float`，T+1 日开盘价。
+* **输出：** `ok: bool`。
+* **参数：** `max_gap_up_pct: float = 0.02`，判定 `(open_t1 - prior_close) / prior_close < max_gap_up_pct`。
+* **约定：** prior_close<=0 → False。
+
+---
+
+**函数名：** exec_exit_date_after_hold  
+**主标签：** 中短线
+
+* **用途：** 自入场日（首个持仓交易日）起数 `hold_trading_days` 个交易日，得到**卖出日**（在该日开盘卖）。
+* **输入：**
+  - `entry_trade_date`: Timestamp，**买入成交日**（场景3为 T+1）。
+  - `trading_calendar: pd.DatetimeIndex` 升序。
+* **输出：** `exit_trade_date: Timestamp` 或 `Optional`（若日历不够长则 None）。
+* **参数：** `hold_trading_days: int = 3`（允许 2~5）。
+
+---
+
+**函数名：** rotation_s3_candidates_on_list_day（T 日盘后组合）
+
+**主标签：** 中短线
+
+* **用途：** 在上榜日收盘后得到「可能参与 T+1 开盘竞价」的标的列表（尚未做跳空过滤）。
+* **输入：** `trade_date=T`, `dragon_daily`, `universe_symbols`, `st_flags`, `bars_by_symbol`, `margin_df`（可选）等。
+* **输出：** `candidates: list[str]`。
+* **组合顺序：**
+  1. `risk_st_exclude`（可选）
+  2. `event_dragon_net_buy_screen`
+  3. 每标的 `tech_consecutive_limit_up_streak` + `risk_exclude_hot_streak_limit_up`
+  4. `tech_turnover_between`（若启用）
+  5. `flow_margin_balance_flat_or_down`（若启用）
+
+---
+
+**函数名：** rotation_s3_should_buy_at_next_open（T+1 开盘决策）
+
+**主标签：** 中短线
+
+* **用途：** 对单一候选标的，在 T+1 是否允许按开盘价买入。
+* **输入：** `prior_close`（T 日收）, `open_t1`（T+1 日开），可选再校验 ST/停牌等（停牌无成交则 False）。
+* **输出：** `should_buy: bool`。
+* **参数：** 透传 `exec_overnight_gap_below_pct`。
+
+---
+
+**函数名：** rotation_s3_position_plan（可选一体化出口，供集成测试）
+
+**主标签：** 中短线
+
+* **用途：** 给定 T 日数据与 T+1 日 open，输出「买/不买」及计划平仓日（需交易日历）。
+* **输入：** 合并上述所需表与 `trading_calendar`。
+* **输出：** 建议结构 `dict`，如 `{"buy": list[str], "skip_gap": list[str], "exit_map": {symbol: exit_date}}`（实现可简化）。
+
+---
+
+**场景3 与全局约定对齐说明：** 上榜信号 **T 日盘后** 可知；跳空用 **T+1 日线 open**；买入价为 **T+1 open**；卖出价为 **持仓满 `hold_trading_days` 后的首个交易日 open**。若回测引擎无法区分「开盘是否可成交」，由实现层用 open 价近似并文档记录。
+
+👉 可优化项已纳入：`risk_exclude_hot_streak_limit_up`、`tech_turnover_between`。
+
+👉 本质：**复制游资路径**
+
+---
+
+### ✅ 场景4：融资融券情绪反转策略
+
+**策略主标签：** 中短线（资金流序列 + 日线形态）
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* 融资融券：trade_date、symbol、rzye（融资余额）；若仅有全市场汇总无分标的，则本场景不适用分标的回测（文档约定数据粒度须到 symbol）。
+* 日线行情：trade_date、open、high、low、close、volume。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. **融资余额连续 5 日下降（可操作定义）：** 以 T 为终点，取 **6 个连续交易日** 的 `rzye`，按时间从旧到新记为 `z_0…z_5`（`z_5` 为 T 日）。**严格连降**要求 `z_5 < z_4 < … < z_0`（共 5 段严格下降）。若口径改为「5 根 K 线、4 次相邻下降」，则取 5 个点并将参数 `n_steps` 设为 4（见 `flow_rzye_strict_down_steps`）。
+2. **股价未明显下跌：** 自 `T - lookback_price` 日收盘价至 T 日收盘价，累计收益率 `>= min_cum_return`（默认 -0.05，即跌幅不超过约 5%；参数可调）。
+3. **放量阳线：** T 日 `close > open`；且 `volume_T >= vol_ma_window` 日均量 × `volume_mult`（默认窗口 5、倍数 1.2）。
+4. **时点与成交：** 上述条件均在 **T 日收盘** 后可知；满足则 **T+1 日开盘价** 买入（全局约定）。
+5. **可选：** 组合前使用 `risk_st_exclude`；卖出规则本场景未限定，由上层 `exec_*` 或组合策略指定（文档默认：若未接组合，可实现为固定持有 N 日开盘卖，**非本场景必选**）。
+
+**复用（仅引用）：** `risk_st_exclude`。
+
+---
+
+#### 场景4 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** flow_margin_rzye_series_until  
+**主标签：** 中短线
+
+* **用途：** 取出单标的截至 T（含）的融资余额时间序列切片，按交易日升序。
+* **输入：**
+  - `margin_df: DataFrame`，列含 `trade_date, symbol, rzye`。
+  - `symbol: str`
+  - `trade_date`: Timestamp，T。
+* **输出：** `s: pd.Series`，index=trade_date，value=rzye，升序；缺失日期不填充（由后续函数要求连续日历）。
+* **参数：** `date_col`, `symbol_col`, `balance_col` 可配置，默认 `trade_date, symbol, rzye`。
+
+---
+
+**函数名：** flow_rzye_strict_down_steps  
+**主标签：** 中短线
+
+* **用途：** 判断以 T 为终点，是否实现 **连续 `n_steps` 次**「相邻交易日融资余额严格下降」。
+* **输入：**
+  - `rzye_series: pd.Series`，index 为连续交易日（已按日对齐，长度 ≥ n_steps+1）。
+  - `trade_date`: Timestamp，T（须在 index 中）。
+* **输出：** `ok: bool`。
+* **参数：** `n_steps: int = 5`（需 `n_steps+1` 个有效数值；从 T 起向前取共 `n_steps+1` 个交易日）。
+* **规则：** 将上述 `n_steps+1` 个余额按时间**从旧到新**排成 `z_0, z_1, …, z_{n_steps}`（`z_{n_steps}` 为 T 日）。**严格连降**定义为：对每个 `i = 0..n_steps-1` 有 `z_{i+1} < z_i`（越新的交易日余额越小），即  
+  `rzye(T) < rzye(T-1) < … < rzye(T-n_steps)`。  
+  若需与「5 根 K 线、4 次下降」口径一致，将 `n_steps` 设为 4 即可。
+
+---
+
+**函数名：** tech_cumulative_return_from_lag_close  
+**主标签：** 中短线
+
+* **用途：** 「抗跌」：从过去第 `lag` 个交易日收盘价到 T 日收盘的累计收益。
+* **输入：**
+  - `bars: DataFrame`，单标的，升序，含 `close`，索引或列含 trade_date。
+  - `trade_date`: Timestamp，T。
+* **输出：** `cum_ret: float` 或 `Optional[float]`（数据不足为 None）。
+* **参数：** `lag_trading_days: int = 5`（使用 T 与 T 之前第 lag 根 K 线的收盘；即跨度为 lag 个交易日间隔）。
+
+---
+
+**函数名：** tech_price_resilience_ok  
+**主标签：** 中短线
+
+* **用途：** 股价未明显下跌。
+* **输入：** `cum_ret`（来自 `tech_cumulative_return_from_lag_close`）或内部调用。
+* **输出：** `ok: bool`。
+* **参数：** `min_cum_return: float = -0.05`（cum_ret >= min_cum_return 为 True）。
+
+---
+
+**函数名：** tech_bull_bar  
+**主标签：** 中短线
+
+* **用途：** 阳线：`close > open`（可选再加 `close >= prev_close`，默认仅实体阳）。
+* **输入：** `bars`, `trade_date`。
+* **输出：** `ok: bool`。
+* **参数：** `require_close_ge_prev_close: bool = False`。
+
+---
+
+**函数名：** tech_volume_vs_ma_ratio  
+**主标签：** 中短线
+
+* **用途：** T 日成交量相对过去 `window` 日（含 T）或不含 T 的均量倍数（文档约定 **含 T 的截止 T 的过去 window 日均量**，实现时用 T 当日 volume 与 `mean(volume_{T-window+1..T})` 或前 window 不含 T 二选一，**默认：不含 T 的前 window 日均量**，避免把当日量混进基准导致定义含糊）。
+* **输入：** `bars`, `trade_date`。
+* **输出：** `ratio: float`（vol_T / mean(vol past window excluding T)）或 None。
+* **参数：** `window: int = 5`，`exclude_today_from_ma: bool = True`（默认 True）。
+
+---
+
+**函数名：** tech_volume_spike_ok  
+**主标签：** 中短线
+
+* **用途：** 放量门控。
+* **输入：** `bars`, `trade_date`。
+* **输出：** `ok: bool`。
+* **参数：** `window: int = 5`，`min_ratio: float = 1.2`（volume_T / MA_vol >= min_ratio）。
+
+---
+
+**函数名：** rotation_s4_signal_at_close（单标的，T 日收盘视角）
+
+**主标签：** 中短线
+
+* **用途：** 串联融资连降、抗跌、放量阳线。
+* **输入：** `margin_df`, `bars`, `trade_date`, `symbol`。
+* **输出：** `signal: bool`。
+* **组合顺序：**
+  1. `flow_margin_rzye_series_until` → 取末段 `n_steps+1` 点 → `flow_rzye_strict_down_steps`
+  2. `tech_cumulative_return_from_lag_close` → `tech_price_resilience_ok`
+  3. `tech_bull_bar` ∧ `tech_volume_spike_ok`
+
+---
+
+**函数名：** rotation_s4_eligible_symbols（场景4组合入口）
+
+**主标签：** 中短线
+
+* **用途：** 对 `universe_symbols` 逐标的调用 `rotation_s4_signal_at_close`，再可选 `risk_st_exclude`。
+* **输入：** `trade_date`, `universe_symbols`, `margin_df`, `bars_by_symbol`, `st_flags`（可选）。
+* **输出：** `eligible: list[str]`（T+1 开盘可买集合；本函数不返回价位，成交规则见全局）。
+* **参数：** 透传各子函数参数。
+
+---
+
+**场景4 单测提示：** `flow_rzye_strict_down_steps` 用构造单调降序列/断点序列；`tech_volume_spike_ok` 对「均量是否含当日」与文档默认 `exclude_today_from_ma=True` 各写一例。
+
+👉 本质：**散户恐慌 → 主力吸筹**
+
+---
+
+# 三、事件驱动：确定性套利策略（高胜率）
+
+### ✅ 场景5：解禁冲击 + 反弹策略
+
+**用到数据：**
+
+* 解禁数据
+* 日线行情
+
+**策略逻辑：**
+
+1. 解禁日前 5 天：
+
+   * 股价持续下跌
+2. 解禁当日：
+
+   * 跌幅 < 3%（不恐慌）
+3. 次日：
+
+   * 阳线 → 买入
+
+👉 本质：**利空落地 → 反弹**
+
+---
+
+### ✅ 场景6：回购公告跟随策略
+
+**用到数据：**
+
+* 回购数据
+* 日线行情
+
+**策略逻辑：**
+
+1. 发布回购公告
+2. 回购金额 / 市值 > 1%
+3. 股价未大涨（<5%）
+
+👉 本质：**公司认为低估 → 信号强化**
+
+---
+
+# 四、市场结构类策略（提高稳定性）
+
+### ✅ 场景7：指数轮动策略（你已有池子可升级）
+
+**策略主标签：** 市场结构
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* **指数日线**（默认）：每个参与轮动的指数一条行情序列，trade_date 升序，含 `open, high, low, close, volume`（动量仅用 `close`）。指数代码如 `000300.SH`（沪深300）、`000905.SH`（中证500）等，由参数 `index_universe: list[str]` 配置。
+* **指数成分 / ETF 映射（实现持仓用，非动量计算必需）：** 选定指数后，需将「配置该指数」落实为持有成分股、ETF 或期货——**本场景接口只产出目标指数代码与权重**；下挂标的由 `rotation_s7_map_index_to_holdings` 或回测引擎另行约定。
+* **可选周线：** 若数据源仅有周线，可将 `bar_freq="weekly"`，并把回望长度改为「周数」（见 `struct_roc_at_date`）；**与「20 日 / 60 日」字面不一致时以参数表为准**。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. 在 **月度调仓日 T**（与场景1 `exec_is_monthly_rebalance_day` 同规则，或参数覆盖）对 `index_universe` 中每个指数计算 **短、长两档动量**：默认分别为 **过去 20 个、60 个交易日** 的收盘价比率动量 `ROC = close_T / close_{T-L} - 1`。
+2. **综合得分：** `score = w_short * roc_short + w_long * roc_long`（默认 `w_short=w_long=0.5`）；任一项为 NaN 时该指数 **本轮剔除**（`score` 视为无效）。
+3. **择优：** 取 **score 最大** 的指数为唯一持仓标的（全额配置）；并列时按 `index_universe` **列表中先出现者优先**。
+4. **时点与成交：** T 日收盘后可知各指数收盘与动量；**换仓指令在 T+1 日开盘价** 执行（全局约定）。非调仓日不改变场景7给出的目标指数（由上层持有逻辑执行）。
+5. **可扩展指数池：** 创业板、科创50、红利指数等仅增加 `index_universe` 元素，不新增业务函数。
+
+**复用（仅引用）：** `exec_is_monthly_rebalance_day`（场景1）。
+
+---
+
+#### 场景7 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** struct_index_bars_slice_until  
+**主标签：** 市场结构
+
+* **用途：** 截取单指数截至 T（含）的行情，升序，供动量计算。
+* **输入：**
+  - `bars: DataFrame`，单指数，索引或列含 `trade_date`，含 `close`。
+  - `trade_date`: Timestamp，T。
+* **输出：** `df: DataFrame`，`trade_date <= T` 的子集，仍升序。
+* **参数：** `date_col: Optional[str] = None`（若 `trade_date` 为索引则可为 None）。
+
+---
+
+**函数名：** struct_roc_at_date  
+**主标签：** 市场结构
+
+* **用途：** 在 T 日收盘上计算 **L 根 K 线之前收盘** 至 **T 日收盘** 的收益率（动量）。
+* **输入：**
+  - `bars: DataFrame`，升序，含 `close`，长度足够。
+  - `trade_date`: Timestamp，T。
+* **输出：** `roc: Optional[float]`；有效样本不足或分母为 0 → `None`。
+* **参数：**
+  - `lookback_trading_days: int`（日线为交易日数；`bar_freq="weekly"` 时为 **周数**）。
+  - `bar_freq: str = "daily"`，可选 `"weekly"`。
+
+---
+
+**函数名：** struct_dual_horizon_momentum_score  
+**主标签：** 市场结构
+
+* **用途：** 短、长两档 ROC 加权为单一得分。
+* **输入：**
+  - `roc_short: Optional[float]`, `roc_long: Optional[float]`。
+* **输出：** `score: Optional[float]`；任一输入为 None → 输出 `None`。
+* **参数：**
+  - `w_short: float = 0.5`, `w_long: float = 0.5`（可实现归一化使和为 1）。
+
+---
+
+**函数名：** struct_scores_table_for_universe  
+**主标签：** 市场结构
+
+* **用途：** 对多指数批量计算得分。
+* **输入：**
+  - `bars_by_index: dict[str, DataFrame]`
+  - `trade_date`: Timestamp，T。
+* **输出：** `scores: dict[str, Optional[float]]`，key 为指数代码。
+* **参数：** `L_short`, `L_long`, `w_short`, `w_long`, `bar_freq` 透传。
+
+---
+
+**函数名：** struct_pick_max_score_index  
+**主标签：** 市场结构
+
+* **用途：** 从得分表中选出唯一胜出指数。
+* **输入：**
+  - `scores: dict[str, Optional[float]]`
+  - `universe_order: list[str]`（同分并列时以 **列表顺序靠前者** 胜出）。
+* **输出：** `winner: Optional[str]`；若全部无效或 dict 空 → `None`。
+* **参数：** `min_score: Optional[float] = None`（可选：全体须高于阈值）。
+
+---
+
+**函数名：** rotation_s7_target_index_on_rebalance_day  
+**主标签：** 市场结构
+
+* **用途：** 在调仓日 T 上输出 **T+1 起** 应持有的指数代码。
+* **输入：**
+  - `trade_date`, `trading_calendar`, `bars_by_index`, `index_universe`（与 `bars_by_index` 的 key 对齐）。
+* **输出：** `target_index: Optional[str]`。
+* **组合顺序：**
+  1. `exec_is_monthly_rebalance_day` 为 False → 返回 `None`（上层保持原指数仓位）。
+  2. `struct_scores_table_for_universe`（内部对每个指数：`struct_index_bars_slice_until` → 两次 `struct_roc_at_date` → `struct_dual_horizon_momentum_score`）。
+  3. `struct_pick_max_score_index(..., universe_order=index_universe)`。
+
+---
+
+**函数名：** rotation_s7_weights_full_allocation  
+**主标签：** 市场结构
+
+* **用途：** 胜出指数 → 权重向量（单指数 100%）。
+* **输入：** `target_index: Optional[str]`。
+* **输出：** `weights: dict[str, float]`，如 `{"000300.SH": 1.0}`；`target_index` 为 None 时默认 **{}**（表示本层不更新权重，由上层解释）。
+
+---
+
+**函数名：** rotation_s7_map_index_to_holdings（占位约定，可与回测引擎合并实现）
+
+**主标签：** 市场结构
+
+* **用途：** 将指数代码映射为实际可交易标的列表（ETF 代码或成分股权重表）；**本文件只约定签名**，映射表数据来源实现侧维护。
+* **输入：** `index_code: str`, `trade_date`（处理指数成分变更时可 as-of）。
+* **输出：** `holdings: list[tuple[str, float]]` 或 DataFrame（symbol, weight）。
+
+---
+
+**函数名：** rotation_s7_default_index_universe  
+**主标签：** 市场结构
+
+* **用途：** 默认指数池（沪深300、中证500 等），扩展时改列表；代码以数据源为准。
+* **输入：** 无。
+* **输出：** `list[str]`。
+
+---
+
+**场景7 与周线说明：** 周线 K 线下 `L_short=4`、`L_long=12` 仅作数量级近似，须在回测报告中披露与「20/60 交易日」的差异。
+
+**场景7 单测提示：** 两指数一高一低 ROC 验证 `struct_pick_max_score_index`；全 NaN 与并列；非调仓日 `rotation_s7_target_index_on_rebalance_day` 返回 None。
+
+👉 本质：**市场风格轮动**
+
+---
+
+### ✅ 场景8：沪港通资金流策略（外资行为）
+
+**策略主标签：** 市场结构（副标签：跨境资金 / 个股技术门控）
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* **北向资金（全市场日频）：** 每个交易日一条 **已合成的「净流入」** 数值（亿元或元与实现一致，接口内统一量纲）。若数据源分拆沪股通、深股通，由数据层先 **按日求和** 得到 `north_net`；**不做分钟**。
+* **沪港通标的清单：** 须支持 **按交易日 as-of**：`symbol` 在 T 日是否属于标的（调入调出日期或区间表）。列示例：`symbol, in_date, out_date`（out_date 空表示仍在池内）或等价宽表。
+* **个股日线：** trade_date、close（计算 SMA20）；可选 open/high/low/volume。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. **市场门控（全市场）：** 以 T 日为终点，**连续 `n_flow` 个交易日**（默认 3）的北向 **单日净流入均 > `min_net`**（默认 `min_net=0`，严格「净流入」；若需剔除噪声可设微小正阈值）。
+2. **标的池：** 仅保留在 **T 日 as-of** 下属于沪港通（含港股通标的中的 A 股可买名单，具体名单类型由 `pool_kind` 参数约定，如 `stock_connect_inbound`）的 `symbol`。
+3. **技术门控：** T 日收盘 **站上** 20 日均线：`close_T > SMA20_T`（参数 `strict: bool = True`；若为 False 则 `>=`）。
+4. **时点与成交：** T 日盘后（北向数据、标的池、收盘均线）均可知；满足条件的标的 **T+1 日开盘价** 买入（全局约定）。北向数据若仅 **T+1 日凌晨** 才公布，则回测须 **整体滞后一日** 使用（见下方「披露滞后」）。
+5. **可选：** `risk_st_exclude`；北向序列缺失日 → 该日不满足「连续正流入」链（单测构造断档）。
+
+**复用（仅引用）：** `risk_st_exclude`。
+
+**披露滞后（重要）：** 若实际披露时间为 **T 日收盘后夜间**，则严格回测中市场门控应以 **`trade_date = T` 行在 T+1 开盘前可得** 为准，等价于 **信号整体滞后一个交易日** 或 **用 T-1 及更早的北向行判定 T 日是否可交易**。文档参数：`northbound_lag_trading_days: int = 0`（0=理想即时；**1=推荐保守**）。组合函数须统一使用该参数。
+
+---
+
+#### 场景8 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** flow_northbound_net_table  
+**主标签：** 市场结构
+
+* **用途：** 约定北向日频输入形状（数据层输出）。
+* **输入：** 实现侧从 Tushare 等拉取后整理。
+* **输出约定：** `DataFrame`，列至少 `trade_date, north_net`（float，**正表示净流入**）。
+* **参数（列名可配）：** `date_col="trade_date"`, `value_col="north_net"`。
+
+---
+
+**函数名：** flow_northbound_series_until  
+**主标签：** 市场结构
+
+* **用途：** 截取截至某评估日的北向净流入序列（升序）。
+* **输入：**
+  - `nb_df: DataFrame`，符合 `flow_northbound_net_table`。
+  - `asof_date: Timestamp`，评估日（可含滞后，见 `eval_date_for_flow`）。
+* **输出：** `s: pd.Series`，index=`trade_date`，value=`north_net`，`index <= asof_date`。
+
+---
+
+**函数名：** flow_consecutive_positive_net  
+**主标签：** 市场结构
+
+* **用途：** 判断以评估日所在行为终点，向前连续 `n_days` 个交易日是否 **均** `north_net > min_net`。
+* **输入：**
+  - `s: pd.Series`（升序、连续交易日索引；若有缺交易日则视为链断）。
+  - `eval_date: Timestamp`，终点日（须在 index 中）。
+* **输出：** `ok: bool`。
+* **参数：** `n_days: int = 3`, `min_net: float = 0.0`。
+* **约定：** 缺数据或长度不足 → False。
+
+---
+
+**函数名：** flow_s8_effective_eval_date  
+**主标签：** 市场结构
+
+* **用途：** 将「策略日历日 T」映射为北向数据 **实际允许使用的最近可用交易日**（处理 **lag**）。
+* **输入：** `trade_date: Timestamp`（信号日 T），`trading_calendar`。
+* **输出：** `eval_date: Timestamp`。
+* **参数：** `northbound_lag_trading_days: int = 0`（**1** 表示用 **T 之前最近一个** 已完整披露北向的交易日作为 flow 的「终点」，实现可选用 `T - lag` 个交易日）。
+
+---
+
+**函数名：** universe_hsgt_members_at  
+**主标签：** 市场结构
+
+* **用途：** T 日 as-of 沪港通（北向可买 A 股）标的列表。
+* **输入：**
+  - `hsgt_df: DataFrame`，至少能判定「T 日是否在池」。两种等价建模任选其一（实现文档化）：
+    - **区间型：** `symbol, effective_from, effective_to`（to 空=仍在池）；
+    - **事件型：** 调入/调出事件表，需 `asof_reconstruct_pool(trade_date)`。
+* **输出：** `members: list[str]`。
+* **参数：** `trade_date: Timestamp`，`pool_kind: str = "northbound_eligible_a_share"`（仅占位枚举）。
+
+---
+
+**函数名：** tech_close_above_sma  
+**主标签：** 市场结构（与场景1技术门控同类，单列均线）
+
+* **用途：** T 日收盘相对 SMA(window) 的多空门控（场景8 默认 window=20）。
+* **输入：**
+  - `bars: DataFrame`，单标的升序，含 `close`。
+  - `trade_date: Timestamp`，T。
+* **输出：** `ok: bool`。
+* **参数：** `window: int = 20`, `strict: bool = True`（True 为 `close > sma`；False 为 `>=`）。
+* **约定：** 长度不足或 sma 为 NaN → False。
+
+---
+
+**函数名：** rotation_s8_market_gate  
+**主标签：** 市场结构
+
+* **用途：** 仅判断「外资净流入环境」是否满足，便于单测。
+* **输入：** `trade_date`, `nb_df`, `trading_calendar`。
+* **输出：** `ok: bool`。
+* **组合：** `eval_dt = flow_s8_effective_eval_date(...)` → `flow_northbound_series_until(..., asof_date=eval_dt)` → `flow_consecutive_positive_net(..., eval_date=eval_dt 对应序列末端日期)`。  
+  **实现注意：** `eval_dt` 与序列「最后一根」应对齐；若 lag=1，则「连续 3 日」指 **eval_dt 及向前两根** 对应的三个 `north_net`。
+
+---
+
+**函数名：** rotation_s8_eligible_symbols（场景8组合入口）
+
+**主标签：** 市场结构
+
+* **用途：** 在 T 日收盘视角输出 **T+1 开盘可买** 标的列表。
+* **输入：**
+  - `trade_date`, `nb_df`, `hsgt_df`, `trading_calendar`
+  - `universe_symbols: Optional[list[str]]`（若 None 则从 `universe_hsgt_members_at` 得到全量标的再筛）
+  - `bars_by_symbol: dict[str, DataFrame]`
+  - `st_flags`（可选，先 `risk_st_exclude`）
+* **输出：** `eligible: list[str]`。
+* **组合顺序（固定）：**
+  1. `rotation_s8_market_gate` 为 False → 返回 `[]`。
+  2. `risk_st_exclude`（可选）
+  3. 池：`universe_hsgt_members_at` 与 `universe_symbols`（若给）求交
+  4. 每标的 `tech_close_above_sma(..., window=20)`
+
+---
+
+**函数名：** rotation_s8_params_default  
+**主标签：** 市场结构
+
+* **用途：** 文档化默认：`n_days=3`, `min_net=0`, `northbound_lag_trading_days` 建议生产用 1、研究用 0 的说明字符串或 dict（单测可读）。
+
+---
+
+**场景8 单测提示：** 北向序列全正但缺中间一日 → `flow_consecutive_positive_net` 为 False；`northbound_lag_trading_days=1` 时 eval 日相对 T 前移一日；标的池在 T 调出则不应出现在 `eligible`。
+
+👉 本质：**跟随外资**
+
+---
+
+# 五、风险控制策略（必须加）
+
+### ✅ 场景9：ST + 财务雷区过滤
+
+**策略主标签：** 风控（横切）
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* **ST 状态：** `trade_date, symbol, is_st`（与场景1 `risk_st_exclude` 一致）。
+* **利润表（年报优先）：** `symbol, end_date, ann_date, n_income`（净利润）；**连续亏损**默认按 **完整财年** 判定。
+* **现金流量表（年报或季报，文档默认年报）：** `symbol, end_date, ann_date, n_cashflow_act`（经营活动产生的现金流量净额）。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. **ST：** T 日收盘视角为 ST → 剔除（**复用** `risk_st_exclude`，输出「允许列表」）。
+2. **连续亏损（默认可操作定义）：** 取截至 T **已披露** 的最近 `k_loss` 个完整财年（默认 `k_loss=2`），若这 `k_loss` 段 **净利润均为负**（`n_income < 0`），则剔除。有效年报不足 `k_loss` 条时 **默认保守剔除**（参数 `insufficient_history_policy: str = "exclude"`，可选 `"pass"` 用于研究）。
+3. **现金流为负（默认可操作定义）：** 在 **已披露** 报表中，按 `end_date` 取 **最近一期**（年报或季报由 `stmt_level` 约定，默认 `annual`）的 `n_cashflow_act`；若 `< 0` 则剔除；缺失或 NaN → 默认 **剔除**（可调 `missing_ocf_policy`）。
+4. **时点：** 一律 `ann_date <= trade_date`（与全局「披露后再用」一致）；不得使用 T 日尚未披露的财报。
+5. **组合语义：** 输入候选 `universe_symbols`，输出 **三者均通过** 的 `allowed` 列表；供各 rotation 策略在选股链 **最前或指定位置** 调用。
+
+**复用（仅引用）：** `risk_st_exclude`（场景1）、`fund_filter_announced_rows`（场景1）。
+
+---
+
+#### 场景9 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** fund_income_annual_asof  
+**主标签：** 风控（横切）
+
+* **用途：** 利润表年报子集，仅保留截至 T 已披露行。
+* **输入：** `income_ann_df`, `trade_date`, `ann_col="ann_date"`。
+* **输出：** `df: DataFrame`。
+* **参数：** `report_type_col` 若需区分年报/季报（实现可选）。
+
+---
+
+**函数名：** fund_cashflow_stmt_asof  
+**主标签：** 风控（横切）
+
+* **用途：** 现金流量表截至 T 已披露子集。
+* **输入：** `cf_df`, `trade_date`。
+* **输出：** `df: DataFrame`。
+
+---
+
+**函数名：** risk_fin_latest_k_annual_net_income  
+**主标签：** 风控（横切）
+
+* **用途：** 每 symbol 取已披露年报中 **按 end_date 最近 k 条** 的 `n_income` 序列（用于连亏判定）。
+* **输入：** `income_asof: DataFrame`（已通过 `fund_income_annual_asof`）。
+* **输出：** `wide_or_list`：实现可选用 `DataFrame`（index=symbol，列 `ni_1..ni_k` 从新到旧）或 `dict[str, list[float]]`。
+* **参数：** `k: int = 2`, `symbol_col`, `end_col`, `ni_col="n_income"`。
+
+---
+
+**函数名：** risk_fin_consecutive_losses_veto  
+**主标签：** 风控（横切）
+
+* **用途：** **连续亏损** 剔除判定。返回 **应剔除** 的 symbol 集合或 veto 布尔序列。
+* **输入：** `latest_k_ni`（来自 `risk_fin_latest_k_annual_net_income`）。
+* **输出：** `veto: pd.Series`，index=symbol，**True=剔除**。
+* **参数：**
+  - `k: int = 2`（与上游一致）
+  - `insufficient_history_policy: str = "exclude"`（有效年报不足 k 条时：exclude→veto True；pass→veto False）
+
+---
+
+**函数名：** risk_fin_latest_ocf_row  
+**主标签：** 风控（横切）
+
+* **用途：** 每 symbol 在 `cf_asof` 中取 **end_date 最新** 的一行经营活动现金流。
+* **输入：** `cf_asof: DataFrame`。
+* **输出：** `ocf: pd.Series`，index=symbol，value=该期 `n_cashflow_act`。
+* **参数：** `stmt_level: str = "annual"`（`"quarterly"` 时按季报 end_date 最新一期）。
+
+---
+
+**函数名：** risk_fin_negative_ocf_veto  
+**主标签：** 风控（横切）
+
+* **用途：** 最近一期已披露 **经营活动现金流净额 < 0** → 剔除。
+* **输入：** `ocf_series`（来自 `risk_fin_latest_ocf_row`）。
+* **输出：** `veto: pd.Series`，**True=剔除**。
+* **参数：**
+  - `missing_policy: str = "exclude"`（NaN 缺失：exclude→veto True；pass→False）
+
+---
+
+**函数名：** risk_fin_merge_vetoes  
+**主标签：** 风控（横切）
+
+* **用途：** 多个 veto Series 逻辑或（任一 True 则剔除）。
+* **输入：** `*veto_series: pd.Series`（对齐 index）。
+* **输出：** `combined_veto: pd.Series`。
+
+---
+
+**函数名：** rotation_s9_allowed_symbols（场景9组合入口）
+
+**主标签：** 风控（横切）
+
+* **用途：** 对候选集依次应用 ST、连续亏损、现金流负向剔除，输出最终允许列表。
+* **输入：**
+  - `trade_date`
+  - `universe_symbols: list[str]`
+  - `st_flags`
+  - `income_ann_df`, `cf_df`
+* **输出：** `allowed: list[str]`。
+* **组合顺序（固定）：**
+  1. `risk_st_exclude(st_flags, trade_date, universe_symbols)` → `u1`
+  2. `fund_filter_announced_rows(income_ann_df, trade_date)` → `fund_income_annual_asof` 若已内含则跳过重复
+  3. `risk_fin_latest_k_annual_net_income` → `risk_fin_consecutive_losses_veto` → 从 `u1` 去掉 veto 为 True
+  4. `fund_filter_announced_rows(cf_df, trade_date)` → `risk_fin_latest_ocf_row` → `risk_fin_negative_ocf_veto` → 再去掉 veto
+* **等价写法：** `allowed = u1 & ~loss_veto & ~ocf_veto`（集合语义）。
+
+---
+
+**函数名：** rotation_s9_params_default  
+**主标签：** 风控（横切）
+
+* **用途：** 文档化默认 `k_loss=2`、`insufficient_history_policy="exclude"`、`missing_ocf_policy="exclude"`、`stmt_level="annual"`。
+
+---
+
+**场景9 单测提示：** 仅 1 年年报 + `insufficient_history_policy=exclude` → 剔除；两年连负 → 剔除；OCF 缺失 + `missing_policy=exclude` → 剔除；ST 与财务同时触发 → 仍剔除。
+
+👉 作用：**避免回测“虚高收益”**
+
+---
+
+### ✅ 场景10：质押风险规避
+
+**策略主标签：** 风控（横切）
+
+**用到数据（原始表，字段名实现时可映射 Tushare）：**
+
+* **股权质押统计/明细汇总表：** 须能落到「每标的、每条披露记录」的 **质押比例** `pledge_ratio`。常见字段：`symbol, ann_date`（或 `end_date` 报告期 + 公告日）、`pledge_ratio`（占总股本比例）。
+* **比例量纲：** 数据源可能是 **0~1 小数** 或 **0~100 百分比**；由参数 `ratio_is_percent: bool` 统一换算后再与阈值比较。
+
+**业务逻辑摘要（与下列函数一致）：**
+
+1. **披露时点：** 仅使用 `ann_date <= trade_date`（或数据源约定的「公告日」列）的记录；与全局「披露后再用」一致。
+2. **最新一期：** 每 symbol 在已披露子集中取 **`ann_date` 最新**（并列时按 `end_date` 最大）的一条作为 T 日可用的质押比例；若无 `ann_date`，则用 **`trade_date`/`pub_date` 列** 并在文档/实现中显式命名。
+3. **剔除规则：** 若 `pledge_ratio > max_pledge_ratio`（默认 **0.5** 表示 50%，当 `ratio_is_percent=True` 时默认阈值为 **50.0**）→ **剔除**。
+4. **缺失数据：** 无质押记录或比例为 NaN 时，默认 **不剔除**（`missing_pledge_policy: str = "pass"`），因「未披露≠高质押」；若需保守可改为 `"exclude"`。
+5. **组合：** 输出允许列表，可与 `rotation_s9_allowed_symbols` 串联（先 S9 再 S10 或反之由策略定，**默认建议先 ST/财务再质押**）。
+
+**复用（仅引用）：** 可与场景9 `rotation_s9_allowed_symbols` 链接；不依赖场景1函数名，但可与 `risk_st_exclude` 同链。
+
+---
+
+#### 场景10 · 接口规格（扁平函数，可写单元测试）
+
+---
+
+**函数名：** fund_pledge_rows_asof  
+**主标签：** 风控（横切）
+
+* **用途：** 质押表裁剪为截至 T 已公告/可得的行。
+* **输入：**
+  - `pledge_df: DataFrame`，至少 `symbol, ann_date`（或等价公告日列）、`pledge_ratio`。
+  - `trade_date: Timestamp`，T。
+* **输出：** `df: DataFrame`。
+* **参数：** `ann_col: str = "ann_date"`。
+
+---
+
+**函数名：** risk_latest_pledge_ratio_per_symbol  
+**主标签：** 风控（横切）
+
+* **用途：** 每 symbol 取 **一条** 代表 T 日认知下的质押比例（最新披露）。
+* **输入：** `pledge_asof: DataFrame`（来自 `fund_pledge_rows_asof`）。
+* **输出：** `ratio: pd.Series`，index=symbol，value=质押比例（建议在函数内据 `ratio_is_percent` **统一为 0~1 小数**，便于与 `risk_pledge_ratio_excess_veto` 的默认阈值 0.5 对齐）。
+* **参数：**
+  - `ann_col`, `end_col: Optional[str] = None`（用于同 ann 日 tie-break）
+  - `ratio_col: str = "pledge_ratio"`
+  - `ratio_is_percent: bool = False`（True 则除以 100 再比较）
+
+---
+
+**函数名：** risk_pledge_ratio_excess_veto  
+**主标签：** 风控（横切）
+
+* **用途：** 比例 **严格大于** 阈值则 **剔除**（veto=True）。
+* **输入：** `ratio: pd.Series`（与 `risk_latest_pledge_ratio_per_symbol` 对齐）。
+* **输出：** `veto: pd.Series`，**True=剔除**。
+* **参数：**
+  - `max_pledge_ratio: float = 0.5`（与 `ratio` 同量纲；若 `ratio_is_percent` 在下游已换算为小数，则此处用 0.5）
+  - `missing_pledge_policy: str = "pass"`（无记录/NaN：pass→veto False；exclude→veto True）
+
+---
+
+**函数名：** risk_pledge_ratio_excess_veto_from_table  
+**主标签：** 风控（横切）
+
+* **用途：** 一站式：pledge_df + trade_date → veto（内部调用 `fund_pledge_rows_asof` → `risk_latest_pledge_ratio_per_symbol` → `risk_pledge_ratio_excess_veto`）。
+* **输入：** `pledge_df`, `trade_date`, `universe_symbols: Optional[list[str]]`（若给则仅输出该子集的 Series，其余不返回或视为不剔除）。
+* **输出：** `veto: pd.Series` 或 `dict[str, bool]`。
+
+---
+
+**函数名：** rotation_s10_allowed_symbols（场景10组合入口）
+
+**主标签：** 风控（横切）
+
+* **用途：** 从候选集中剔除高质押标的。
+* **输入：**
+  - `trade_date`
+  - `universe_symbols: list[str]`
+  - `pledge_df`
+* **输出：** `allowed: list[str]`。
+* **组合：** `veto = risk_pledge_ratio_excess_veto_from_table(...)` → `allowed = [s for s in universe_symbols if not veto.get(s, False)]`（无记录时依 `missing_pledge_policy`）。
+
+---
+
+**函数名：** rotation_s10_and_s9_pipeline（可选串联示例）
+
+**主标签：** 风控（横切）
+
+* **用途：** 文档示例：`allowed = rotation_s10_allowed_symbols(rotation_s9_allowed_symbols(...), pledge_df)` 的扁平封装签名，便于集成测试。
+* **输入：** 合并场景9、场景10所需全部表。
+* **输出：** `allowed: list[str]`。
+
+---
+
+**函数名：** rotation_s10_params_default  
+**主标签：** 风控（横切）
+
+* **用途：** 默认 `max_pledge_ratio=0.5`（或 percent 模式下 50）、`missing_pledge_policy="pass"`、`ratio_is_percent` 与数据源对齐说明。
+
+---
+
+**场景10 单测提示：** `ratio_is_percent` 下 51% → veto；49.9% → 通过；缺失 + pass → 通过；缺失 + exclude → veto；并列 ann_date 用 `end_date` tie-break。
+
+👉 本质：**防止爆雷股**
+
+---
+
+# 六、你当前策略可以升级的方向（重点）
+
+你现在是：
+
+> 20日均线 + 跌破3% + 10:00前涨幅限制
+
+👉 可以升级为：
+
+### 🔥 「增强版低吸策略」
+
+加入：
+
+1. 财务过滤（ROE > 10%）
+2. 非ST
+3. 非高质押
+4. 融资余额下降（情绪冷却）
+
+👉 会从：
+
+* “纯技术低吸”
+  → 升级为：
+* **“机构风格低吸”**
+
+---
+
+# 最后给你一个组合建议（实战）
+
+你可以做一个 **三策略组合回测：**
+
+1. **趋势（稳定收益）**
+
+   * 成长 + 均线
+
+2. **事件（高胜率）**
+
+   * 回购 / 解禁
+
+3. **短线（弹性）**
+
+   * 龙虎榜
+
+👉 再做：
+
+* 等权组合 or 动态资金分配
+
+---
+
+👉 **把这些策略直接转成当前 Python 回测框架（tushare版）**

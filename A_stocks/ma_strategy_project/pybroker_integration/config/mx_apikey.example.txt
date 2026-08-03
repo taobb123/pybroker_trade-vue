@@ -1,0 +1,5 @@
+# 东财妙想 Skills API Key（mkt_...）
+# 复制本文件为 mx_apikey.txt 并填入密钥；或设置环境变量 MX_APIKEY
+# mx_apikey.txt 请勿提交到 git
+#
+# mkt_your_skills_key_here

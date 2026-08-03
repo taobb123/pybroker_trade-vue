@@ -97,19 +97,32 @@ def rotate(ctx: ExecContext):
         return
 
 
+def load_symbols_from_pool_file(pool_path: str) -> list[str]:
+    """从文本文件加载股票代码：一行一只，忽略空行与 # 注释。"""
+    symbols: list[str] = []
+    with open(pool_path, encoding='utf-8') as f:
+        for line in f:
+            s = line.strip()
+            if not s or s.startswith('#'):
+                continue
+            symbols.append(s)
+    return symbols
+
+
 # 我们将使用 set_before_exec 方法在运行 轮动 函数之前使用 rank 执行我们的排名
 if __name__ == '__main__':
     import time
     
-    # 股票列表
-    symbols = [
-        '000408',
-        '600309',
-    ]
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pool_file = os.path.join(script_dir, 'stocks_pool.txt')
+    symbols = load_symbols_from_pool_file(pool_file)
+    if not symbols:
+        raise SystemExit(f'股票池为空或文件不存在: {pool_file}')
     
     print("=" * 80)
     print("轮动交易策略回测")
     print("=" * 80)
+    print(f"股票池文件: {pool_file}")
     print(f"股票池数量: {len(symbols)}")
     print(f"回测日期范围: 2022-01-01 至 2025-12-05")
     print(f"预热期: 20 天")
@@ -125,8 +138,8 @@ if __name__ == '__main__':
         # 创建策略
         strategy = Strategy(
             data_source,
-            start_date='20220101',
-            end_date='20251205',
+            start_date='20230101',
+            end_date='20260430',
             config=config
         )
         strategy.set_before_exec(rank)
@@ -140,19 +153,41 @@ if __name__ == '__main__':
         
         print(f"\n✓ 回测完成！耗时: {elapsed_time:.2f} 秒 ({elapsed_time/60:.2f} 分钟)")
         print("=" * 80)
-        
-        # 保存结果
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        base_filename = 'rotation_trade_result.csv'
-        csv_file = os.path.join(script_dir, base_filename)
+
+        # 期末总资产、总收益率（PyBroker EvalMetrics）
+        if hasattr(result, "metrics") and result.metrics is not None:
+            m = result.metrics
+            end_mv = getattr(m, "end_market_value", None)
+            trp = getattr(m, "total_return_pct", None)
+            if end_mv is not None:
+                print(f"期末总资产 end_market_value: {float(end_mv):,.2f}")
+            if trp is not None:
+                print(f"总收益率 total_return_pct: {float(trp):.4f}%")
+        elif hasattr(result, "metrics_df") and result.metrics_df is not None and not result.metrics_df.empty:
+            md = result.metrics_df
+            if "name" in md.columns and "value" in md.columns:
+                mp = dict(zip(md["name"], md["value"]))
+                if "end_market_value" in mp:
+                    print(f"期末总资产 end_market_value: {float(mp['end_market_value']):,.2f}")
+                if "total_return_pct" in mp:
+                    print(f"总收益率 total_return_pct: {float(mp['total_return_pct']):.4f}%")
+
         trades_df = result.trades
-        
         if trades_df is not None and not trades_df.empty:
-            trades_df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-            print(f"✓ 交易记录已保存到: {csv_file}")
-            print(f"  总交易数: {len(trades_df)}")
+            print(f"总交易数（成交笔数）: {len(trades_df)}")
         else:
             print("⚠ 警告: 没有交易记录")
+
+        # # 保存结果（暂不写入 CSV）
+        # base_filename = 'rotation_trade_result.csv'
+        # csv_file = os.path.join(script_dir, base_filename)
+        # trades_df = result.trades
+        # if trades_df is not None and not trades_df.empty:
+        #     trades_df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+        #     print(f"✓ 交易记录已保存到: {csv_file}")
+        #     print(f"  总交易数: {len(trades_df)}")
+        # else:
+        #     print("⚠ 警告: 没有交易记录")
         
         # 显示订单信息
         if hasattr(result, 'orders') and result.orders is not None:

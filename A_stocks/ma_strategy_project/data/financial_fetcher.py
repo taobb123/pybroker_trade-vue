@@ -6,7 +6,6 @@
 """
 
 import pandas as pd
-import time
 from datetime import datetime
 from typing import Optional, Dict, List
 from config.db_config import DB_CONFIG
@@ -177,7 +176,6 @@ class FinancialDataFetcher:
                     df = api_func()
                     
                     if df is None or df.empty:
-                        time.sleep(0.1)  # 减少延迟：0.3 -> 0.1秒
                         continue
                     
                     # 检查是否有"指标"列
@@ -209,7 +207,6 @@ class FinancialDataFetcher:
                 except Exception as e:
                     if attempt < retry - 1:
                         logger.debug(f"{api_name} 获取失败，重试中: {str(e)[:50]}")
-                        time.sleep(0.2)  # 减少延迟：0.5 -> 0.2秒
                         continue
                     else:
                         logger.warning(f"{stock_code} 从 {api_name} 获取财务数据失败: {str(e)[:50]}")

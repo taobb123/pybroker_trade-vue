@@ -1,0 +1,6 @@
+# backtest_sy_002028_threshold / backtest_sy_base_cost_search 共用的回测窗口与资金
+# 修改后保存即可；无需改 .py
+
+START_DATE: "2026-01-10"
+END_DATE: "2026-04-25"
+INITIAL_CASH: 50000

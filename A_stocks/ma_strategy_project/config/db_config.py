@@ -16,7 +16,8 @@ try:
     from db_config import DB_CONFIG
     print(f"✓ 已加载数据库配置")
 except ImportError:
-    print("⚠ 警告：无法导入父级db_config.py，使用默认配置")
+    # 避免控制台非 GBK 字符导致 UnicodeEncodeError
+    print("WARNING: 无法导入父级db_config.py，使用默认配置")
     # 备用配置
     DB_CONFIG = {
         'host': '127.0.0.1',

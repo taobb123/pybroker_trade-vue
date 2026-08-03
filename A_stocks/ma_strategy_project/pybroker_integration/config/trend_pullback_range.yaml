@@ -1,0 +1,14 @@
+# fetch_trend_pullback 历史回测区间（工作流默认读取）
+# 修改后保存，再「运行本步」即可；无需改 .py
+#
+# SCAN_FROM / SCAN_TO：区间内寻找最近下沿命中（内部计算）；主表仅写买入/主升信号
+# END_DATE：拉取日线截止日；留空则与 SCAN_TO 相同（SCAN_TO 留空则用今天）
+# PRINT_BACKTEST_LOWER：true 时在控制台重显已算好的最近下沿参考（下沿区间价格=命中日收盘；不改 CSV）
+# SKIP_PULLBACK_LAYERS_12：true 时关闭第一二层（下沿结构+接近买入），全池仅过第三层换手增大+量稳 + 第四层筹码；
+#   排序：换手率增幅 → 量稳天数 → 筹码分（score_total）
+
+SCAN_FROM: "2026-01-28"
+SCAN_TO: ""
+END_DATE: ""
+PRINT_BACKTEST_LOWER: false
+SKIP_PULLBACK_LAYERS_12: true

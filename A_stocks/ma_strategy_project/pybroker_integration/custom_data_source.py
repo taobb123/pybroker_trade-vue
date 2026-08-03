@@ -92,8 +92,7 @@ class CustomDataSource(DataSource):
         # 处理 symbols（可能是 frozenset 或单个值）
         symbol_list = list(symbols) if hasattr(symbols, '__iter__') and not isinstance(symbols, str) else [symbols]
         
-        for symbol in symbol_list:
-            # 获取数据
+        for i, symbol in enumerate(symbol_list, 1):
             try:
                 data = self.fetcher.fetch_stock_data(
                     code=symbol,

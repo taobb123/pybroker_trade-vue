@@ -96,14 +96,14 @@ if __name__ == '__main__':
     model_slr = pybroker.model('slr', train_slr, indicators=[cmma_20])
     
     # 定义策略配置
-    config = StrategyConfig(initial_cash=50000, bootstrap_sample_size=100)  # 初始资金5万元
+    config = StrategyConfig(bootstrap_sample_size=100)
     
     # 定义策略 (使用自定义数据源)
-    strategy = Strategy(custom_data_source, start_date='20220101', end_date='20251205', config=config)
+    strategy = Strategy(custom_data_source, start_date='20220101', end_date='20251101', config=config)
     
     # 添加模型训练和交易执行
     # 传入注册后的模型对象
-    strategy.add_execution(exec_fn, ['000408'], models=model_slr)
+    strategy.add_execution(exec_fn, ['600690', '601939'], models=model_slr)
     
     # 运行前向分析
     # 使用 5 个时间窗口，每个窗口 50/50 的训练/测试数据分割，前瞻期为 1 bar
@@ -118,7 +118,6 @@ if __name__ == '__main__':
     # 打印和分析结果
     print(result.metrics_df)
     print(result.bootstrap.conf_intervals) # 示例：打印夏普比率的置信区间
-    print(result.bootstrap.drawdown_conf)  #自助法检查策略的最大回撤
 
     # 保存交易信息到csv
     script_dir = os.path.dirname(os.path.abspath(__file__))

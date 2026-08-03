@@ -27,6 +27,14 @@ if PROJECT_ROOT not in sys.path:
 from data.fetcher import DataFetcher
 from config.settings import DATA_CONFIG
 
+# 尝试导入 tushare（用于获取股票名称）
+try:
+    import tushare as ts
+    TUSHARE_AVAILABLE = True
+except ImportError:
+    TUSHARE_AVAILABLE = False
+    ts = None
+
 
 class RotationSignalGenerator:
     """轮动策略信号生成器"""
@@ -66,8 +74,9 @@ class RotationSignalGenerator:
         if end_date is None:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
-        # 计算开始日期
-        start_date = (datetime.now() - timedelta(days=self.lookback_days)).strftime('%Y-%m-%d')
+        # 开始日期与 end_date 对齐（避免截止日写死在过去时仍用「今天」倒推导致窗口过短）
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        start_date = (end_dt - timedelta(days=self.lookback_days)).strftime('%Y-%m-%d')
         
         if self.use_tushare_only:
             # 强制使用 tushare
@@ -129,6 +138,91 @@ class RotationSignalGenerator:
             print(f"计算 ROC 指标失败: {e}")
             return None
     
+    def get_stock_names(self, symbols: List[str]) -> Dict[str, str]:
+        """
+        批量获取股票名称（使用 tushare）
+        
+        Args:
+            symbols: 股票代码列表
+            
+        Returns:
+            字典，key 为股票代码，value 为股票名称
+        """
+        stock_names = {}
+        
+        if not TUSHARE_AVAILABLE:
+            print("⚠ 警告: tushare 不可用，无法获取股票名称")
+            return stock_names
+        
+        try:
+            # 初始化 tushare pro
+            tushare_token = DATA_CONFIG.get('tushare_token', '')
+            if not tushare_token:
+                print("⚠ 警告: tushare token 未配置，无法获取股票名称")
+                return stock_names
+            
+            pro = ts.pro_api(tushare_token)
+            
+            # 批量查询股票基本信息
+            # 将股票代码转换为 tushare 格式（6位数字，如果是6位则直接使用，否则可能需要补零）
+            ts_codes = []
+            for symbol in symbols:
+                # tushare 需要带后缀的代码，如 000001.SZ 或 600000.SH
+                # 但如果是纯数字代码，可以尝试查询
+                if len(symbol) == 6 and symbol.isdigit():
+                    # 判断是上交所还是深交所
+                    if symbol.startswith(('60', '68')):
+                        ts_code = f"{symbol}.SH"
+                    elif symbol.startswith(('00', '30')):
+                        ts_code = f"{symbol}.SZ"
+                    else:
+                        ts_code = symbol
+                    ts_codes.append(ts_code)
+                else:
+                    ts_codes.append(symbol)
+            
+            # 使用 stock_basic 接口获取股票基本信息
+            df = pro.stock_basic(exchange='', list_status='L', fields='ts_code,name')
+            
+            # 创建映射：从 ts_code 到 name
+            code_to_name = {}
+            for _, row in df.iterrows():
+                ts_code = row['ts_code']
+                name = row['name']
+                # 提取纯数字代码（去掉后缀）
+                code = ts_code.split('.')[0]
+                code_to_name[code] = name
+                code_to_name[ts_code] = name  # 也保存完整代码
+            
+            # 匹配股票代码和名称
+            for symbol in symbols:
+                # 尝试多种匹配方式
+                if symbol in code_to_name:
+                    stock_names[symbol] = code_to_name[symbol]
+                elif len(symbol) == 6 and symbol.isdigit():
+                    # 尝试匹配
+                    if symbol.startswith(('60', '68')):
+                        ts_code = f"{symbol}.SH"
+                    elif symbol.startswith(('00', '30')):
+                        ts_code = f"{symbol}.SZ"
+                    else:
+                        ts_code = symbol
+                    
+                    if ts_code in code_to_name:
+                        stock_names[symbol] = code_to_name[ts_code]
+                    else:
+                        stock_names[symbol] = symbol  # 如果找不到，使用代码本身
+                else:
+                    stock_names[symbol] = symbol  # 如果找不到，使用代码本身
+            
+        except Exception as e:
+            print(f"⚠ 获取股票名称失败: {e}")
+            # 如果失败，返回空字典或使用代码作为名称
+            for symbol in symbols:
+                stock_names[symbol] = symbol
+        
+        return stock_names
+    
     def rank_stocks(self, symbols: List[str]) -> List[Dict]:
         """
         对股票进行排名（基于 ROC 指标）
@@ -150,7 +244,6 @@ class RotationSignalGenerator:
         
         for i, symbol in enumerate(symbols, 1):
             try:
-                # 获取数据
                 data = self.fetch_stock_data(symbol)
                 
                 if data is None or data.empty:
@@ -215,7 +308,8 @@ class RotationSignalGenerator:
             return {
                 'signals': [],
                 'top_ranked': [],
-                'message': '没有可用的股票数据'
+                'message': '没有可用的股票数据',
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
         
         # 获取前 N 名（rank_threshold）
@@ -223,6 +317,19 @@ class RotationSignalGenerator:
         
         # 买入信号：前 max_positions 名
         buy_signals = ranked_stocks[:self.max_positions]
+        
+        # 仅对前5名查询股票名称
+        top_5_symbols = [stock['symbol'] for stock in top_ranked]
+        print(f"\n正在查询前 {len(top_5_symbols)} 名股票的名称...")
+        stock_names = self.get_stock_names(top_5_symbols)
+        
+        # 将股票名称添加到结果中
+        for stock in top_ranked:
+            stock['name'] = stock_names.get(stock['symbol'], stock['symbol'])
+        
+        for stock in buy_signals:
+            if 'name' not in stock:
+                stock['name'] = stock_names.get(stock['symbol'], stock['symbol'])
         
         return {
             'signals': buy_signals,
@@ -241,7 +348,7 @@ class RotationSignalGenerator:
         print("\n" + "=" * 80)
         print("轮动策略买入信号")
         print("=" * 80)
-        print(f"生成时间: {result['timestamp']}")
+        print(f"生成时间: {result.get('timestamp', '')}")
         print(f"策略参数: ROC周期={self.roc_period}, 最大持仓={self.max_positions}, 排名阈值={self.rank_threshold}")
         print("-" * 80)
         
@@ -253,7 +360,8 @@ class RotationSignalGenerator:
         print(f"\n【买入信号】前 {self.max_positions} 名（建议建仓）:")
         print("-" * 80)
         for i, signal in enumerate(result['signals'], 1):
-            print(f"{i}. 股票代码: {signal['symbol']}")
+            stock_name = signal.get('name', signal['symbol'])
+            print(f"{i}. 股票代码: {signal['symbol']} ({stock_name})")
             print(f"   ROC 20: {signal['roc']:.2f}%")
             print(f"   当前价格: {signal['price']:.2f} 元")
             print(f"   数据日期: {signal['date']}")
@@ -264,7 +372,8 @@ class RotationSignalGenerator:
         print("-" * 80)
         for signal in result['top_ranked']:
             marker = "✓" if signal in result['signals'] else " "
-            print(f"{marker} {signal['rank']:2d}. {signal['symbol']:8s} - ROC: {signal['roc']:7.2f}% - 价格: {signal['price']:8.2f} 元")
+            stock_name = signal.get('name', signal['symbol'])
+            print(f"{marker} {signal['rank']:2d}. {signal['symbol']:8s} ({stock_name:10s}) - ROC: {signal['roc']:7.2f}% - 价格: {signal['price']:8.2f} 元")
         
         print("\n" + "=" * 80)
         print("建仓建议:")
@@ -344,9 +453,8 @@ def main():
         use_tushare_only = True
         print(f"✓ 使用 tushare 数据源")
     
-    end_date='2025-12-08'
-    # 创建信号生成器
-    generator = RotationSignalGenerator(use_tushare_only=True, end_date=end_date)
+    # 结束日 None = 使用当天；回测可传入 end_date='YYYY-MM-DD'
+    generator = RotationSignalGenerator(use_tushare_only=use_tushare_only, end_date=None)
     
     # 生成买入信号
     result = generator.generate_buy_signals(symbols)

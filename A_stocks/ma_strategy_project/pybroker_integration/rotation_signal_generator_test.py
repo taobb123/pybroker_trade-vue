@@ -31,17 +31,15 @@ from config.settings import DATA_CONFIG
 class RotationSignalGenerator:
     """轮动策略信号生成器"""
     
-    def __init__(self, use_tushare_only: bool = True, end_date: Optional[str] = None):
+    def __init__(self, use_tushare_only: bool = True):
         """
         初始化信号生成器
         
         Args:
             use_tushare_only: 是否仅使用 tushare 数据源
-            end_date: 结束日期（格式：YYYY-MM-DD），如果为 None 则使用今天
         """
         self.fetcher = DataFetcher()
         self.use_tushare_only = use_tushare_only
-        self.end_date = end_date  # 全局结束日期配置
         
         # 策略参数（与 rotation_trade.py 保持一致）
         self.roc_period = 20  # ROC 计算周期
@@ -55,19 +53,16 @@ class RotationSignalGenerator:
         
         Args:
             symbol: 股票代码
-            end_date: 结束日期（格式：YYYY-MM-DD），如果为 None 则使用实例配置的 end_date，再为 None 则使用今天
+            end_date: 结束日期（格式：YYYY-MM-DD），如果为 None 则使用今天
             
         Returns:
             DataFrame 或 None
         """
-        # 优先使用传入的参数，其次使用实例配置，最后使用今天
-        if end_date is None:
-            end_date = self.end_date
         if end_date is None:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
-        # 计算开始日期
-        start_date = (datetime.now() - timedelta(days=self.lookback_days)).strftime('%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        start_date = (end_dt - timedelta(days=self.lookback_days)).strftime('%Y-%m-%d')
         
         if self.use_tushare_only:
             # 强制使用 tushare
@@ -215,7 +210,8 @@ class RotationSignalGenerator:
             return {
                 'signals': [],
                 'top_ranked': [],
-                'message': '没有可用的股票数据'
+                'message': '没有可用的股票数据',
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
         
         # 获取前 N 名（rank_threshold）
@@ -241,7 +237,7 @@ class RotationSignalGenerator:
         print("\n" + "=" * 80)
         print("轮动策略买入信号")
         print("=" * 80)
-        print(f"生成时间: {result['timestamp']}")
+        print(f"生成时间: {result.get('timestamp', '')}")
         print(f"策略参数: ROC周期={self.roc_period}, 最大持仓={self.max_positions}, 排名阈值={self.rank_threshold}")
         print("-" * 80)
         
@@ -330,7 +326,46 @@ def main():
         # 默认股票代码列表（与 rotation_trade.py 保持一致）
         symbols = [
         '603194',
-        '301626'
+        '301626',
+        '603596',
+        '300308',
+        '300502',
+        '600536',
+        '300394',
+        '603392',
+        '300760',
+        '600085',
+        '301269',
+        '600588',
+        '002085',
+        '003033',
+        '300673',
+        '159959',
+        '560700',
+        '600809',
+        '600570',
+        '002463',
+        '601360',
+        '600480',
+        '603859',
+        '600143',
+        '600435',
+        '000738',
+        '603712',
+        '002179',
+        '000651',
+        '600690',
+        '600887',
+        '515650',
+        '002891',
+        '603019',
+        '000977',
+        '603501',
+        '002371',
+        '002142',
+        '002352',
+        '600206',
+        '601939'
     ]
     
     # 检查 tushare token
@@ -344,9 +379,8 @@ def main():
         use_tushare_only = True
         print(f"✓ 使用 tushare 数据源")
     
-    end_date='2025-12-08'
     # 创建信号生成器
-    generator = RotationSignalGenerator(use_tushare_only=True, end_date=end_date)
+    generator = RotationSignalGenerator(use_tushare_only=use_tushare_only)
     
     # 生成买入信号
     result = generator.generate_buy_signals(symbols)
@@ -355,7 +389,7 @@ def main():
     generator.print_signals(result)
     
     # 保存到 CSV
-    # generator.save_signals_to_csv(result)
+    generator.save_signals_to_csv(result)
     
     return result
 
