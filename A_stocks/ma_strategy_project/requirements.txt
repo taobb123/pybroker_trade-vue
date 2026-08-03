@@ -1,0 +1,29 @@
+# 核心依赖
+pandas>=1.5.0
+numpy>=1.23.0
+pymysql>=1.0.0
+
+# 数据API（至少安装一个）
+akshare>=1.11.0  # 推荐：免费，无需token，A股数据全面
+# baostock>=0.8.8  # 强烈推荐作为akshare替代：免费，无需token，专门为A股设计，数据质量可靠
+# tushare>=1.2.0  # 可选：需要token（在config/settings.py中配置）
+# yfinance>=0.2.0  # 备选：免费，无需token，但对A股支持有限
+
+# 技术分析和回测
+talib>=0.4.0  # 技术指标库（可选，如需要更多指标）
+lib-pybroker>=1.1.0  # PyBroker回测框架（支持机器学习策略和快速回测）
+
+# 可视化
+matplotlib>=3.5.0
+plotly>=5.0.0  # 可选，用于交互式图表
+streamlit>=1.37.0
+mplcursors>=0.5.0  # 用于交互式图表悬浮提示
+mpld3>=0.5.2  # 用于Streamlit环境的交互式HTML图表
+
+# 日志
+logging  # Python标准库
+
+# 开发工具（可选）
+# pytest>=7.0.0  # 单元测试
+# ipython>=8.0.0  # 交互式开发
+

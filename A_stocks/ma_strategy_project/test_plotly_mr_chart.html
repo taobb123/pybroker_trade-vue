@@ -1,0 +1,977 @@
+<div class="mpld3-wrapper">
+
+<style>
+
+</style>
+
+<div id="fig_el2080868b25ce9-449d-4e91-9f1b-13b357dd0a678301892000"></div>
+<script>
+(function(){
+  // 抑制非关键警告（可选，用于减少控制台噪音）
+  var originalWarn = console.warn;
+  var suppressedWarnings = ['mpld3', 'd3', 'deprecated', 'deprecation'];
+  console.warn = function(){
+    var message = Array.prototype.join.call(arguments, ' ');
+    var shouldSuppress = suppressedWarnings.some(function(keyword){
+      return message.toLowerCase().indexOf(keyword.toLowerCase()) >= 0;
+    });
+    if(!shouldSuppress) originalWarn.apply(console, arguments);
+  };
+  
+  // 保存原始的mpld3_load_lib函数
+  var original_mpld3_load_lib = window.mpld3_load_lib || function(url, callback){
+    var s = document.createElement('script');
+    s.src = url;
+    s.async = true;
+    s.onreadystatechange = s.onload = callback;
+    s.onerror = function(){/* 静默处理加载错误，使用备用CDN */};
+    document.getElementsByTagName('head')[0].appendChild(s);
+  };
+  
+  // CDN备用列表
+  var cdn_fallbacks = {
+    'd3.v5.js': [
+      'https://cdn.jsdelivr.net/npm/d3@5/dist/d3.min.js',
+      'https://unpkg.com/d3@5/dist/d3.min.js',
+      'https://d3js.org/d3.v5.js'
+    ],
+    'mpld3.v0.5.11.js': [
+      'https://cdn.jsdelivr.net/gh/mpld3/mpld3@v0.5.11/js/mpld3.v0.5.11.js',
+      'https://unpkg.com/mpld3@0.5.11/dist/mpld3.min.js',
+      'https://mpld3.github.io/js/mpld3.v0.5.11.js'
+    ]
+  };
+  
+  // 增强的加载函数，支持备用CDN
+  function enhanced_mpld3_load_lib(url, callback, fallbackIndex) {
+    fallbackIndex = fallbackIndex || 0;
+    
+    // 确定备用CDN列表
+    var fallbacks = [url];
+    for(var key in cdn_fallbacks) {
+      if(url.indexOf(key) >= 0) {
+        fallbacks = cdn_fallbacks[key];
+        // 如果原始URL不在列表中，添加到开头
+        if(fallbacks.indexOf(url) < 0) {
+          fallbacks = [url].concat(fallbacks);
+        }
+        break;
+      }
+    }
+    
+    if(fallbackIndex >= fallbacks.length) {
+      // 所有CDN都失败时，静默处理（避免过多错误信息）
+      if(callback) callback();
+      return;
+    }
+    
+    var currentUrl = fallbacks[fallbackIndex];
+    var s = document.createElement('script');
+    s.src = currentUrl;
+    s.async = true;
+    
+    s.onload = s.onreadystatechange = function() {
+      if(!s.readyState || s.readyState === 'loaded' || s.readyState === 'complete') {
+        s.onload = s.onreadystatechange = null;
+        if(callback) callback();
+      }
+    };
+    
+    s.onerror = function() {
+      // 静默处理CDN加载失败，自动尝试备用CDN
+      // 移除失败的script标签
+      if(s.parentNode) s.parentNode.removeChild(s);
+      // 尝试下一个备用CDN
+      enhanced_mpld3_load_lib(url, callback, fallbackIndex + 1);
+    };
+    
+    document.getElementsByTagName('head')[0].appendChild(s);
+  }
+  
+  // 替换全局的mpld3_load_lib函数
+  window.mpld3_load_lib = enhanced_mpld3_load_lib;
+  
+  // 如果已经存在mpld3_load_lib，也替换它
+  if(typeof mpld3_load_lib !== 'undefined') {
+    mpld3_load_lib = enhanced_mpld3_load_lib;
+  }
+})();
+</script>
+<script>
+function mpld3_load_lib(url, callback){
+  var s = document.createElement('script');
+  s.src = url;
+  s.async = true;
+  s.onreadystatechange = s.onload = callback;
+  s.onerror = function(){console.warn("failed to load library " + url);};
+  document.getElementsByTagName("head")[0].appendChild(s);
+}
+
+if(typeof(mpld3) !== "undefined" && mpld3._mpld3IsLoaded){
+   // already loaded: just create the figure
+   !function(mpld3){
+       
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+       mpld3.draw_figure("fig_el2080868b25ce9-449d-4e91-9f1b-13b357dd0a678301892000", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [12.957445283648049, 23.697033200480945], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [12.957445283648049, 23.697033200480945], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el20808e6e59c75-b65a-4bd1-8455-742110205dd8", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el20808296e9eae-7acf-4117-b07a-4ee70c6c5d28", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el20808997cdb22-3dc8-41f3-90f4-1191108a5cf4", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el2080811d68a1c-9835-410e-b1ca-455a8ab8c1fc", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el20808314f81fe-a873-4a3e-bad6-1fc6ace6649c", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el2080858b59ea9-83b2-4456-98d8-d39ed2d6c523", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el20808f4f3e723-6ea5-469a-9d87-b4ae6c7eb575", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808fe978357-c679-4264-87e5-077bdef7597d", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el2080843726766-2aa2-48ba-8efd-d3bed3c11398", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208088eb2e163-5b8d-4331-9f63-5990d16c01f9", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808b265630d-9855-4701-8450-0d9f9c5bf9b2"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080836e0bd8a-295a-4ba1-b8c2-71fa9510264c"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.9441540948275864], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a2ee1ef7-1bdd-4ac7-aa48-019351ea3ee3"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.8955818965517244], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808b09bcded-6228-478c-87d8-ce2cc99b2877"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.8483836206896553], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d9d7248a-f4f6-434e-b58a-267d2061f65c"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.8015894396551726], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d356d23b-7992-4107-a958-5e769a11fb61"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.7547952586206899], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808de5aa8f4-eadd-4fac-9cc7-dad970a4b88e"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.708405172413793], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a274fd80-4628-4b3f-9b8c-72146a8b11bf"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.6604391163793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080d8eb783-3bf9-45ea-9c3d-63add55d3151"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.14465885062723], [19724.0, 20.282923151798407], [19725.0, 20.58873108151154], [19726.0, 21.40979077122172], [19727.0, 21.575429764759157], [19728.0, 21.59956415716997], [19729.0, 21.99515461547586], [19730.0, 22.40610589702292], [19731.0, 22.555182531260613], [19732.0, 22.743583927441126], [19733.0, 22.80652138647475], [19734.0, 22.802283395578765], [19735.0, 22.8154621863885], [19736.0, 22.752000998560856], [19737.0, 22.76746281982952], [19738.0, 22.7986763444157], [19739.0, 22.87813787800386], [19740.0, 22.89056647200745], [19741.0, 22.9387857312029], [19742.0, 23.055283479609585], [19743.0, 23.10763945499557], [19744.0, 23.159331541408367], [19745.0, 23.1865323625217], [19746.0, 23.19806430811867], [19747.0, 23.208870113352177], [19748.0, 23.186364715616804], [19749.0, 23.065519249784934], [19750.0, 22.791162054264973], [19751.0, 22.523229606905094], [19752.0, 22.12846507066365], [19753.0, 21.725214235387394], [19754.0, 21.233362739801127], [19755.0, 20.585575402714767], [19756.0, 20.13972271479459], [19757.0, 19.847465018614795], [19758.0, 19.606319005887837], [19759.0, 19.436939950448906], [19760.0, 19.29570662949733], [19761.0, 19.312903993146378], [19762.0, 19.356008733491404], [19763.0, 19.171683965767432], [19764.0, 18.95703020616379], [19765.0, 18.686015637913602], [19766.0, 18.549176587418945], [19767.0, 18.512527893645135], [19768.0, 18.46346819618942], [19769.0, 18.487309606449752], [19770.0, 18.376505927427907], [19771.0, 18.27557934423224], [19772.0, 18.244561513081422], [19773.0, 18.201839328323526], [19774.0, 17.97562215350873], [19775.0, 17.72293071170531], [19776.0, 17.50758421775046], [19777.0, 17.111196915690385], [19778.0, 16.833754108601433], [19779.0, 16.454773605987704], [19780.0, 16.29753073945266], [19781.0, 16.247401776126527], [19782.0, 16.213016664607213], [19783.0, 16.082929837508146], [19784.0, 15.907124565840121], [19785.0, 15.70450092129327], [19786.0, 15.561792525304593], [19787.0, 15.520075641589049], [19788.0, 15.537082068890792], [19789.0, 15.558319550984717], [19790.0, 15.618913793413562], [19791.0, 15.691355000817888], [19792.0, 15.746320476733983], [19793.0, 15.826630476879696], [19794.0, 16.062298025895945], [19795.0, 16.21476182480912], [19796.0, 16.57344712905624], [19797.0, 16.622232514429086], [19798.0, 16.713758008580605], [19799.0, 16.81235309490325], [19800.0, 16.873135266949273], [19801.0, 16.935305751418003], [19802.0, 16.93024130984682], [19803.0, 16.93123997510646], [19804.0, 16.931306079132128], [19805.0, 16.94150429464278], [19806.0, 16.815529925703224], [19807.0, 16.72168241241262], [19808.0, 16.723333093712682], [19809.0, 16.703246172052214], [19810.0, 16.70549344008383], [19811.0, 16.70253096588477], [19812.0, 16.703446101133935], [19813.0, 16.706620627766988], [19814.0, 16.68504584464019], [19815.0, 16.63019648967737], [19816.0, 16.33808258315793], [19817.0, 16.32503520294174], [19818.0, 16.306567170233528], [19819.0, 16.2331681030432], [19820.0, 16.161337726571276], [19821.0, 16.0632259650753], [19822.0, 16.074553580782382], [19822.0, 14.51577148705167], [19822.0, 14.51577148705167], [19821.0, 14.550971083207461], [19820.0, 14.564380391221484], [19819.0, 14.5997387182649], [19818.0, 14.661531485722216], [19817.0, 14.788708948102952], [19816.0, 14.807036190350349], [19815.0, 14.65767875384238], [19814.0, 14.650970578770444], [19813.0, 14.64422562279615], [19812.0, 14.633760397785052], [19811.0, 14.607819878582056], [19810.0, 14.635921109316758], [19809.0, 14.624662270841396], [19808.0, 14.557330153262336], [19807.0, 14.56110625060793], [19806.0, 14.376484299755093], [19805.0, 14.078684521988928], [19804.0, 13.950954148963328], [19803.0, 13.94230311539011], [19802.0, 13.961723220459646], [19801.0, 13.988055336198755], [19800.0, 13.933466675891609], [19799.0, 13.865514570418357], [19798.0, 13.835885630490989], [19797.0, 13.845500327965535], [19796.0, 13.806906035924365], [19795.0, 13.89567443142818], [19794.0, 13.825869689946712], [19793.0, 13.871323496628115], [19792.0, 13.857575696783096], [19791.0, 13.820348954514136], [19790.0, 13.856493963771292], [19789.0, 13.881692894826923], [19788.0, 13.864855599131298], [19787.0, 13.863218681112457], [19786.0, 13.906662663924596], [19785.0, 13.963667525101698], [19784.0, 13.91600199129605], [19783.0, 13.84562049578834], [19782.0, 13.803106081956901], [19781.0, 13.79541134281318], [19780.0, 13.810906946425298], [19779.0, 13.802261120843612], [19778.0, 13.654400546584661], [19777.0, 13.555673611939122], [19776.0, 13.445608370776817], [19775.0, 13.52700666823937], [19774.0, 13.654529378743202], [19773.0, 13.775355117457249], [19772.0, 13.96780782298194], [19771.0, 14.218254411194918], [19770.0, 14.325224927084578], [19769.0, 14.469531196122414], [19768.0, 14.782553764836083], [19767.0, 15.05719296615685], [19766.0, 15.302704831254283], [19765.0, 15.401319376338758], [19764.0, 15.421940628198914], [19763.0, 15.489763864351797], [19762.0, 15.607773321468182], [19761.0, 15.91685317720726], [19760.0, 16.28048390311057], [19759.0, 16.464675845744406], [19758.0, 16.507026181067136], [19757.0, 16.538694294868794], [19756.0, 16.48632291918111], [19755.0, 16.407729688983864], [19754.0, 16.169980275405518], [19753.0, 16.07539372851208], [19752.0, 16.185308238832597], [19751.0, 16.296794602217094], [19750.0, 16.49340036481418], [19749.0, 16.677023164052002], [19748.0, 16.99457085743755], [19747.0, 17.27394829927311], [19746.0, 17.603889921410495], [19745.0, 17.91904621642127], [19744.0, 18.102482484817312], [19743.0, 18.281402001842196], [19742.0, 18.456609807874493], [19741.0, 18.83299516240332], [19740.0, 19.091517111660295], [19739.0, 19.28557670776082], [19738.0, 19.589013576995224], [19737.0, 19.806543740624857], [19736.0, 19.99477546871169], [19735.0, 19.997978186250165], [19734.0, 19.929491512932213], [19733.0, 19.850736361845883], [19732.0, 19.777680253294054], [19731.0, 19.748376434335412], [19730.0, 19.693141555097412], [19729.0, 19.774338835613577], [19728.0, 19.85816308073711], [19727.0, 19.761667337794087], [19726.0, 19.687826889063476], [19725.0, 20.031703050085802], [19724.0, 20.14465885062723]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el20808fe102060-d8e1-4451-beee-35615e956df5"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080849b72dff-79c2-45b0-8181-9ddf8395f96b"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080825ebd0ed-6b1b-4c3e-bd96-e787f5169fe5"}], "images": [], "sharex": ["el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.710655581331073, 2.8692034105580246], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.710655581331073, 2.8692034105580246], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el2080837257d4a-5bed-421f-b60c-76af011c77fe", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el208084dabb3a8-a02c-4aa0-8a17-64739ff8b9c4", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el20808a8da5c2f-8d01-4737-be37-6a36d269ef99", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el2080809cb415f-8ac4-4b10-a698-ae5833597a03", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el20808bbe00e8a-8198-4eb9-acc0-8d89720d6431", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el208083300b998-11af-4512-b4a6-0b776ec65ad3", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el2080808336402-8db9-47e7-9d63-4a5b95dc1be3", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el20808b91409f7-df6f-4cb5-95f0-4ce1db6f8c62", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el2080881df0a31-b856-4192-9970-991ce155b335", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808e544a490-83a5-41e2-a98f-1c7ebce6fd85", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el208087fdbbdd4-75a7-403d-b464-eb06117dbbc6", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208080f305e71-397d-44b7-b02b-11c05fe4f29b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808125f3176-dd7e-4836-9940-1e9261d08974"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808c276beff-c733-4905-80e3-ee809ba7c65d"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080855c187ff-2b59-4575-bb92-6c54a5e59466"}, {"text": "Z\u5206\u6570", "position": [0.9106657608695653, 0.9441945043103449], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080890b3f64f-81bd-4573-ab97-35e168f27edf"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.9106657608695653, 0.8956627155172413], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208088eac80f6-5446-4814-918a-902a34f3778a"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.9106657608695653, 0.8472925646551724], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808e3b52a07-2b0f-4dd8-bbcb-28bed739ceb8"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.9106657608695653, 0.7987607758620691], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080802d431d3-4f84-47ba-8f6f-ec9a65ff1477"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.9106657608695653, 0.7501885775862069], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808914f6abe-4614-4dca-a325-7f41f319ed1a"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9106657608695653, 0.7037984913793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808fd17c32d-d207-4b6e-9787-fe6a0369a0e0"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9106657608695653, 0.6558324353448276], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080825a2b1-e161-4818-8269-45dccd6cfc7a"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el20808e5a95764-335f-4369-b75b-29624dd93b99"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080859810049-c4a0-474e-bc8e-af480a0774c2"}], "images": [], "sharex": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03"], "sharey": []}], "data": {"data01": [[19723.0, 20.248357076505616, 20.248357076505616, NaN, NaN, 0.0], [19724.0, 20.179224925920025, 20.21379100121282, 20.282923151798407, 20.14465885062723, -0.9999999999999744], [19725.0, 20.50306919497037, 20.31021706579867, 20.58873108151154, 20.031703050085802, 1.3848648060176292], [19726.0, 21.264584123174384, 20.548808830142598, 21.40979077122172, 19.687826889063476, 1.662695252666189], [19727.0, 21.147507435812713, 20.668548551276622, 21.575429764759157, 19.761667337794087, 1.056277001696465], [19728.0, 21.030438957338124, 20.72886361895354, 21.59956415716997, 19.85816308073711, 0.692718851425865], [19729.0, 21.820045365091822, 20.88474672554472, 21.99515461547586, 19.774338835613577, 1.6846037353086543], [19730.0, 22.203762729668274, 21.049623726060165, 22.40610589702292, 19.693141555097412, 1.7016648332192499], [19731.0, 21.969025536700798, 21.151779482798013, 22.555182531260613, 19.748376434335412, 1.1646633585384634], [19732.0, 22.24030555849378, 21.26063209036759, 22.743583927441126, 19.777680253294054, 1.3212478566525567], [19733.0, 22.00859671208755, 21.328628874160316, 22.80652138647475, 19.850736361845883, 0.9201857811193311], [19734.0, 21.77573183530242, 21.36588745425549, 22.802283395578765, 19.929491512932213, 0.570656556811713], [19735.0, 21.89671297108544, 21.406720186319333, 22.8154621863885, 19.997978186250165, 0.6956458808526284], [19736.0, 20.94007284875654, 21.373388233636273, 22.752000998560856, 19.99477546871169, -0.6286252324138878], [19737.0, 20.07761393250002, 21.28700328022719, 22.76746281982952, 19.806543740624857, -1.6338026340821503], [19738.0, 19.796470167879537, 21.193844960705462, 22.7986763444157, 19.589013576995224, -1.7414599527525554], [19739.0, 19.290054607712324, 21.08185729288234, 22.87813787800386, 19.28557670776082, -1.9950142533537432], [19740.0, 19.44717827400996, 20.991041791833872, 22.89056647200745, 19.091517111660295, -1.6255261476074472], [19741.0, 18.993166236249355, 20.88589044680311, 22.9387857312029, 18.83299516240332, -1.8439559240423076], [19742.0, 18.28701438558171, 20.75594664374204, 23.055283479609585, 18.456609807874493, -2.1475168141067886], [19743.0, 19.019838770042487, 20.694520728418883, 23.10763945499557, 18.281402001842196, -1.3879814034282048], [19744.0, 18.90695061979922, 20.63090701311284, 23.159331541408367, 18.102482484817312, -1.3636605514784992], [19745.0, 18.94071472214318, 20.552789289471484, 23.1865323625217, 17.91904621642127, -1.2241699532683057], [19746.0, 18.228340629036452, 20.400977114764583, 23.19806430811867, 17.603889921410495, -1.5534992908982885], [19747.0, 17.956149266773863, 20.241409206312643, 23.208870113352177, 17.27394829927311, -1.540212330425376], [19748.0, 18.011610561628796, 20.090467786527178, 23.186364715616804, 16.99457085743755, -1.3429757336977532], [19749.0, 17.436113772917643, 19.87127120691847, 23.065519249784934, 16.677023164052002, -1.524714049329465], [19750.0, 17.62396278209048, 19.642281209539576, 22.791162054264973, 16.49340036481418, -1.2819274700914285], [19751.0, 17.32364343713108, 19.410012104561094, 22.523229606905094, 16.296794602217094, -1.3403295245893672], [19752.0, 17.17779656223444, 19.156886654748124, 22.12846507066365, 16.185308238832597, -1.3320126986478578], [19753.0, 16.87694325611974, 18.900303981949737, 21.725214235387394, 16.07539372851208, -1.43251327957605], [19754.0, 17.80308234837421, 18.701671507603322, 21.233362739801127, 16.169980275405518, -0.7098726320184237], [19755.0, 17.79633373600524, 18.496652545849315, 20.585575402714767, 16.407729688983864, -0.6705071061311877], [19756.0, 17.267478271527292, 18.31302281698785, 20.13972271479459, 16.48632291918111, -1.1447359762990188], [19757.0, 17.678750727578887, 18.193079656741794, 19.847465018614795, 16.538694294868794, -0.6217764506579214], [19758.0, 17.068328902593375, 18.056672593477487, 19.606319005887837, 16.507026181067136, -1.2755731668449743], [19759.0, 17.172760700095754, 17.950807898096656, 19.436939950448906, 16.464675845744406, -1.0470768015122336], [19760.0, 16.192925638155867, 17.78809526630395, 19.29570662949733, 16.28048390311057, -2.1161549549072647], [19761.0, 15.528832613706651, 17.614878585176818, 19.312903993146378, 15.91685317720726, -2.457025627154296], [19762.0, 15.627263231641212, 17.481891027479794, 19.356008733491404, 15.607773321468182, -1.9792009753597524], [19763.0, 15.996496521638917, 17.330723915059615, 19.171683965767432, 15.489763864351797, -1.4494908707092367], [19764.0, 16.082180662233903, 17.189485417181352, 18.95703020616379, 15.421940628198914, -1.25292978356143], [19765.0, 16.024356521039785, 17.04366750712618, 18.686015637913602, 15.401319376338758, -1.2412849224575642], [19766.0, 15.87380467324514, 16.925940709336615, 18.549176587418945, 15.302704831254283, -1.2963439883234407], [19767.0, 15.134543678061425, 16.78486042990099, 18.512527893645135, 15.05719296615685, -1.910456481321997], [19768.0, 14.77462157386407, 16.623010980512753, 18.46346819618942, 14.782553764836083, -2.008619804801163], [19769.0, 14.544302188384176, 16.478420401286083, 18.487309606449752, 14.469531196122414, -1.9255598645564225], [19770.0, 15.072863301493634, 16.35086542725624, 18.376505927427907, 14.325224927084578, -1.2618252109930694], [19771.0, 15.244672446277864, 16.24691687771358, 18.27557934423224, 14.218254411194918, -0.9880839695877488], [19772.0, 14.363152368596499, 16.10618466803168, 18.244561513081422, 13.96780782298194, -1.6302386583265087], [19773.0, 14.525194353293895, 15.988597222890387, 18.201839328323526, 13.775355117457249, -1.3224064967895595], [19774.0, 14.332653213085738, 15.815075766125966, 17.97562215350873, 13.654529378743202, -1.3722663504910906], [19775.0, 13.994192212932758, 15.62496868997234, 17.72293071170531, 13.52700666823937, -1.5546291688278693], [19776.0, 14.300030357353192, 15.476596294263638, 17.50758421775046, 13.445608370776817, -1.1586144095731559], [19777.0, 14.815530118601167, 15.333435263814753, 17.111196915690385, 13.555673611939122, -0.5826485734655925], [19778.0, 15.281170178159266, 15.244077327593047, 16.833754108601433, 13.654400546584661, 0.04666716027982789], [19779.0, 14.861561416547946, 15.128517363415657, 16.454773605987704, 13.802261120843612, -0.4025706922969813], [19780.0, 14.706955228622341, 15.05421884293898, 16.29753073945266, 13.810906946425298, -0.5586106194115662], [19781.0, 14.872586944324123, 15.021406559469852, 16.247401776126527, 13.79541134281318, -0.24277356571025657], [19782.0, 15.360359507885303, 15.008061373282057, 16.213016664607213, 13.803106081956901, 0.5847488900867079], [19783.0, 15.120772388962656, 14.964275166648244, 16.082929837508146, 13.84562049578834, 0.2797954120982011], [19784.0, 15.027942900630748, 14.911563278568085, 15.907124565840121, 13.91600199129605, 0.23379700185321156], [19785.0, 14.474775413627734, 14.834084223197484, 15.70450092129327, 13.963667525101698, -0.8256018303780509], [19786.0, 13.876672101587399, 14.734227594614595, 15.561792525304593, 13.906662663924596, -2.0724790556607844], [19787.0, 14.282935012784499, 14.691647161350753, 15.520075641589049, 13.863218681112457, -0.9867167976858756], [19788.0, 14.96105502706991, 14.700968834011045, 15.537082068890792, 13.864855599131298, 0.6221315061380961], [19789.0, 14.925049966279744, 14.72000622290582, 15.558319550984717, 13.881692894826923, 0.48918163771488177], [19790.0, 15.426816415225755, 14.737703878592427, 15.618913793413562, 13.856493963771292, 1.5640144874520647], [19791.0, 15.607634427749572, 14.755851977666012, 15.691355000817888, 13.820348954514136, 1.8210148529798527], [19792.0, 15.28507455044701, 14.80194808675854, 15.746320476733983, 13.857575696783096, 1.0231693954988106], [19793.0, 15.465772353201217, 14.848976986753906, 15.826630476879696, 13.871323496628115, 1.26178727468758], [19794.0, 16.2347906364342, 14.944083857921328, 16.062298025895945, 13.825869689946712, 2.3085144429008406], [19795.0, 16.216877616879223, 15.05521812811865, 16.21476182480912, 13.89567443142818, 2.0036493528896613], [19796.0, 16.99919944478623, 15.190176582490304, 16.57344712905624, 13.806906035924365, 2.6155734563812474], [19797.0, 15.689326892741356, 15.23386642119731, 16.622232514429086, 13.845500327965535, 0.6561100472914095], [19798.0, 16.100278144928968, 15.274821819535797, 16.713758008580605, 13.835885630490989, 1.1473147060692443], [19799.0, 16.143801679048053, 15.338933832660803, 16.81235309490325, 13.865514570418357, 1.0925170683085736], [19800.0, 15.99429800381512, 15.40330097142044, 16.873135266949273, 13.933466675891609, 0.8041682442605462], [19801.0, 16.040178392082872, 15.461680543808379, 16.935305751418003, 13.988055336198755, 0.7851356576790348], [19802.0, 15.046393934782424, 15.445982265153233, 16.93024130984682, 13.961723220459646, -0.5384347588103142], [19803.0, 14.936557990863669, 15.436771545248286, 16.93123997510646, 13.94230311539011, -0.6694200350984821], [19804.0, 15.115114276619542, 15.441130114047727, 16.931306079132128, 13.950954148963328, -0.43755347699453834], [19805.0, 15.854061298990299, 15.510094408315855, 16.94150429464278, 14.078684521988928, 0.48059873549858123], [19806.0, 15.594926189853476, 15.596007112729158, 16.815529925703224, 14.376484299755093, -0.0017726980818760791], [19807.0, 15.190679388406881, 15.641394331510275, 16.72168241241262, 14.56110625060793, -0.8344347236098729], [19808.0, 14.939800866614615, 15.640331623487508, 16.723333093712682, 14.557330153262336, -1.2936838520214433], [19809.0, 15.39750192546565, 15.663954221446806, 16.703246172052214, 14.624662270841396, -0.5127573552858583], [19810.0, 15.561877480295493, 15.670707274700295, 16.70549344008383, 14.635921109316758, -0.2103425771342129], [19811.0, 15.296997378411973, 15.655175422233413, 16.70253096588477, 14.607819878582056, -0.6839664830010581], [19812.0, 15.553631094968651, 15.668603249459494, 16.703446101133935, 14.633760397785052, -0.22220215234576102], [19813.0, 15.602169869642672, 15.675423125281569, 16.706620627766988, 14.64422562279615, -0.14207415255048453], [19814.0, 16.086492364909116, 15.668008211705317, 16.68504584464019, 14.650970578770444, 0.8229472335181468], [19815.0, 15.73546581797044, 15.643937621759875, 16.63019648967737, 14.65767875384238, 0.18560684053229987], [19816.0, 15.571634744671556, 15.57255938675414, 16.33808258315793, 14.807036190350349, -0.002415712775073623], [19817.0, 15.375580668105476, 15.556872075522346, 16.32503520294174, 14.788708948102952, -0.472012782039954], [19818.0, 14.643823194039417, 15.484049327977871, 16.306567170233528, 14.661531485722216, -2.04305874176355], [19819.0, 14.791883332571704, 15.416453410654052, 16.2331681030432, 14.5997387182649, -1.5294694313757997], [19820.0, 14.92241096866165, 15.36285905889638, 16.161337726571276, 14.564380391221484, -1.1032181774305345], [19821.0, 14.924967696982879, 15.30709852414138, 16.0632259650753, 14.550971083207461, -1.0107577280531388], [19822.0, 14.807674130295307, 15.295162533917026, 16.074553580782382, 14.51577148705167, -1.2509468913771966]], "data02": [[0.0, 0.0]], "data03": [[19742.0, 18.28701438558171, -2.1475168141067886], [19760.0, 16.192925638155867, -2.1161549549072647], [19761.0, 15.528832613706651, -2.457025627154296], [19768.0, 14.77462157386407, -2.008619804801163], [19786.0, 13.876672101587399, -2.0724790556607844], [19818.0, 14.643823194039417, -2.04305874176355]], "data04": [[19794.0, 16.2347906364342, 2.3085144429008406], [19795.0, 16.216877616879223, 2.0036493528896613], [19796.0, 16.99919944478623, 2.6155734563812474]], "data05": [[0.8902853260869565, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9016077898550725, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9129302536231885, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037]], "data06": [[0.8902853260869565, 0.8483836206896553], [0.9129302536231885, 0.8483836206896553], [0.9129302536231885, 0.871012931034483], [0.8902853260869565, 0.871012931034483]], "data07": [[0.9016077898550725, 0.7168911637931034, 0.6689251077586208]], "data08": [[0.8880208333333334, 0.6423356681034482], [0.992074275362319, 0.6423356681034482], [0.994338768115942, 0.6423356681034482], [0.994338768115942, 0.6488011853448277], [0.994338768115942, 0.9773706896551726], [0.994338768115942, 0.9838362068965516], [0.992074275362319, 0.9838362068965516], [0.8880208333333334, 0.9838362068965516], [0.8857563405797102, 0.9838362068965516], [0.8857563405797102, 0.9773706896551726], [0.8857563405797102, 0.6488011853448277], [0.8857563405797102, 0.6423356681034482], [0.8880208333333334, 0.6423356681034482]], "data09": [[72.0, 129.2461951423466, 406.43360595593646, 267.83990054914153], [1176.0, 129.2461951423466, 406.43360595593646, 267.83990054914153]], "data10": [[0.8789628623188407, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.8902853260869567, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.9016077898550726, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208]], "data11": [[0.8902853260869567, 0.7122844827586208, 0.664318426724138]], "data12": [[0.8766983695652174, 0.6377289870689655], [0.992074275362319, 0.6377289870689655], [0.994338768115942, 0.6377289870689655], [0.994338768115942, 0.6441945043103449], [0.994338768115942, 0.9773706896551725], [0.994338768115942, 0.9838362068965517], [0.992074275362319, 0.9838362068965517], [0.8766983695652174, 0.9838362068965517], [0.8744338768115942, 0.9838362068965517], [0.8744338768115942, 0.9773706896551725], [0.8744338768115942, 0.6441945043103449], [0.8744338768115942, 0.6377289870689655], [0.8766983695652174, 0.6377289870689655]]}, "id": "el2080868b25ce9-449d-4e91-9f1b-13b357dd0a67", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+   }(mpld3);
+}else if(typeof define === "function" && define.amd){
+   // require.js is available: use it to load d3/mpld3
+   require.config({paths: {d3: "https://cdn.jsdelivr.net/npm/d3@5/dist/d3.min"}});
+   require(["d3"], function(d3){
+      window.d3 = d3;
+      mpld3_load_lib("https://cdn.jsdelivr.net/gh/mpld3/mpld3@v0.5.11/js/mpld3.v0.5.11.js", function(){
+         
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+         mpld3.draw_figure("fig_el2080868b25ce9-449d-4e91-9f1b-13b357dd0a678301892000", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [12.957445283648049, 23.697033200480945], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [12.957445283648049, 23.697033200480945], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el20808e6e59c75-b65a-4bd1-8455-742110205dd8", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el20808296e9eae-7acf-4117-b07a-4ee70c6c5d28", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el20808997cdb22-3dc8-41f3-90f4-1191108a5cf4", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el2080811d68a1c-9835-410e-b1ca-455a8ab8c1fc", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el20808314f81fe-a873-4a3e-bad6-1fc6ace6649c", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el2080858b59ea9-83b2-4456-98d8-d39ed2d6c523", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el20808f4f3e723-6ea5-469a-9d87-b4ae6c7eb575", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808fe978357-c679-4264-87e5-077bdef7597d", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el2080843726766-2aa2-48ba-8efd-d3bed3c11398", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208088eb2e163-5b8d-4331-9f63-5990d16c01f9", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808b265630d-9855-4701-8450-0d9f9c5bf9b2"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080836e0bd8a-295a-4ba1-b8c2-71fa9510264c"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.9441540948275864], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a2ee1ef7-1bdd-4ac7-aa48-019351ea3ee3"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.8955818965517244], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808b09bcded-6228-478c-87d8-ce2cc99b2877"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.8483836206896553], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d9d7248a-f4f6-434e-b58a-267d2061f65c"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.8015894396551726], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d356d23b-7992-4107-a958-5e769a11fb61"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.7547952586206899], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808de5aa8f4-eadd-4fac-9cc7-dad970a4b88e"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.708405172413793], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a274fd80-4628-4b3f-9b8c-72146a8b11bf"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.6604391163793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080d8eb783-3bf9-45ea-9c3d-63add55d3151"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.14465885062723], [19724.0, 20.282923151798407], [19725.0, 20.58873108151154], [19726.0, 21.40979077122172], [19727.0, 21.575429764759157], [19728.0, 21.59956415716997], [19729.0, 21.99515461547586], [19730.0, 22.40610589702292], [19731.0, 22.555182531260613], [19732.0, 22.743583927441126], [19733.0, 22.80652138647475], [19734.0, 22.802283395578765], [19735.0, 22.8154621863885], [19736.0, 22.752000998560856], [19737.0, 22.76746281982952], [19738.0, 22.7986763444157], [19739.0, 22.87813787800386], [19740.0, 22.89056647200745], [19741.0, 22.9387857312029], [19742.0, 23.055283479609585], [19743.0, 23.10763945499557], [19744.0, 23.159331541408367], [19745.0, 23.1865323625217], [19746.0, 23.19806430811867], [19747.0, 23.208870113352177], [19748.0, 23.186364715616804], [19749.0, 23.065519249784934], [19750.0, 22.791162054264973], [19751.0, 22.523229606905094], [19752.0, 22.12846507066365], [19753.0, 21.725214235387394], [19754.0, 21.233362739801127], [19755.0, 20.585575402714767], [19756.0, 20.13972271479459], [19757.0, 19.847465018614795], [19758.0, 19.606319005887837], [19759.0, 19.436939950448906], [19760.0, 19.29570662949733], [19761.0, 19.312903993146378], [19762.0, 19.356008733491404], [19763.0, 19.171683965767432], [19764.0, 18.95703020616379], [19765.0, 18.686015637913602], [19766.0, 18.549176587418945], [19767.0, 18.512527893645135], [19768.0, 18.46346819618942], [19769.0, 18.487309606449752], [19770.0, 18.376505927427907], [19771.0, 18.27557934423224], [19772.0, 18.244561513081422], [19773.0, 18.201839328323526], [19774.0, 17.97562215350873], [19775.0, 17.72293071170531], [19776.0, 17.50758421775046], [19777.0, 17.111196915690385], [19778.0, 16.833754108601433], [19779.0, 16.454773605987704], [19780.0, 16.29753073945266], [19781.0, 16.247401776126527], [19782.0, 16.213016664607213], [19783.0, 16.082929837508146], [19784.0, 15.907124565840121], [19785.0, 15.70450092129327], [19786.0, 15.561792525304593], [19787.0, 15.520075641589049], [19788.0, 15.537082068890792], [19789.0, 15.558319550984717], [19790.0, 15.618913793413562], [19791.0, 15.691355000817888], [19792.0, 15.746320476733983], [19793.0, 15.826630476879696], [19794.0, 16.062298025895945], [19795.0, 16.21476182480912], [19796.0, 16.57344712905624], [19797.0, 16.622232514429086], [19798.0, 16.713758008580605], [19799.0, 16.81235309490325], [19800.0, 16.873135266949273], [19801.0, 16.935305751418003], [19802.0, 16.93024130984682], [19803.0, 16.93123997510646], [19804.0, 16.931306079132128], [19805.0, 16.94150429464278], [19806.0, 16.815529925703224], [19807.0, 16.72168241241262], [19808.0, 16.723333093712682], [19809.0, 16.703246172052214], [19810.0, 16.70549344008383], [19811.0, 16.70253096588477], [19812.0, 16.703446101133935], [19813.0, 16.706620627766988], [19814.0, 16.68504584464019], [19815.0, 16.63019648967737], [19816.0, 16.33808258315793], [19817.0, 16.32503520294174], [19818.0, 16.306567170233528], [19819.0, 16.2331681030432], [19820.0, 16.161337726571276], [19821.0, 16.0632259650753], [19822.0, 16.074553580782382], [19822.0, 14.51577148705167], [19822.0, 14.51577148705167], [19821.0, 14.550971083207461], [19820.0, 14.564380391221484], [19819.0, 14.5997387182649], [19818.0, 14.661531485722216], [19817.0, 14.788708948102952], [19816.0, 14.807036190350349], [19815.0, 14.65767875384238], [19814.0, 14.650970578770444], [19813.0, 14.64422562279615], [19812.0, 14.633760397785052], [19811.0, 14.607819878582056], [19810.0, 14.635921109316758], [19809.0, 14.624662270841396], [19808.0, 14.557330153262336], [19807.0, 14.56110625060793], [19806.0, 14.376484299755093], [19805.0, 14.078684521988928], [19804.0, 13.950954148963328], [19803.0, 13.94230311539011], [19802.0, 13.961723220459646], [19801.0, 13.988055336198755], [19800.0, 13.933466675891609], [19799.0, 13.865514570418357], [19798.0, 13.835885630490989], [19797.0, 13.845500327965535], [19796.0, 13.806906035924365], [19795.0, 13.89567443142818], [19794.0, 13.825869689946712], [19793.0, 13.871323496628115], [19792.0, 13.857575696783096], [19791.0, 13.820348954514136], [19790.0, 13.856493963771292], [19789.0, 13.881692894826923], [19788.0, 13.864855599131298], [19787.0, 13.863218681112457], [19786.0, 13.906662663924596], [19785.0, 13.963667525101698], [19784.0, 13.91600199129605], [19783.0, 13.84562049578834], [19782.0, 13.803106081956901], [19781.0, 13.79541134281318], [19780.0, 13.810906946425298], [19779.0, 13.802261120843612], [19778.0, 13.654400546584661], [19777.0, 13.555673611939122], [19776.0, 13.445608370776817], [19775.0, 13.52700666823937], [19774.0, 13.654529378743202], [19773.0, 13.775355117457249], [19772.0, 13.96780782298194], [19771.0, 14.218254411194918], [19770.0, 14.325224927084578], [19769.0, 14.469531196122414], [19768.0, 14.782553764836083], [19767.0, 15.05719296615685], [19766.0, 15.302704831254283], [19765.0, 15.401319376338758], [19764.0, 15.421940628198914], [19763.0, 15.489763864351797], [19762.0, 15.607773321468182], [19761.0, 15.91685317720726], [19760.0, 16.28048390311057], [19759.0, 16.464675845744406], [19758.0, 16.507026181067136], [19757.0, 16.538694294868794], [19756.0, 16.48632291918111], [19755.0, 16.407729688983864], [19754.0, 16.169980275405518], [19753.0, 16.07539372851208], [19752.0, 16.185308238832597], [19751.0, 16.296794602217094], [19750.0, 16.49340036481418], [19749.0, 16.677023164052002], [19748.0, 16.99457085743755], [19747.0, 17.27394829927311], [19746.0, 17.603889921410495], [19745.0, 17.91904621642127], [19744.0, 18.102482484817312], [19743.0, 18.281402001842196], [19742.0, 18.456609807874493], [19741.0, 18.83299516240332], [19740.0, 19.091517111660295], [19739.0, 19.28557670776082], [19738.0, 19.589013576995224], [19737.0, 19.806543740624857], [19736.0, 19.99477546871169], [19735.0, 19.997978186250165], [19734.0, 19.929491512932213], [19733.0, 19.850736361845883], [19732.0, 19.777680253294054], [19731.0, 19.748376434335412], [19730.0, 19.693141555097412], [19729.0, 19.774338835613577], [19728.0, 19.85816308073711], [19727.0, 19.761667337794087], [19726.0, 19.687826889063476], [19725.0, 20.031703050085802], [19724.0, 20.14465885062723]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el20808fe102060-d8e1-4451-beee-35615e956df5"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080849b72dff-79c2-45b0-8181-9ddf8395f96b"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080825ebd0ed-6b1b-4c3e-bd96-e787f5169fe5"}], "images": [], "sharex": ["el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.710655581331073, 2.8692034105580246], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.710655581331073, 2.8692034105580246], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el2080837257d4a-5bed-421f-b60c-76af011c77fe", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el208084dabb3a8-a02c-4aa0-8a17-64739ff8b9c4", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el20808a8da5c2f-8d01-4737-be37-6a36d269ef99", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el2080809cb415f-8ac4-4b10-a698-ae5833597a03", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el20808bbe00e8a-8198-4eb9-acc0-8d89720d6431", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el208083300b998-11af-4512-b4a6-0b776ec65ad3", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el2080808336402-8db9-47e7-9d63-4a5b95dc1be3", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el20808b91409f7-df6f-4cb5-95f0-4ce1db6f8c62", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el2080881df0a31-b856-4192-9970-991ce155b335", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808e544a490-83a5-41e2-a98f-1c7ebce6fd85", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el208087fdbbdd4-75a7-403d-b464-eb06117dbbc6", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208080f305e71-397d-44b7-b02b-11c05fe4f29b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808125f3176-dd7e-4836-9940-1e9261d08974"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808c276beff-c733-4905-80e3-ee809ba7c65d"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080855c187ff-2b59-4575-bb92-6c54a5e59466"}, {"text": "Z\u5206\u6570", "position": [0.9106657608695653, 0.9441945043103449], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080890b3f64f-81bd-4573-ab97-35e168f27edf"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.9106657608695653, 0.8956627155172413], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208088eac80f6-5446-4814-918a-902a34f3778a"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.9106657608695653, 0.8472925646551724], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808e3b52a07-2b0f-4dd8-bbcb-28bed739ceb8"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.9106657608695653, 0.7987607758620691], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080802d431d3-4f84-47ba-8f6f-ec9a65ff1477"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.9106657608695653, 0.7501885775862069], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808914f6abe-4614-4dca-a325-7f41f319ed1a"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9106657608695653, 0.7037984913793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808fd17c32d-d207-4b6e-9787-fe6a0369a0e0"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9106657608695653, 0.6558324353448276], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080825a2b1-e161-4818-8269-45dccd6cfc7a"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el20808e5a95764-335f-4369-b75b-29624dd93b99"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080859810049-c4a0-474e-bc8e-af480a0774c2"}], "images": [], "sharex": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03"], "sharey": []}], "data": {"data01": [[19723.0, 20.248357076505616, 20.248357076505616, NaN, NaN, 0.0], [19724.0, 20.179224925920025, 20.21379100121282, 20.282923151798407, 20.14465885062723, -0.9999999999999744], [19725.0, 20.50306919497037, 20.31021706579867, 20.58873108151154, 20.031703050085802, 1.3848648060176292], [19726.0, 21.264584123174384, 20.548808830142598, 21.40979077122172, 19.687826889063476, 1.662695252666189], [19727.0, 21.147507435812713, 20.668548551276622, 21.575429764759157, 19.761667337794087, 1.056277001696465], [19728.0, 21.030438957338124, 20.72886361895354, 21.59956415716997, 19.85816308073711, 0.692718851425865], [19729.0, 21.820045365091822, 20.88474672554472, 21.99515461547586, 19.774338835613577, 1.6846037353086543], [19730.0, 22.203762729668274, 21.049623726060165, 22.40610589702292, 19.693141555097412, 1.7016648332192499], [19731.0, 21.969025536700798, 21.151779482798013, 22.555182531260613, 19.748376434335412, 1.1646633585384634], [19732.0, 22.24030555849378, 21.26063209036759, 22.743583927441126, 19.777680253294054, 1.3212478566525567], [19733.0, 22.00859671208755, 21.328628874160316, 22.80652138647475, 19.850736361845883, 0.9201857811193311], [19734.0, 21.77573183530242, 21.36588745425549, 22.802283395578765, 19.929491512932213, 0.570656556811713], [19735.0, 21.89671297108544, 21.406720186319333, 22.8154621863885, 19.997978186250165, 0.6956458808526284], [19736.0, 20.94007284875654, 21.373388233636273, 22.752000998560856, 19.99477546871169, -0.6286252324138878], [19737.0, 20.07761393250002, 21.28700328022719, 22.76746281982952, 19.806543740624857, -1.6338026340821503], [19738.0, 19.796470167879537, 21.193844960705462, 22.7986763444157, 19.589013576995224, -1.7414599527525554], [19739.0, 19.290054607712324, 21.08185729288234, 22.87813787800386, 19.28557670776082, -1.9950142533537432], [19740.0, 19.44717827400996, 20.991041791833872, 22.89056647200745, 19.091517111660295, -1.6255261476074472], [19741.0, 18.993166236249355, 20.88589044680311, 22.9387857312029, 18.83299516240332, -1.8439559240423076], [19742.0, 18.28701438558171, 20.75594664374204, 23.055283479609585, 18.456609807874493, -2.1475168141067886], [19743.0, 19.019838770042487, 20.694520728418883, 23.10763945499557, 18.281402001842196, -1.3879814034282048], [19744.0, 18.90695061979922, 20.63090701311284, 23.159331541408367, 18.102482484817312, -1.3636605514784992], [19745.0, 18.94071472214318, 20.552789289471484, 23.1865323625217, 17.91904621642127, -1.2241699532683057], [19746.0, 18.228340629036452, 20.400977114764583, 23.19806430811867, 17.603889921410495, -1.5534992908982885], [19747.0, 17.956149266773863, 20.241409206312643, 23.208870113352177, 17.27394829927311, -1.540212330425376], [19748.0, 18.011610561628796, 20.090467786527178, 23.186364715616804, 16.99457085743755, -1.3429757336977532], [19749.0, 17.436113772917643, 19.87127120691847, 23.065519249784934, 16.677023164052002, -1.524714049329465], [19750.0, 17.62396278209048, 19.642281209539576, 22.791162054264973, 16.49340036481418, -1.2819274700914285], [19751.0, 17.32364343713108, 19.410012104561094, 22.523229606905094, 16.296794602217094, -1.3403295245893672], [19752.0, 17.17779656223444, 19.156886654748124, 22.12846507066365, 16.185308238832597, -1.3320126986478578], [19753.0, 16.87694325611974, 18.900303981949737, 21.725214235387394, 16.07539372851208, -1.43251327957605], [19754.0, 17.80308234837421, 18.701671507603322, 21.233362739801127, 16.169980275405518, -0.7098726320184237], [19755.0, 17.79633373600524, 18.496652545849315, 20.585575402714767, 16.407729688983864, -0.6705071061311877], [19756.0, 17.267478271527292, 18.31302281698785, 20.13972271479459, 16.48632291918111, -1.1447359762990188], [19757.0, 17.678750727578887, 18.193079656741794, 19.847465018614795, 16.538694294868794, -0.6217764506579214], [19758.0, 17.068328902593375, 18.056672593477487, 19.606319005887837, 16.507026181067136, -1.2755731668449743], [19759.0, 17.172760700095754, 17.950807898096656, 19.436939950448906, 16.464675845744406, -1.0470768015122336], [19760.0, 16.192925638155867, 17.78809526630395, 19.29570662949733, 16.28048390311057, -2.1161549549072647], [19761.0, 15.528832613706651, 17.614878585176818, 19.312903993146378, 15.91685317720726, -2.457025627154296], [19762.0, 15.627263231641212, 17.481891027479794, 19.356008733491404, 15.607773321468182, -1.9792009753597524], [19763.0, 15.996496521638917, 17.330723915059615, 19.171683965767432, 15.489763864351797, -1.4494908707092367], [19764.0, 16.082180662233903, 17.189485417181352, 18.95703020616379, 15.421940628198914, -1.25292978356143], [19765.0, 16.024356521039785, 17.04366750712618, 18.686015637913602, 15.401319376338758, -1.2412849224575642], [19766.0, 15.87380467324514, 16.925940709336615, 18.549176587418945, 15.302704831254283, -1.2963439883234407], [19767.0, 15.134543678061425, 16.78486042990099, 18.512527893645135, 15.05719296615685, -1.910456481321997], [19768.0, 14.77462157386407, 16.623010980512753, 18.46346819618942, 14.782553764836083, -2.008619804801163], [19769.0, 14.544302188384176, 16.478420401286083, 18.487309606449752, 14.469531196122414, -1.9255598645564225], [19770.0, 15.072863301493634, 16.35086542725624, 18.376505927427907, 14.325224927084578, -1.2618252109930694], [19771.0, 15.244672446277864, 16.24691687771358, 18.27557934423224, 14.218254411194918, -0.9880839695877488], [19772.0, 14.363152368596499, 16.10618466803168, 18.244561513081422, 13.96780782298194, -1.6302386583265087], [19773.0, 14.525194353293895, 15.988597222890387, 18.201839328323526, 13.775355117457249, -1.3224064967895595], [19774.0, 14.332653213085738, 15.815075766125966, 17.97562215350873, 13.654529378743202, -1.3722663504910906], [19775.0, 13.994192212932758, 15.62496868997234, 17.72293071170531, 13.52700666823937, -1.5546291688278693], [19776.0, 14.300030357353192, 15.476596294263638, 17.50758421775046, 13.445608370776817, -1.1586144095731559], [19777.0, 14.815530118601167, 15.333435263814753, 17.111196915690385, 13.555673611939122, -0.5826485734655925], [19778.0, 15.281170178159266, 15.244077327593047, 16.833754108601433, 13.654400546584661, 0.04666716027982789], [19779.0, 14.861561416547946, 15.128517363415657, 16.454773605987704, 13.802261120843612, -0.4025706922969813], [19780.0, 14.706955228622341, 15.05421884293898, 16.29753073945266, 13.810906946425298, -0.5586106194115662], [19781.0, 14.872586944324123, 15.021406559469852, 16.247401776126527, 13.79541134281318, -0.24277356571025657], [19782.0, 15.360359507885303, 15.008061373282057, 16.213016664607213, 13.803106081956901, 0.5847488900867079], [19783.0, 15.120772388962656, 14.964275166648244, 16.082929837508146, 13.84562049578834, 0.2797954120982011], [19784.0, 15.027942900630748, 14.911563278568085, 15.907124565840121, 13.91600199129605, 0.23379700185321156], [19785.0, 14.474775413627734, 14.834084223197484, 15.70450092129327, 13.963667525101698, -0.8256018303780509], [19786.0, 13.876672101587399, 14.734227594614595, 15.561792525304593, 13.906662663924596, -2.0724790556607844], [19787.0, 14.282935012784499, 14.691647161350753, 15.520075641589049, 13.863218681112457, -0.9867167976858756], [19788.0, 14.96105502706991, 14.700968834011045, 15.537082068890792, 13.864855599131298, 0.6221315061380961], [19789.0, 14.925049966279744, 14.72000622290582, 15.558319550984717, 13.881692894826923, 0.48918163771488177], [19790.0, 15.426816415225755, 14.737703878592427, 15.618913793413562, 13.856493963771292, 1.5640144874520647], [19791.0, 15.607634427749572, 14.755851977666012, 15.691355000817888, 13.820348954514136, 1.8210148529798527], [19792.0, 15.28507455044701, 14.80194808675854, 15.746320476733983, 13.857575696783096, 1.0231693954988106], [19793.0, 15.465772353201217, 14.848976986753906, 15.826630476879696, 13.871323496628115, 1.26178727468758], [19794.0, 16.2347906364342, 14.944083857921328, 16.062298025895945, 13.825869689946712, 2.3085144429008406], [19795.0, 16.216877616879223, 15.05521812811865, 16.21476182480912, 13.89567443142818, 2.0036493528896613], [19796.0, 16.99919944478623, 15.190176582490304, 16.57344712905624, 13.806906035924365, 2.6155734563812474], [19797.0, 15.689326892741356, 15.23386642119731, 16.622232514429086, 13.845500327965535, 0.6561100472914095], [19798.0, 16.100278144928968, 15.274821819535797, 16.713758008580605, 13.835885630490989, 1.1473147060692443], [19799.0, 16.143801679048053, 15.338933832660803, 16.81235309490325, 13.865514570418357, 1.0925170683085736], [19800.0, 15.99429800381512, 15.40330097142044, 16.873135266949273, 13.933466675891609, 0.8041682442605462], [19801.0, 16.040178392082872, 15.461680543808379, 16.935305751418003, 13.988055336198755, 0.7851356576790348], [19802.0, 15.046393934782424, 15.445982265153233, 16.93024130984682, 13.961723220459646, -0.5384347588103142], [19803.0, 14.936557990863669, 15.436771545248286, 16.93123997510646, 13.94230311539011, -0.6694200350984821], [19804.0, 15.115114276619542, 15.441130114047727, 16.931306079132128, 13.950954148963328, -0.43755347699453834], [19805.0, 15.854061298990299, 15.510094408315855, 16.94150429464278, 14.078684521988928, 0.48059873549858123], [19806.0, 15.594926189853476, 15.596007112729158, 16.815529925703224, 14.376484299755093, -0.0017726980818760791], [19807.0, 15.190679388406881, 15.641394331510275, 16.72168241241262, 14.56110625060793, -0.8344347236098729], [19808.0, 14.939800866614615, 15.640331623487508, 16.723333093712682, 14.557330153262336, -1.2936838520214433], [19809.0, 15.39750192546565, 15.663954221446806, 16.703246172052214, 14.624662270841396, -0.5127573552858583], [19810.0, 15.561877480295493, 15.670707274700295, 16.70549344008383, 14.635921109316758, -0.2103425771342129], [19811.0, 15.296997378411973, 15.655175422233413, 16.70253096588477, 14.607819878582056, -0.6839664830010581], [19812.0, 15.553631094968651, 15.668603249459494, 16.703446101133935, 14.633760397785052, -0.22220215234576102], [19813.0, 15.602169869642672, 15.675423125281569, 16.706620627766988, 14.64422562279615, -0.14207415255048453], [19814.0, 16.086492364909116, 15.668008211705317, 16.68504584464019, 14.650970578770444, 0.8229472335181468], [19815.0, 15.73546581797044, 15.643937621759875, 16.63019648967737, 14.65767875384238, 0.18560684053229987], [19816.0, 15.571634744671556, 15.57255938675414, 16.33808258315793, 14.807036190350349, -0.002415712775073623], [19817.0, 15.375580668105476, 15.556872075522346, 16.32503520294174, 14.788708948102952, -0.472012782039954], [19818.0, 14.643823194039417, 15.484049327977871, 16.306567170233528, 14.661531485722216, -2.04305874176355], [19819.0, 14.791883332571704, 15.416453410654052, 16.2331681030432, 14.5997387182649, -1.5294694313757997], [19820.0, 14.92241096866165, 15.36285905889638, 16.161337726571276, 14.564380391221484, -1.1032181774305345], [19821.0, 14.924967696982879, 15.30709852414138, 16.0632259650753, 14.550971083207461, -1.0107577280531388], [19822.0, 14.807674130295307, 15.295162533917026, 16.074553580782382, 14.51577148705167, -1.2509468913771966]], "data02": [[0.0, 0.0]], "data03": [[19742.0, 18.28701438558171, -2.1475168141067886], [19760.0, 16.192925638155867, -2.1161549549072647], [19761.0, 15.528832613706651, -2.457025627154296], [19768.0, 14.77462157386407, -2.008619804801163], [19786.0, 13.876672101587399, -2.0724790556607844], [19818.0, 14.643823194039417, -2.04305874176355]], "data04": [[19794.0, 16.2347906364342, 2.3085144429008406], [19795.0, 16.216877616879223, 2.0036493528896613], [19796.0, 16.99919944478623, 2.6155734563812474]], "data05": [[0.8902853260869565, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9016077898550725, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9129302536231885, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037]], "data06": [[0.8902853260869565, 0.8483836206896553], [0.9129302536231885, 0.8483836206896553], [0.9129302536231885, 0.871012931034483], [0.8902853260869565, 0.871012931034483]], "data07": [[0.9016077898550725, 0.7168911637931034, 0.6689251077586208]], "data08": [[0.8880208333333334, 0.6423356681034482], [0.992074275362319, 0.6423356681034482], [0.994338768115942, 0.6423356681034482], [0.994338768115942, 0.6488011853448277], [0.994338768115942, 0.9773706896551726], [0.994338768115942, 0.9838362068965516], [0.992074275362319, 0.9838362068965516], [0.8880208333333334, 0.9838362068965516], [0.8857563405797102, 0.9838362068965516], [0.8857563405797102, 0.9773706896551726], [0.8857563405797102, 0.6488011853448277], [0.8857563405797102, 0.6423356681034482], [0.8880208333333334, 0.6423356681034482]], "data09": [[72.0, 129.2461951423466, 406.43360595593646, 267.83990054914153], [1176.0, 129.2461951423466, 406.43360595593646, 267.83990054914153]], "data10": [[0.8789628623188407, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.8902853260869567, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.9016077898550726, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208]], "data11": [[0.8902853260869567, 0.7122844827586208, 0.664318426724138]], "data12": [[0.8766983695652174, 0.6377289870689655], [0.992074275362319, 0.6377289870689655], [0.994338768115942, 0.6377289870689655], [0.994338768115942, 0.6441945043103449], [0.994338768115942, 0.9773706896551725], [0.994338768115942, 0.9838362068965517], [0.992074275362319, 0.9838362068965517], [0.8766983695652174, 0.9838362068965517], [0.8744338768115942, 0.9838362068965517], [0.8744338768115942, 0.9773706896551725], [0.8744338768115942, 0.6441945043103449], [0.8744338768115942, 0.6377289870689655], [0.8766983695652174, 0.6377289870689655]]}, "id": "el2080868b25ce9-449d-4e91-9f1b-13b357dd0a67", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+      });
+    });
+}else{
+    // require.js not available: dynamically load d3 & mpld3
+    mpld3_load_lib("https://cdn.jsdelivr.net/npm/d3@5/dist/d3.min.js", function(){
+         mpld3_load_lib("https://cdn.jsdelivr.net/gh/mpld3/mpld3@v0.5.11/js/mpld3.v0.5.11.js", function(){
+                 
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+                 mpld3.draw_figure("fig_el2080868b25ce9-449d-4e91-9f1b-13b357dd0a678301892000", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [12.957445283648049, 23.697033200480945], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [12.957445283648049, 23.697033200480945], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el20808e6e59c75-b65a-4bd1-8455-742110205dd8", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el20808296e9eae-7acf-4117-b07a-4ee70c6c5d28", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el20808997cdb22-3dc8-41f3-90f4-1191108a5cf4", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el2080811d68a1c-9835-410e-b1ca-455a8ab8c1fc", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el20808314f81fe-a873-4a3e-bad6-1fc6ace6649c", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el2080858b59ea9-83b2-4456-98d8-d39ed2d6c523", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el20808f4f3e723-6ea5-469a-9d87-b4ae6c7eb575", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808fe978357-c679-4264-87e5-077bdef7597d", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el2080843726766-2aa2-48ba-8efd-d3bed3c11398", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208088eb2e163-5b8d-4331-9f63-5990d16c01f9", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808b265630d-9855-4701-8450-0d9f9c5bf9b2"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080836e0bd8a-295a-4ba1-b8c2-71fa9510264c"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.9441540948275864], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a2ee1ef7-1bdd-4ac7-aa48-019351ea3ee3"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.8955818965517244], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808b09bcded-6228-478c-87d8-ce2cc99b2877"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.8483836206896553], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d9d7248a-f4f6-434e-b58a-267d2061f65c"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.8015894396551726], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808d356d23b-7992-4107-a958-5e769a11fb61"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.7547952586206899], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808de5aa8f4-eadd-4fac-9cc7-dad970a4b88e"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.708405172413793], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808a274fd80-4628-4b3f-9b8c-72146a8b11bf"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.6604391163793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080d8eb783-3bf9-45ea-9c3d-63add55d3151"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.14465885062723], [19724.0, 20.282923151798407], [19725.0, 20.58873108151154], [19726.0, 21.40979077122172], [19727.0, 21.575429764759157], [19728.0, 21.59956415716997], [19729.0, 21.99515461547586], [19730.0, 22.40610589702292], [19731.0, 22.555182531260613], [19732.0, 22.743583927441126], [19733.0, 22.80652138647475], [19734.0, 22.802283395578765], [19735.0, 22.8154621863885], [19736.0, 22.752000998560856], [19737.0, 22.76746281982952], [19738.0, 22.7986763444157], [19739.0, 22.87813787800386], [19740.0, 22.89056647200745], [19741.0, 22.9387857312029], [19742.0, 23.055283479609585], [19743.0, 23.10763945499557], [19744.0, 23.159331541408367], [19745.0, 23.1865323625217], [19746.0, 23.19806430811867], [19747.0, 23.208870113352177], [19748.0, 23.186364715616804], [19749.0, 23.065519249784934], [19750.0, 22.791162054264973], [19751.0, 22.523229606905094], [19752.0, 22.12846507066365], [19753.0, 21.725214235387394], [19754.0, 21.233362739801127], [19755.0, 20.585575402714767], [19756.0, 20.13972271479459], [19757.0, 19.847465018614795], [19758.0, 19.606319005887837], [19759.0, 19.436939950448906], [19760.0, 19.29570662949733], [19761.0, 19.312903993146378], [19762.0, 19.356008733491404], [19763.0, 19.171683965767432], [19764.0, 18.95703020616379], [19765.0, 18.686015637913602], [19766.0, 18.549176587418945], [19767.0, 18.512527893645135], [19768.0, 18.46346819618942], [19769.0, 18.487309606449752], [19770.0, 18.376505927427907], [19771.0, 18.27557934423224], [19772.0, 18.244561513081422], [19773.0, 18.201839328323526], [19774.0, 17.97562215350873], [19775.0, 17.72293071170531], [19776.0, 17.50758421775046], [19777.0, 17.111196915690385], [19778.0, 16.833754108601433], [19779.0, 16.454773605987704], [19780.0, 16.29753073945266], [19781.0, 16.247401776126527], [19782.0, 16.213016664607213], [19783.0, 16.082929837508146], [19784.0, 15.907124565840121], [19785.0, 15.70450092129327], [19786.0, 15.561792525304593], [19787.0, 15.520075641589049], [19788.0, 15.537082068890792], [19789.0, 15.558319550984717], [19790.0, 15.618913793413562], [19791.0, 15.691355000817888], [19792.0, 15.746320476733983], [19793.0, 15.826630476879696], [19794.0, 16.062298025895945], [19795.0, 16.21476182480912], [19796.0, 16.57344712905624], [19797.0, 16.622232514429086], [19798.0, 16.713758008580605], [19799.0, 16.81235309490325], [19800.0, 16.873135266949273], [19801.0, 16.935305751418003], [19802.0, 16.93024130984682], [19803.0, 16.93123997510646], [19804.0, 16.931306079132128], [19805.0, 16.94150429464278], [19806.0, 16.815529925703224], [19807.0, 16.72168241241262], [19808.0, 16.723333093712682], [19809.0, 16.703246172052214], [19810.0, 16.70549344008383], [19811.0, 16.70253096588477], [19812.0, 16.703446101133935], [19813.0, 16.706620627766988], [19814.0, 16.68504584464019], [19815.0, 16.63019648967737], [19816.0, 16.33808258315793], [19817.0, 16.32503520294174], [19818.0, 16.306567170233528], [19819.0, 16.2331681030432], [19820.0, 16.161337726571276], [19821.0, 16.0632259650753], [19822.0, 16.074553580782382], [19822.0, 14.51577148705167], [19822.0, 14.51577148705167], [19821.0, 14.550971083207461], [19820.0, 14.564380391221484], [19819.0, 14.5997387182649], [19818.0, 14.661531485722216], [19817.0, 14.788708948102952], [19816.0, 14.807036190350349], [19815.0, 14.65767875384238], [19814.0, 14.650970578770444], [19813.0, 14.64422562279615], [19812.0, 14.633760397785052], [19811.0, 14.607819878582056], [19810.0, 14.635921109316758], [19809.0, 14.624662270841396], [19808.0, 14.557330153262336], [19807.0, 14.56110625060793], [19806.0, 14.376484299755093], [19805.0, 14.078684521988928], [19804.0, 13.950954148963328], [19803.0, 13.94230311539011], [19802.0, 13.961723220459646], [19801.0, 13.988055336198755], [19800.0, 13.933466675891609], [19799.0, 13.865514570418357], [19798.0, 13.835885630490989], [19797.0, 13.845500327965535], [19796.0, 13.806906035924365], [19795.0, 13.89567443142818], [19794.0, 13.825869689946712], [19793.0, 13.871323496628115], [19792.0, 13.857575696783096], [19791.0, 13.820348954514136], [19790.0, 13.856493963771292], [19789.0, 13.881692894826923], [19788.0, 13.864855599131298], [19787.0, 13.863218681112457], [19786.0, 13.906662663924596], [19785.0, 13.963667525101698], [19784.0, 13.91600199129605], [19783.0, 13.84562049578834], [19782.0, 13.803106081956901], [19781.0, 13.79541134281318], [19780.0, 13.810906946425298], [19779.0, 13.802261120843612], [19778.0, 13.654400546584661], [19777.0, 13.555673611939122], [19776.0, 13.445608370776817], [19775.0, 13.52700666823937], [19774.0, 13.654529378743202], [19773.0, 13.775355117457249], [19772.0, 13.96780782298194], [19771.0, 14.218254411194918], [19770.0, 14.325224927084578], [19769.0, 14.469531196122414], [19768.0, 14.782553764836083], [19767.0, 15.05719296615685], [19766.0, 15.302704831254283], [19765.0, 15.401319376338758], [19764.0, 15.421940628198914], [19763.0, 15.489763864351797], [19762.0, 15.607773321468182], [19761.0, 15.91685317720726], [19760.0, 16.28048390311057], [19759.0, 16.464675845744406], [19758.0, 16.507026181067136], [19757.0, 16.538694294868794], [19756.0, 16.48632291918111], [19755.0, 16.407729688983864], [19754.0, 16.169980275405518], [19753.0, 16.07539372851208], [19752.0, 16.185308238832597], [19751.0, 16.296794602217094], [19750.0, 16.49340036481418], [19749.0, 16.677023164052002], [19748.0, 16.99457085743755], [19747.0, 17.27394829927311], [19746.0, 17.603889921410495], [19745.0, 17.91904621642127], [19744.0, 18.102482484817312], [19743.0, 18.281402001842196], [19742.0, 18.456609807874493], [19741.0, 18.83299516240332], [19740.0, 19.091517111660295], [19739.0, 19.28557670776082], [19738.0, 19.589013576995224], [19737.0, 19.806543740624857], [19736.0, 19.99477546871169], [19735.0, 19.997978186250165], [19734.0, 19.929491512932213], [19733.0, 19.850736361845883], [19732.0, 19.777680253294054], [19731.0, 19.748376434335412], [19730.0, 19.693141555097412], [19729.0, 19.774338835613577], [19728.0, 19.85816308073711], [19727.0, 19.761667337794087], [19726.0, 19.687826889063476], [19725.0, 20.031703050085802], [19724.0, 20.14465885062723]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el20808fe102060-d8e1-4451-beee-35615e956df5"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080849b72dff-79c2-45b0-8181-9ddf8395f96b"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080825ebd0ed-6b1b-4c3e-bd96-e787f5169fe5"}], "images": [], "sharex": ["el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.710655581331073, 2.8692034105580246], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.710655581331073, 2.8692034105580246], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el2080837257d4a-5bed-421f-b60c-76af011c77fe", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el208084dabb3a8-a02c-4aa0-8a17-64739ff8b9c4", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el20808a8da5c2f-8d01-4737-be37-6a36d269ef99", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el2080809cb415f-8ac4-4b10-a698-ae5833597a03", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el20808bbe00e8a-8198-4eb9-acc0-8d89720d6431", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el208083300b998-11af-4512-b4a6-0b776ec65ad3", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el2080808336402-8db9-47e7-9d63-4a5b95dc1be3", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el20808b91409f7-df6f-4cb5-95f0-4ce1db6f8c62", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el2080881df0a31-b856-4192-9970-991ce155b335", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el20808e544a490-83a5-41e2-a98f-1c7ebce6fd85", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el208087fdbbdd4-75a7-403d-b464-eb06117dbbc6", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el208080f305e71-397d-44b7-b02b-11c05fe4f29b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808125f3176-dd7e-4836-9940-1e9261d08974"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el20808c276beff-c733-4905-80e3-ee809ba7c65d"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el2080855c187ff-2b59-4575-bb92-6c54a5e59466"}, {"text": "Z\u5206\u6570", "position": [0.9106657608695653, 0.9441945043103449], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080890b3f64f-81bd-4573-ab97-35e168f27edf"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.9106657608695653, 0.8956627155172413], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208088eac80f6-5446-4814-918a-902a34f3778a"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.9106657608695653, 0.8472925646551724], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808e3b52a07-2b0f-4dd8-bbcb-28bed739ceb8"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.9106657608695653, 0.7987607758620691], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el2080802d431d3-4f84-47ba-8f6f-ec9a65ff1477"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.9106657608695653, 0.7501885775862069], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808914f6abe-4614-4dca-a325-7f41f319ed1a"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9106657608695653, 0.7037984913793104], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el20808fd17c32d-d207-4b6e-9787-fe6a0369a0e0"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9106657608695653, 0.6558324353448276], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el208080825a2b1-e161-4818-8269-45dccd6cfc7a"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el20808e5a95764-335f-4369-b75b-29624dd93b99"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el2080859810049-c4a0-474e-bc8e-af480a0774c2"}], "images": [], "sharex": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03"], "sharey": []}], "data": {"data01": [[19723.0, 20.248357076505616, 20.248357076505616, NaN, NaN, 0.0], [19724.0, 20.179224925920025, 20.21379100121282, 20.282923151798407, 20.14465885062723, -0.9999999999999744], [19725.0, 20.50306919497037, 20.31021706579867, 20.58873108151154, 20.031703050085802, 1.3848648060176292], [19726.0, 21.264584123174384, 20.548808830142598, 21.40979077122172, 19.687826889063476, 1.662695252666189], [19727.0, 21.147507435812713, 20.668548551276622, 21.575429764759157, 19.761667337794087, 1.056277001696465], [19728.0, 21.030438957338124, 20.72886361895354, 21.59956415716997, 19.85816308073711, 0.692718851425865], [19729.0, 21.820045365091822, 20.88474672554472, 21.99515461547586, 19.774338835613577, 1.6846037353086543], [19730.0, 22.203762729668274, 21.049623726060165, 22.40610589702292, 19.693141555097412, 1.7016648332192499], [19731.0, 21.969025536700798, 21.151779482798013, 22.555182531260613, 19.748376434335412, 1.1646633585384634], [19732.0, 22.24030555849378, 21.26063209036759, 22.743583927441126, 19.777680253294054, 1.3212478566525567], [19733.0, 22.00859671208755, 21.328628874160316, 22.80652138647475, 19.850736361845883, 0.9201857811193311], [19734.0, 21.77573183530242, 21.36588745425549, 22.802283395578765, 19.929491512932213, 0.570656556811713], [19735.0, 21.89671297108544, 21.406720186319333, 22.8154621863885, 19.997978186250165, 0.6956458808526284], [19736.0, 20.94007284875654, 21.373388233636273, 22.752000998560856, 19.99477546871169, -0.6286252324138878], [19737.0, 20.07761393250002, 21.28700328022719, 22.76746281982952, 19.806543740624857, -1.6338026340821503], [19738.0, 19.796470167879537, 21.193844960705462, 22.7986763444157, 19.589013576995224, -1.7414599527525554], [19739.0, 19.290054607712324, 21.08185729288234, 22.87813787800386, 19.28557670776082, -1.9950142533537432], [19740.0, 19.44717827400996, 20.991041791833872, 22.89056647200745, 19.091517111660295, -1.6255261476074472], [19741.0, 18.993166236249355, 20.88589044680311, 22.9387857312029, 18.83299516240332, -1.8439559240423076], [19742.0, 18.28701438558171, 20.75594664374204, 23.055283479609585, 18.456609807874493, -2.1475168141067886], [19743.0, 19.019838770042487, 20.694520728418883, 23.10763945499557, 18.281402001842196, -1.3879814034282048], [19744.0, 18.90695061979922, 20.63090701311284, 23.159331541408367, 18.102482484817312, -1.3636605514784992], [19745.0, 18.94071472214318, 20.552789289471484, 23.1865323625217, 17.91904621642127, -1.2241699532683057], [19746.0, 18.228340629036452, 20.400977114764583, 23.19806430811867, 17.603889921410495, -1.5534992908982885], [19747.0, 17.956149266773863, 20.241409206312643, 23.208870113352177, 17.27394829927311, -1.540212330425376], [19748.0, 18.011610561628796, 20.090467786527178, 23.186364715616804, 16.99457085743755, -1.3429757336977532], [19749.0, 17.436113772917643, 19.87127120691847, 23.065519249784934, 16.677023164052002, -1.524714049329465], [19750.0, 17.62396278209048, 19.642281209539576, 22.791162054264973, 16.49340036481418, -1.2819274700914285], [19751.0, 17.32364343713108, 19.410012104561094, 22.523229606905094, 16.296794602217094, -1.3403295245893672], [19752.0, 17.17779656223444, 19.156886654748124, 22.12846507066365, 16.185308238832597, -1.3320126986478578], [19753.0, 16.87694325611974, 18.900303981949737, 21.725214235387394, 16.07539372851208, -1.43251327957605], [19754.0, 17.80308234837421, 18.701671507603322, 21.233362739801127, 16.169980275405518, -0.7098726320184237], [19755.0, 17.79633373600524, 18.496652545849315, 20.585575402714767, 16.407729688983864, -0.6705071061311877], [19756.0, 17.267478271527292, 18.31302281698785, 20.13972271479459, 16.48632291918111, -1.1447359762990188], [19757.0, 17.678750727578887, 18.193079656741794, 19.847465018614795, 16.538694294868794, -0.6217764506579214], [19758.0, 17.068328902593375, 18.056672593477487, 19.606319005887837, 16.507026181067136, -1.2755731668449743], [19759.0, 17.172760700095754, 17.950807898096656, 19.436939950448906, 16.464675845744406, -1.0470768015122336], [19760.0, 16.192925638155867, 17.78809526630395, 19.29570662949733, 16.28048390311057, -2.1161549549072647], [19761.0, 15.528832613706651, 17.614878585176818, 19.312903993146378, 15.91685317720726, -2.457025627154296], [19762.0, 15.627263231641212, 17.481891027479794, 19.356008733491404, 15.607773321468182, -1.9792009753597524], [19763.0, 15.996496521638917, 17.330723915059615, 19.171683965767432, 15.489763864351797, -1.4494908707092367], [19764.0, 16.082180662233903, 17.189485417181352, 18.95703020616379, 15.421940628198914, -1.25292978356143], [19765.0, 16.024356521039785, 17.04366750712618, 18.686015637913602, 15.401319376338758, -1.2412849224575642], [19766.0, 15.87380467324514, 16.925940709336615, 18.549176587418945, 15.302704831254283, -1.2963439883234407], [19767.0, 15.134543678061425, 16.78486042990099, 18.512527893645135, 15.05719296615685, -1.910456481321997], [19768.0, 14.77462157386407, 16.623010980512753, 18.46346819618942, 14.782553764836083, -2.008619804801163], [19769.0, 14.544302188384176, 16.478420401286083, 18.487309606449752, 14.469531196122414, -1.9255598645564225], [19770.0, 15.072863301493634, 16.35086542725624, 18.376505927427907, 14.325224927084578, -1.2618252109930694], [19771.0, 15.244672446277864, 16.24691687771358, 18.27557934423224, 14.218254411194918, -0.9880839695877488], [19772.0, 14.363152368596499, 16.10618466803168, 18.244561513081422, 13.96780782298194, -1.6302386583265087], [19773.0, 14.525194353293895, 15.988597222890387, 18.201839328323526, 13.775355117457249, -1.3224064967895595], [19774.0, 14.332653213085738, 15.815075766125966, 17.97562215350873, 13.654529378743202, -1.3722663504910906], [19775.0, 13.994192212932758, 15.62496868997234, 17.72293071170531, 13.52700666823937, -1.5546291688278693], [19776.0, 14.300030357353192, 15.476596294263638, 17.50758421775046, 13.445608370776817, -1.1586144095731559], [19777.0, 14.815530118601167, 15.333435263814753, 17.111196915690385, 13.555673611939122, -0.5826485734655925], [19778.0, 15.281170178159266, 15.244077327593047, 16.833754108601433, 13.654400546584661, 0.04666716027982789], [19779.0, 14.861561416547946, 15.128517363415657, 16.454773605987704, 13.802261120843612, -0.4025706922969813], [19780.0, 14.706955228622341, 15.05421884293898, 16.29753073945266, 13.810906946425298, -0.5586106194115662], [19781.0, 14.872586944324123, 15.021406559469852, 16.247401776126527, 13.79541134281318, -0.24277356571025657], [19782.0, 15.360359507885303, 15.008061373282057, 16.213016664607213, 13.803106081956901, 0.5847488900867079], [19783.0, 15.120772388962656, 14.964275166648244, 16.082929837508146, 13.84562049578834, 0.2797954120982011], [19784.0, 15.027942900630748, 14.911563278568085, 15.907124565840121, 13.91600199129605, 0.23379700185321156], [19785.0, 14.474775413627734, 14.834084223197484, 15.70450092129327, 13.963667525101698, -0.8256018303780509], [19786.0, 13.876672101587399, 14.734227594614595, 15.561792525304593, 13.906662663924596, -2.0724790556607844], [19787.0, 14.282935012784499, 14.691647161350753, 15.520075641589049, 13.863218681112457, -0.9867167976858756], [19788.0, 14.96105502706991, 14.700968834011045, 15.537082068890792, 13.864855599131298, 0.6221315061380961], [19789.0, 14.925049966279744, 14.72000622290582, 15.558319550984717, 13.881692894826923, 0.48918163771488177], [19790.0, 15.426816415225755, 14.737703878592427, 15.618913793413562, 13.856493963771292, 1.5640144874520647], [19791.0, 15.607634427749572, 14.755851977666012, 15.691355000817888, 13.820348954514136, 1.8210148529798527], [19792.0, 15.28507455044701, 14.80194808675854, 15.746320476733983, 13.857575696783096, 1.0231693954988106], [19793.0, 15.465772353201217, 14.848976986753906, 15.826630476879696, 13.871323496628115, 1.26178727468758], [19794.0, 16.2347906364342, 14.944083857921328, 16.062298025895945, 13.825869689946712, 2.3085144429008406], [19795.0, 16.216877616879223, 15.05521812811865, 16.21476182480912, 13.89567443142818, 2.0036493528896613], [19796.0, 16.99919944478623, 15.190176582490304, 16.57344712905624, 13.806906035924365, 2.6155734563812474], [19797.0, 15.689326892741356, 15.23386642119731, 16.622232514429086, 13.845500327965535, 0.6561100472914095], [19798.0, 16.100278144928968, 15.274821819535797, 16.713758008580605, 13.835885630490989, 1.1473147060692443], [19799.0, 16.143801679048053, 15.338933832660803, 16.81235309490325, 13.865514570418357, 1.0925170683085736], [19800.0, 15.99429800381512, 15.40330097142044, 16.873135266949273, 13.933466675891609, 0.8041682442605462], [19801.0, 16.040178392082872, 15.461680543808379, 16.935305751418003, 13.988055336198755, 0.7851356576790348], [19802.0, 15.046393934782424, 15.445982265153233, 16.93024130984682, 13.961723220459646, -0.5384347588103142], [19803.0, 14.936557990863669, 15.436771545248286, 16.93123997510646, 13.94230311539011, -0.6694200350984821], [19804.0, 15.115114276619542, 15.441130114047727, 16.931306079132128, 13.950954148963328, -0.43755347699453834], [19805.0, 15.854061298990299, 15.510094408315855, 16.94150429464278, 14.078684521988928, 0.48059873549858123], [19806.0, 15.594926189853476, 15.596007112729158, 16.815529925703224, 14.376484299755093, -0.0017726980818760791], [19807.0, 15.190679388406881, 15.641394331510275, 16.72168241241262, 14.56110625060793, -0.8344347236098729], [19808.0, 14.939800866614615, 15.640331623487508, 16.723333093712682, 14.557330153262336, -1.2936838520214433], [19809.0, 15.39750192546565, 15.663954221446806, 16.703246172052214, 14.624662270841396, -0.5127573552858583], [19810.0, 15.561877480295493, 15.670707274700295, 16.70549344008383, 14.635921109316758, -0.2103425771342129], [19811.0, 15.296997378411973, 15.655175422233413, 16.70253096588477, 14.607819878582056, -0.6839664830010581], [19812.0, 15.553631094968651, 15.668603249459494, 16.703446101133935, 14.633760397785052, -0.22220215234576102], [19813.0, 15.602169869642672, 15.675423125281569, 16.706620627766988, 14.64422562279615, -0.14207415255048453], [19814.0, 16.086492364909116, 15.668008211705317, 16.68504584464019, 14.650970578770444, 0.8229472335181468], [19815.0, 15.73546581797044, 15.643937621759875, 16.63019648967737, 14.65767875384238, 0.18560684053229987], [19816.0, 15.571634744671556, 15.57255938675414, 16.33808258315793, 14.807036190350349, -0.002415712775073623], [19817.0, 15.375580668105476, 15.556872075522346, 16.32503520294174, 14.788708948102952, -0.472012782039954], [19818.0, 14.643823194039417, 15.484049327977871, 16.306567170233528, 14.661531485722216, -2.04305874176355], [19819.0, 14.791883332571704, 15.416453410654052, 16.2331681030432, 14.5997387182649, -1.5294694313757997], [19820.0, 14.92241096866165, 15.36285905889638, 16.161337726571276, 14.564380391221484, -1.1032181774305345], [19821.0, 14.924967696982879, 15.30709852414138, 16.0632259650753, 14.550971083207461, -1.0107577280531388], [19822.0, 14.807674130295307, 15.295162533917026, 16.074553580782382, 14.51577148705167, -1.2509468913771966]], "data02": [[0.0, 0.0]], "data03": [[19742.0, 18.28701438558171, -2.1475168141067886], [19760.0, 16.192925638155867, -2.1161549549072647], [19761.0, 15.528832613706651, -2.457025627154296], [19768.0, 14.77462157386407, -2.008619804801163], [19786.0, 13.876672101587399, -2.0724790556607844], [19818.0, 14.643823194039417, -2.04305874176355]], "data04": [[19794.0, 16.2347906364342, 2.3085144429008406], [19795.0, 16.216877616879223, 2.0036493528896613], [19796.0, 16.99919944478623, 2.6155734563812474]], "data05": [[0.8902853260869565, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9016077898550725, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037], [0.9129302536231885, 0.9554687500000002, 0.9068965517241382, 0.8129040948275864, 0.7661099137931037]], "data06": [[0.8902853260869565, 0.8483836206896553], [0.9129302536231885, 0.8483836206896553], [0.9129302536231885, 0.871012931034483], [0.8902853260869565, 0.871012931034483]], "data07": [[0.9016077898550725, 0.7168911637931034, 0.6689251077586208]], "data08": [[0.8880208333333334, 0.6423356681034482], [0.992074275362319, 0.6423356681034482], [0.994338768115942, 0.6423356681034482], [0.994338768115942, 0.6488011853448277], [0.994338768115942, 0.9773706896551726], [0.994338768115942, 0.9838362068965516], [0.992074275362319, 0.9838362068965516], [0.8880208333333334, 0.9838362068965516], [0.8857563405797102, 0.9838362068965516], [0.8857563405797102, 0.9773706896551726], [0.8857563405797102, 0.6488011853448277], [0.8857563405797102, 0.6423356681034482], [0.8880208333333334, 0.6423356681034482]], "data09": [[72.0, 129.2461951423466, 406.43360595593646, 267.83990054914153], [1176.0, 129.2461951423466, 406.43360595593646, 267.83990054914153]], "data10": [[0.8789628623188407, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.8902853260869567, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208], [0.9016077898550726, 0.9555091594827587, 0.9069773706896551, 0.8586072198275863, 0.8100754310344829, 0.7615032327586208]], "data11": [[0.8902853260869567, 0.7122844827586208, 0.664318426724138]], "data12": [[0.8766983695652174, 0.6377289870689655], [0.992074275362319, 0.6377289870689655], [0.994338768115942, 0.6377289870689655], [0.994338768115942, 0.6441945043103449], [0.994338768115942, 0.9773706896551725], [0.994338768115942, 0.9838362068965517], [0.992074275362319, 0.9838362068965517], [0.8766983695652174, 0.9838362068965517], [0.8744338768115942, 0.9838362068965517], [0.8744338768115942, 0.9773706896551725], [0.8744338768115942, 0.6441945043103449], [0.8744338768115942, 0.6377289870689655], [0.8766983695652174, 0.6377289870689655]]}, "id": "el2080868b25ce9-449d-4e91-9f1b-13b357dd0a67", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el208089fe2415e-dcab-473b-b211-7ee6e4c64196", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el208089ee29d86-8db7-422e-925b-7fde6e0517ca", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808d7761b44-018f-4f87-b6fa-1bfea60d4fd5", "labels": ["\u65e5\u671f: 2024-01-20<br>\u6536\u76d8\u4ef7: 18.29<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.148", "\u65e5\u671f: 2024-02-07<br>\u6536\u76d8\u4ef7: 16.19<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.116", "\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 15.53<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.457", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 14.77<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.009", "\u65e5\u671f: 2024-03-04<br>\u6536\u76d8\u4ef7: 13.88<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.072", "\u65e5\u671f: 2024-04-05<br>\u6536\u76d8\u4ef7: 14.64<br>\u4fe1\u53f7: \u4e70\u5165<br>Z\u5206\u6570: -2.043"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el20808684f8006-1de0-4eca-bb5d-5df71debbb1a", "labels": ["\u65e5\u671f: 2024-03-12<br>\u6536\u76d8\u4ef7: 16.23<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.309", "\u65e5\u671f: 2024-03-13<br>\u6536\u76d8\u4ef7: 16.22<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.004", "\u65e5\u671f: 2024-03-14<br>\u6536\u76d8\u4ef7: 17.00<br>\u4fe1\u53f7: \u5356\u51fa<br>Z\u5206\u6570: 2.616"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el208087a7b1e8c-4ed6-4a8c-bcfb-2c5410413a03", "el2080837257d4a-5bed-421f-b60c-76af011c77fe"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+            })
+         });
+}
+</script><style>
+.mpld3-wrapper{position:relative;text-align:left;}
+.mpld3-figure{display:block;margin:0;}
+.mpld3-figure > svg{display:block;margin:0;}
+/* 工具栏容器样式 - 确保始终可点击 */
+.mpld3-toolbar{
+  position:absolute!important;
+  top:50%!important;
+  left:0!important;
+  right:auto!important;
+  transform:translateY(-50%)!important;
+  margin:0!important;
+  padding:8px!important;
+  z-index:10000!important;
+  pointer-events:auto!important;
+  background:rgba(255,255,255,0.9)!important;
+  border-radius:4px!important;
+  box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;
+}
+/* 工具栏所有交互元素样式 */
+.mpld3-toolbar button,
+.mpld3-toolbar a,
+.mpld3-toolbar .mpld3-toolbar-button,
+.mpld3-toolbar [class*='toolbar'],
+.mpld3-toolbar [role='button']{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  position:relative!important;
+  z-index:10001!important;
+  display:inline-block!important;
+  margin:2px!important;
+  padding:4px!important;
+  min-width:24px!important;
+  min-height:24px!important;
+}
+/* 确保工具栏不被SVG遮挡 */
+.mpld3-figure > svg{
+  pointer-events:auto!important;
+}
+</style><script>
+(function(){
+  var initAttempts = 0;
+  var maxAttempts = 10;
+  var toolbarMonitorInterval = null;
+  
+  // 修复工具栏按钮状态
+  function fixToolbarButtons(toolbar){
+    if(!toolbar) return false;
+    
+    // 查找所有可能的按钮元素
+    var selectors = ['button', 'a', '.mpld3-toolbar-button', '[class*="toolbar"]', '[role="button"]'];
+    var allButtons = [];
+    selectors.forEach(function(sel){
+      try{
+        var elements = toolbar.querySelectorAll(sel);
+        for(var i=0; i<elements.length; i++){
+          if(allButtons.indexOf(elements[i]) === -1){
+            allButtons.push(elements[i]);
+          }
+        }
+      }catch(e){}
+    });
+    
+    // 修复每个按钮
+    var fixed = false;
+    for(var i=0; i<allButtons.length; i++){
+      var btn = allButtons[i];
+      if(btn.style.pointerEvents !== 'auto' || btn.style.cursor !== 'pointer'){
+        btn.style.pointerEvents = 'auto';
+        btn.style.cursor = 'pointer';
+        btn.style.position = 'relative';
+        btn.style.zIndex = '10001';
+        fixed = true;
+      }
+      // 确保按钮可点击
+      if(btn.hasAttribute('disabled')){
+        btn.removeAttribute('disabled');
+        fixed = true;
+      }
+    }
+    
+    // 修复工具栏容器
+    if(toolbar.style.pointerEvents !== 'auto' || parseInt(toolbar.style.zIndex) < 10000){
+      toolbar.style.pointerEvents = 'auto';
+      toolbar.style.zIndex = '10000';
+      fixed = true;
+    }
+    
+    return fixed;
+  }
+  
+  function initToolbar(){
+    initAttempts++;
+    try{
+      var wrapper = document.currentScript ? document.currentScript.parentElement : null;
+      if(!wrapper) wrapper = document.querySelector('.mpld3-wrapper:last-child');
+      if(!wrapper){
+        if(initAttempts < maxAttempts){
+          setTimeout(initToolbar, 200);
+        }
+        return;
+      }
+      
+      var toolbar = wrapper.querySelector('.mpld3-toolbar');
+      if(!toolbar){
+        if(initAttempts < maxAttempts){
+          setTimeout(initToolbar, 200);
+        }
+        return;
+      }
+      
+      // 确保工具栏在正确的父元素中
+      if(toolbar.parentElement !== wrapper){
+        wrapper.appendChild(toolbar);
+      }
+      
+      // 修复工具栏按钮状态
+      fixToolbarButtons(toolbar);
+      
+      // 默认激活移动工具（平移工具）
+      function activatePanTool(){
+        var toolbarButtons = toolbar.querySelectorAll('.mpld3-toolbar-button, button, a, [class*="toolbar"], [role="button"]');
+        var panButton = null;
+        
+        // 方法1: 通过title属性查找
+        for(var i=0; i<toolbarButtons.length; i++){
+          var title = (toolbarButtons[i].getAttribute('title') || '').toLowerCase();
+          if(title.indexOf('pan') >= 0 || title.indexOf('move') >= 0 || title.indexOf('平移') >= 0){
+            panButton = toolbarButtons[i];
+            break;
+          }
+        }
+        
+        // 方法2: 如果没找到，尝试第二个按钮（通常是平移工具）
+        if(!panButton && toolbarButtons.length >= 2){
+          panButton = toolbarButtons[1];
+        }
+        
+        // 激活平移工具
+        if(panButton){
+          setTimeout(function(){
+            try{
+              if(panButton.click){
+                panButton.click();
+              } else if(panButton.dispatchEvent){
+                var clickEvent = new MouseEvent('click', {bubbles: true, cancelable: true});
+                panButton.dispatchEvent(clickEvent);
+              }
+            }catch(e){console.log('Pan tool activation:', e);}
+          }, 200);
+        }
+      }
+      
+      // 只在第一次成功初始化时激活平移工具
+      if(initAttempts === 1){
+        activatePanTool();
+      }
+      
+      // 启动工具栏状态监控
+      if(!toolbarMonitorInterval){
+        toolbarMonitorInterval = setInterval(function(){
+          var currentToolbar = wrapper.querySelector('.mpld3-toolbar');
+          if(currentToolbar){
+            fixToolbarButtons(currentToolbar);
+          }
+        }, 1000);
+      }
+      
+    }catch(e){console.error('Toolbar init error:', e);}
+  }
+  
+  // 多种方式确保执行时机正确
+  function startInit(){
+    if(document.readyState === 'complete' || document.readyState === 'interactive'){
+      setTimeout(initToolbar, 100);
+    }else{
+      document.addEventListener('DOMContentLoaded', function(){setTimeout(initToolbar, 100);});
+      window.addEventListener('load', function(){setTimeout(initToolbar, 200);});
+    }
+    // 立即尝试一次
+    setTimeout(initToolbar, 50);
+  }
+  
+  startInit();
+})();
+</script></div>

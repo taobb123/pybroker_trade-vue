@@ -1,0 +1,19 @@
+name: ma_strategy
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.9
+  - pandas>=1.5.0
+  - numpy>=1.23.0
+  - matplotlib>=3.5.0
+  - pip
+  - pip:
+    - akshare>=1.11.0
+    # - baostock>=0.8.8  # 强烈推荐作为akshare替代：免费，无需token，专门为A股设计
+    - pymysql>=1.0.0
+    - plotly>=5.0.0
+    # - tushare>=1.2.0  # 可选：需要token
+    # - yfinance>=0.2.0  # 备选：对A股支持有限
+    # - talib>=0.4.0  # 可选：技术指标库
+

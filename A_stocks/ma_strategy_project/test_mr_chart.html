@@ -1,0 +1,885 @@
+<div class="mpld3-wrapper">
+
+<style>
+
+</style>
+
+<div id="fig_el770445ae180d-b0c0-4314-ad8e-655f819f85e85495478379"></div>
+<script>
+function mpld3_load_lib(url, callback){
+  var s = document.createElement('script');
+  s.src = url;
+  s.async = true;
+  s.onreadystatechange = s.onload = callback;
+  s.onerror = function(){console.warn("failed to load library " + url);};
+  document.getElementsByTagName("head")[0].appendChild(s);
+}
+
+if(typeof(mpld3) !== "undefined" && mpld3._mpld3IsLoaded){
+   // already loaded: just create the figure
+   !function(mpld3){
+       
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+       mpld3.draw_figure("fig_el770445ae180d-b0c0-4314-ad8e-655f819f85e85495478379", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [19.683915878436366, 21.17569821946968], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [19.683915878436366, 21.17569821946968], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el7704798ab607-2e7a-4249-b5b9-e9e3fef8ffcf", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el770438ed9df7-40f2-4f3e-92d4-a7c352249962", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el770458a7b46f-7985-449e-88c8-2de6f822aae6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el7704188a08e9-5141-4ad5-81e4-cf8efe29d6cb", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el7704b5c788dd-ac66-4c33-bfca-e32227139617", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el770481e6b855-9109-4e5b-85ab-419740c26f6c", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el7704fa33c9b1-467f-4df2-aeba-10cd1d2dae01", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el7704ac761d16-416d-416f-9b64-fc373e9b427b", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el770406ac57b6-3197-4cd0-ad72-852b0d024e65", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el7704e83e578c-11c0-4dda-982f-d706a8889f1b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.03908766103059581, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704ea42e255-23e9-447c-ae95-2ec86f375055"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el77045110dc96-c358-4559-ba89-0a7d262e494a"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.3179822198275861], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704421ee4ec-bc5a-4ba7-b8ec-7cfc7f98dbd8"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.2694100215517241], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77040e7b9685-a37e-4905-89fd-8cb85c57f3cd"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.22221174568965507], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704617959ee-df60-43ab-8097-adb5de96df60"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.17541756465517233], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770444e55a00-b9cc-4eb8-a902-216f879e0077"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.1286233836206896], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704102fb255-e248-4b3c-a4cd-f3a92dc46e25"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.08223329741379315], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770494e32417-3a27-48dd-9ec7-52d20cdd4415"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.034267241379310365], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77048cf78cc0-eef1-4332-b0fd-f7117e66c33c"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.046483620258677], [19724.0, 20.059234800428477], [19725.0, 20.165525080287924], [19726.0, 20.35294638197227], [19727.0, 20.408216626030445], [19728.0, 20.431851561227294], [19729.0, 20.53497662079883], [19730.0, 20.64029570906687], [19731.0, 20.691710694969498], [19732.0, 20.751572933019975], [19733.0, 20.784106380492513], [19734.0, 20.800507231033766], [19735.0, 20.821995933719162], [19736.0, 20.810931193316733], [19737.0, 20.79369282965579], [19738.0, 20.778291156866633], [19739.0, 20.767051471080887], [19740.0, 20.75382787968941], [19741.0, 20.74399552438941], [19742.0, 20.743104983856167], [19743.0, 20.73335482300103], [19744.0, 20.722891009208848], [19745.0, 20.71861723367903], [19746.0, 20.724781161288238], [19747.0, 20.731973798320723], [19748.0, 20.73495733824089], [19749.0, 20.72751888495321], [19750.0, 20.694191851251198], [19751.0, 20.66177035475584], [19752.0, 20.60497952309854], [19753.0, 20.54566329032478], [19754.0, 20.47905825594679], [19755.0, 20.379999335425325], [19756.0, 20.31805362434581], [19757.0, 20.3034643879484], [19758.0, 20.285804365864884], [19759.0, 20.283719591468465], [19760.0, 20.27443229888915], [19761.0, 20.28894894233894], [19762.0, 20.29784227143825], [19763.0, 20.283793884051995], [19764.0, 20.268113679630847], [19765.0, 20.24510923844306], [19766.0, 20.24077743888297], [19767.0, 20.2435540906384], [19768.0, 20.246722803910323], [19769.0, 20.256263440031233], [19770.0, 20.25221115658703], [19771.0, 20.251654324483518], [19772.0, 20.254925980889727], [19773.0, 20.255475891269832], [19774.0, 20.23279361871599], [19775.0, 20.203913840212675], [19776.0, 20.186277525026178], [19777.0, 20.149136608406092], [19778.0, 20.160259932656167], [19779.0, 20.147011065015214], [19780.0, 20.160591109723473], [19781.0, 20.183359245431472], [19782.0, 20.232159340319853], [19783.0, 20.26531634024594], [19784.0, 20.293221687203108], [19785.0, 20.303121643825957], [19786.0, 20.303413303124454], [19787.0, 20.314956879121176], [19788.0, 20.347798972677126], [19789.0, 20.373426161500703], [19790.0, 20.429688662594828], [19791.0, 20.491660570961905], [19792.0, 20.52403666475326], [19793.0, 20.564614295731005], [19794.0, 20.635131379229737], [19795.0, 20.686362854131378], [19796.0, 20.779233531971826], [19797.0, 20.810209929840305], [19798.0, 20.859651037648103], [19799.0, 20.903302789627617], [19800.0, 20.93527516477224], [19801.0, 20.968392525600002], [19802.0, 20.978459726967582], [19803.0, 20.984161539279985], [19804.0, 20.991940281376344], [19805.0, 21.007122340248404], [19806.0, 20.984993754759497], [19807.0, 20.95551568937341], [19808.0, 20.93918896991822], [19809.0, 20.92753385945259], [19810.0, 20.936820238000536], [19811.0, 20.94143383466032], [19812.0, 20.94358646948083], [19813.0, 20.95311101595888], [19814.0, 21.006819227040594], [19815.0, 21.038970916382947], [19816.0, 21.057742498974715], [19817.0, 21.07308326563969], [19818.0, 21.0760784908014], [19819.0, 21.0831342598605], [19820.0, 21.09467418309136], [19821.0, 21.107889931240894], [19822.0, 21.10419218780665], [19822.0, 20.630034441921776], [19822.0, 20.630034441921776], [19821.0, 20.590707054173233], [19820.0, 20.58582297582073], [19819.0, 20.57839659935061], [19818.0, 20.5720866949352], [19817.0, 20.563806978710666], [19816.0, 20.54501862946432], [19815.0, 20.551937465654337], [19814.0, 20.553313350570825], [19813.0, 20.569583486679004], [19812.0, 20.535976042424178], [19811.0, 20.492353505950216], [19810.0, 20.462775803192713], [19809.0, 20.428956920035223], [19808.0, 20.367448729981838], [19807.0, 20.311143053331715], [19806.0, 20.223106060029142], [19805.0, 20.12620835237087], [19804.0, 20.073400653131635], [19803.0, 20.039031927304176], [19802.0, 20.008013987174525], [19801.0, 19.983956459600115], [19800.0, 19.95331795106866], [19799.0, 19.919139430305393], [19798.0, 19.89674233663087], [19797.0, 19.889397244699225], [19796.0, 19.862493666680855], [19795.0, 19.860976922368604], [19794.0, 19.827350648787277], [19793.0, 19.819420943414997], [19792.0, 19.800782973990557], [19791.0, 19.774316583740863], [19790.0, 19.788625212074464], [19789.0, 19.797404610489906], [19788.0, 19.77501280335153], [19787.0, 19.76372218743932], [19786.0, 19.751893896337545], [19785.0, 19.751724166665152], [19784.0, 19.752211705032202], [19783.0, 19.760797766817404], [19782.0, 19.771065208992965], [19781.0, 19.784799337952425], [19780.0, 19.78028834664404], [19779.0, 19.78318375913893], [19778.0, 19.775754836764882], [19777.0, 19.782217295099603], [19776.0, 19.76193675025504], [19775.0, 19.76324535294798], [19774.0, 19.770004364502075], [19773.0, 19.776326634249962], [19772.0, 19.78350748228254], [19771.0, 19.802667982157473], [19770.0, 19.80328652946698], [19769.0, 19.809852195230675], [19768.0, 19.83682502263821], [19767.0, 19.86432947526139], [19766.0, 19.88313419838703], [19765.0, 19.885489077538725], [19764.0, 19.880407759968964], [19763.0, 19.880818914295084], [19762.0, 19.886833331472864], [19761.0, 19.90851764324693], [19760.0, 19.95191691874354], [19759.0, 19.96731063847726], [19758.0, 19.96716770182914], [19757.0, 19.963666464647314], [19756.0, 19.95665045194428], [19755.0, 19.927752592005305], [19754.0, 19.870297215781406], [19753.0, 19.842741130737945], [19752.0, 19.8456539266795], [19751.0, 19.849709234543344], [19750.0, 19.869791339635334], [19749.0, 19.887656264480842], [19748.0, 19.92749240263261], [19747.0, 19.950448470062923], [19746.0, 19.98106423007214], [19745.0, 20.007548987160067], [19744.0, 19.994118260682757], [19743.0, 19.96869589260895], [19742.0, 19.943112057479038], [19741.0, 19.973997017968205], [19740.0, 19.986023180478483], [19739.0, 19.988923769304375], [19738.0, 20.002277130445858], [19737.0, 20.00393676526337], [19736.0, 20.00105036276404], [19735.0, 19.983116383232815], [19734.0, 19.96806997289065], [19733.0, 19.94936537119182], [19732.0, 19.934498084945243], [19731.0, 19.93061725976587], [19730.0, 19.92096792277134], [19729.0, 19.940134190631184], [19728.0, 19.960703987364223], [19727.0, 19.940010875288287], [19726.0, 19.92718321069083], [19725.0, 19.998965786435587], [19724.0, 20.046483620258677]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el77043adc8ee2-7fc8-4610-988b-262f440b621f"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77047ae59bd0-6095-473b-9d24-01f741e5781d"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el7704d8845ac6-1b7e-4422-889e-55fba755d431"}], "images": [], "sharex": ["el770433e6ff93-72fc-49ad-a349-c5872b183157"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.608773442224284, 2.6709691246335], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.608773442224284, 2.6709691246335], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el770433e6ff93-72fc-49ad-a349-c5872b183157", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el7704ea3d63a2-9283-4b7a-a69e-9445627e052d", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el77045c5c4adb-8f84-4b48-860d-11d9feac6ce6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el77047c5505c6-f386-476f-a774-ab90872e134a", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77049a933b1f-b930-4814-ba7b-b0f0d3e03cec", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77044a0368f4-348a-49f6-9974-d735b3202412", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el77048ebd9e60-6445-4c10-84df-ddd84a675942", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el7704f6f98c5f-9dea-45a1-a628-c0c1231f23ea", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el77042efa6426-fab3-41d6-b324-e5a44f1d4891", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el770491457229-cb4e-47a8-9063-09743111ac65", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el77048c41dec8-fe6f-4195-a125-bbd05ff58f16", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el77048bd08737-e189-4bad-90f9-3ba8a66f0aab", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704370c6e93-a368-4d62-8d60-d3eb5d1fdcde"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el770408711734-e292-45c1-b3b1-7e7a77446de8"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704092c74f4-c081-4f7e-b788-9eb630a7504d"}, {"text": "Z\u5206\u6570", "position": [0.04189311594202899, 0.32262931034482756], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d50061c-5bf4-430c-8721-506228f86ed1"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.04189311594202899, 0.27409752155172407], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704a01165a0-019f-4630-b0ce-9d9815afe9e0"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.04189311594202899, 0.22572737068965512], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d312cda-b814-4363-b400-3355aea7c44c"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.04189311594202899, 0.17719558189655168], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704d4a491c9-4098-4772-859a-514efefba89a"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.04189311594202899, 0.12862338362068962], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704603e6e83-fc96-4fea-aa06-a6f309396a24"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.04189311594202899, 0.08223329741379307], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770496517d22-f991-4409-914a-03d176f3e29d"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.04189311594202899, 0.03426724137931031], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770430df1766-87d5-4a28-9e27-f5babe84823b"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704d18f6149-4b73-448a-9a99-602502a32929"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77044e30c531-08f0-494c-a6b3-51930d7da068"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el770467c4c71f-9d12-40e9-a4fc-7cf1feacff4a"}], "images": [], "sharex": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd"], "sharey": []}], "data": {"data01": [[19723.0, 20.049671415301123, 20.049671415301123, NaN, NaN, 0.0], [19724.0, 20.056047005386027, 20.052859210343577, 20.059234800428477, 20.046483620258677, 0.9999999999997213], [19725.0, 20.141017879398117, 20.082245433361756, 20.165525080287924, 19.998965786435587, 1.4114480117444388], [19726.0, 20.31352288524094, 20.14006479633155, 20.35294638197227, 19.92718321069083, 1.6296204144414261], [19727.0, 20.310309567970624, 20.174113750659366, 20.408216626030445, 19.940010875288287, 1.1635552711206305], [19728.0, 20.307097892477724, 20.19627777429576, 20.431851561227294, 19.960703987364223, 0.9408527122261993], [19729.0, 20.485221194230487, 20.237555405715007, 20.53497662079883, 19.940134190631184, 1.665421133093549], [19730.0, 20.582166687347797, 20.280631815919104, 20.64029570906687, 19.92096792277134, 1.676759203097495], [19731.0, 20.555421268956323, 20.311163977367684, 20.691710694969498, 19.93061725976587, 1.2837177686247654], [19732.0, 20.62987929351694, 20.34303550898261, 20.751572933019975, 19.934498084945243, 1.4042472863298592], [19733.0, 20.603739544437712, 20.366735875842167, 20.784106380492513, 19.94936537119182, 1.1356991735393211], [19734.0, 20.577368589282706, 20.384288601962208, 20.800507231033766, 19.96806997289065, 0.9277815735984448], [19735.0, 20.62176683664133, 20.40255615847599, 20.821995933719162, 19.983116383232815, 1.045254604374392], [19736.0, 20.45064083237757, 20.405990778040387, 20.810931193316733, 20.00105036276404, 0.22052653996866042], [19737.0, 20.298351069328287, 20.39881479745958, 20.79369282965579, 20.00393676526337, -0.5088342219117054], [19738.0, 20.262324336606213, 20.390284143656245, 20.778291156866633, 20.002277130445858, -0.6595747122779454], [19739.0, 20.181243244774787, 20.37798762019263, 20.767051471080887, 19.988923769304375, -1.0113731973230835], [19740.0, 20.232869998236335, 20.369925530083947, 20.75382787968941, 19.986023180478483, -0.7140124669122967], [19741.0, 20.162269610886234, 20.358996271178807, 20.74399552438941, 19.973997017968205, -1.0219586591507477], [19742.0, 20.041241260954727, 20.343108520667602, 20.743104983856167, 19.943112057479038, -1.5093496442770846], [19743.0, 20.2080081580489, 20.35102535780499, 20.73335482300103, 19.96869589260895, -0.7481359025402636], [19744.0, 20.20563254820227, 20.358504634945803, 20.722891009208848, 19.994118260682757, -0.8390658791932567], [19745.0, 20.23258738887308, 20.36308311041955, 20.71861723367903, 20.007548987160067, -0.7340826829790957], [19746.0, 20.110314590453754, 20.35292269568019, 20.724781161288238, 19.98106423007214, -1.304841103077914], [19747.0, 20.076078338203256, 20.341211134191823, 20.731973798320723, 19.950448470062923, -1.3570016806984868], [19748.0, 20.107372617376264, 20.33122487043675, 20.73495733824089, 19.92749240263261, -1.108913802637646], [19749.0, 20.012475279836053, 20.307587574717026, 20.72751888495321, 19.887656264480842, -1.4055265120145033], [19750.0, 20.070247101872642, 20.281991595443266, 20.694191851251198, 19.869791339635334, -1.0273865219010796], [19751.0, 20.030385253082784, 20.255739794649593, 20.66177035475584, 19.849709234543344, -1.1100373405777106], [19752.0, 20.021417898305472, 20.22531672488902, 20.60497952309854, 19.8456539266795, -1.0741048506470945], [19753.0, 19.981449257284552, 20.194202210531362, 20.54566329032478, 19.842741130737945, -1.2106771729709693], [19754.0, 20.186879095937467, 20.174677735864098, 20.47905825594679, 19.870297215781406, 0.08017175389577924], [19755.0, 20.205731393665694, 20.153875963715315, 20.379999335425325, 19.927752592005305, 0.4586472380827661], [19756.0, 20.120162320972128, 20.137352038145046, 20.31805362434581, 19.95665045194428, -0.1902552991850361], [19757.0, 20.222618832384466, 20.133565426297857, 20.3034643879484, 19.963666464647314, 1.0483101864952], [19758.0, 20.12073648758938, 20.126486033847012, 20.285804365864884, 19.96716770182914, -0.0721768321926403], [19759.0, 20.161824867291877, 20.125515114972863, 20.283719591468465, 19.96731063847726, 0.45902307094354367], [19760.0, 19.98605987510592, 20.113174608816344, 20.27443229888915, 19.95191691874354, -1.5765416663606333], [19761.0, 19.8734432904181, 20.098733292792936, 20.28894894233894, 19.90851764324693, -2.3687851437307486], [19762.0, 19.91333143420703, 20.092337801455557, 20.29784227143825, 19.886833331472864, -1.7421165317095202], [19763.0, 20.007380112408594, 20.08230639917354, 20.283793884051995, 19.880818914295084, -0.7437314214343712], [19764.0, 20.044718960729607, 20.074260719799906, 20.268113679630847, 19.880407759968964, -0.3047852258336564], [19765.0, 20.053356152692803, 20.065299157990893, 20.24510923844306, 19.885489077538725, -0.13284021972579593], [19766.0, 20.043447803335898, 20.061955818635, 20.24077743888297, 19.88313419838703, -0.20699974950944558], [19767.0, 19.915797624501174, 20.053941782949895, 20.2435540906384, 19.86432947526139, -1.4571222736834564], [19768.0, 19.864015223863724, 20.041773913274266, 20.246722803910323, 19.83682502263821, -1.734663592067946], [19769.0, 19.838153366969767, 20.033057817630954, 20.256263440031233, 19.809852195230675, -1.7464116590366348], [19770.0, 19.964067609793673, 20.027748843027005, 20.25221115658703, 19.80328652946698, -0.5674113593799609], [19771.0, 20.01863145895254, 20.027161153320495, 20.251654324483518, 19.802667982157473, -0.07599068001725912], [19772.0, 19.86252946361829, 20.019216731586134, 20.254925980889727, 19.78350748228254, -1.3294961350119212], [19773.0, 19.91513988075979, 20.015901262759897, 20.255475891269832, 19.776326634249962, -0.8411690555615732], [19774.0, 19.896833672920177, 20.001398991609033, 20.23279361871599, 19.770004364502075, -0.903783462876365], [19775.0, 19.849343493091602, 19.983579596580327, 20.203913840212675, 19.76324535294798, -1.2184769945493665], [19776.0, 19.93071314217771, 19.97410713764061, 20.186277525026178, 19.76193675025504, -0.40904855760141084], [19777.0, 20.054015114629323, 19.965676951752847, 20.149136608406092, 19.782217295099603, 0.9630254900503065], [19778.0, 20.167345146742964, 19.968007384710525, 20.160259932656167, 19.775754836764882, 2.0737073621391047], [19779.0, 20.10362541462272, 19.96509741207707, 20.147011065015214, 19.78318375913893, 1.5230083098023615], [19780.0, 20.09290619723962, 19.970439728183756, 20.160591109723473, 19.78028834664404, 1.2880944441656426], [19781.0, 20.146234560582, 19.98407929169195, 20.183359245431472, 19.784799337952425, 1.6274117476161214], [19782.0, 20.26399109349625, 20.00161227465641, 20.232159340319853, 19.771065208992965, 2.276141039442822], [19783.0, 20.236275689913743, 20.01305705353167, 20.26531634024594, 19.760797766817404, 1.7697555502478706], [19784.0, 20.237911812449383, 20.022716696117655, 20.293221687203108, 19.752211705032202, 1.591062075921153], [19785.0, 20.147480335250798, 20.027422905245555, 20.303121643825957, 19.751724166665152, 0.8709320225651368], [19786.0, 20.048061693044755, 20.027653599731, 20.303413303124454, 19.751893896337545, 0.148013600701017], [19787.0, 20.149516295486194, 20.03933953328025, 20.314956879121176, 19.76372218743932, 0.7994907713067828], [19788.0, 20.305342318545296, 20.061405888014328, 20.347798972677126, 19.77501280335153, 1.7035078260928038], [19789.0, 20.31834332658928, 20.085415385995304, 20.373426161500703, 19.797404610489906, 1.6174946245343378], [19790.0, 20.438898636580504, 20.109156937334646, 20.429688662594828, 19.788625212074464, 2.057466848114343], [19791.0, 20.49526425928729, 20.132988577351384, 20.491660570961905, 19.774316583740863, 2.0200946178657966], [19792.0, 20.450954304028798, 20.16240981937191, 20.52403666475326, 19.800782973990557, 1.5958134101056896], [19793.0, 20.50729588478166, 20.192017619573, 20.564614295731005, 19.819420943414997, 1.6923299931691247], [19794.0, 20.681301561630278, 20.231241014008507, 20.635131379229737, 19.827350648787277, 2.2286273027347523], [19795.0, 20.6979209779213, 20.27366988824999, 20.686362854131378, 19.860976922368604, 2.0560131853240438], [19796.0, 20.87458736370472, 20.32086359932634, 20.779233531971826, 19.862493666680855, 2.416056224205457], [19797.0, 20.632814873497765, 20.349803587269765, 20.810209929840305, 19.889397244699225, 1.2293978603678268], [19798.0, 20.73520714413731, 20.378196687139486, 20.859651037648103, 19.89674233663087, 1.4830500819887558], [19799.0, 20.764113871163147, 20.411221109966505, 20.903302789627617, 19.919139430305393, 1.4342853058040026], [19800.0, 20.75441515631858, 20.44429655792045, 20.93527516477224, 19.95331795106866, 1.2632672547044204], [19801.0, 20.78379325417415, 20.47617449260006, 20.968392525600002, 19.983956459600115, 1.2499288565241393], [19802.0, 20.60523838291608, 20.493236857071054, 20.978459726967582, 20.008013987174525, 0.46164982235446217], [19803.0, 20.60347321433435, 20.51159673329208, 20.984161539279985, 20.039031927304176, 0.38884182604415857], [19804.0, 20.659386491687545, 20.53267046725399, 20.991940281376344, 20.073400653131635, 0.5518151663231129], [19805.0, 20.827377916363716, 20.566665346309637, 21.007122340248404, 20.12620835237087, 1.183827586537643], [19806.0, 20.795752914738372, 20.60404990739432, 20.984993754759497, 20.223106060029142, 1.0064633340056761], [19807.0, 20.735105574651072, 20.633329371352563, 20.95551568937341, 20.311143053331715, 0.6317847630756561], [19808.0, 20.705131890494638, 20.65331884995003, 20.93918896991822, 20.367448729981838, 0.3624935726082442], [19809.0, 20.816874122466867, 20.678245389743907, 20.92753385945259, 20.428956920035223, 1.1121953043793862], [19810.0, 20.869951253634856, 20.699798020596624, 20.936820238000536, 20.462775803192713, 1.4357576677993142], [19811.0, 20.837177253460172, 20.716893670305268, 20.94143383466032, 20.492353505950216, 1.07137699395916], [19812.0, 20.90870601697353, 20.739781255952504, 20.94358646948083, 20.535976042424178, 1.6577079466865061], [19813.0, 20.938615792110355, 20.76134725131894, 20.95311101595888, 20.569583486679004, 1.8488220767282015], [19814.0, 21.05568231136566, 20.78006628880571, 21.006819227040594, 20.553313350570825, 2.4309808261399644], [19815.0, 21.005679022179947, 20.795454191018642, 21.038970916382947, 20.551937465654337, 1.7265740646504182], [19816.0, 20.99311482772219, 20.801380564219517, 21.057742498974715, 20.54501862946432, 1.4958091472180672], [19817.0, 20.974106032610994, 20.818445122175177, 21.07308326563969, 20.563806978710666, 1.222604817314116], [19818.0, 20.847956557999805, 20.8240825928683, 21.0760784908014, 20.5720866949352, 0.18947899808941915], [19819.0, 20.897770605908278, 20.830765429605556, 21.0831342598605, 20.57839659935061, 0.5310099209560319], [19820.0, 20.944078153328288, 20.840248579456045, 21.09467418309136, 20.58582297582073, 0.816188091046595], [19821.0, 20.964791519194556, 20.849298492707064, 21.107889931240894, 20.590707054173233, 0.89324710162345], [19822.0, 20.96153482605906, 20.867113314864213, 21.10419218780665, 20.630034441921776, 0.7965409150377899]], "data02": [[0.0, 0.0]], "data03": [[19761.0, 19.8734432904181, -2.3687851437307486], [19768.0, 19.864015223863724, -1.734663592067946]], "data04": [[19723.0, 20.049671415301123, 0.0], [19754.0, 20.186879095937467, 0.08017175389577924], [19757.0, 20.222618832384466, 1.0483101864952], [19759.0, 20.161824867291877, 0.45902307094354367], [19765.0, 20.053356152692803, -0.13284021972579593], [19771.0, 20.01863145895254, -0.07599068001725912], [19777.0, 20.054015114629323, 0.9630254900503065]], "data05": [[0.8902853260869565, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9016077898550725, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9129302536231885, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338]], "data06": [[0.8902853260869565, 0.22221174568965507], [0.9129302536231885, 0.22221174568965507], [0.9129302536231885, 0.24484105603448264], [0.8902853260869565, 0.24484105603448264]], "data07": [[0.9016077898550725, 0.0907192887931035, 0.04275323275862071]], "data08": [[0.8880208333333334, 0.016163793103448176], [0.992074275362319, 0.016163793103448176], [0.994338768115942, 0.016163793103448176], [0.994338768115942, 0.022629310344827624], [0.994338768115942, 0.35119881465517233], [0.994338768115942, 0.3576643318965518], [0.992074275362319, 0.3576643318965518], [0.8880208333333334, 0.3576643318965518], [0.8857563405797102, 0.3576643318965518], [0.8857563405797102, 0.35119881465517233], [0.8857563405797102, 0.022629310344827624], [0.8857563405797102, 0.016163793103448176], [0.8880208333333334, 0.016163793103448176]], "data09": [[72.0, 124.58406724935247, 417.5276430167518, 271.05585513305215], [1176.0, 124.58406724935247, 417.5276430167518, 271.05585513305215]], "data10": [[0.010190217391304351, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.021512681159420295, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.03283514492753624, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034]], "data11": [[0.021512681159420295, 0.09071928879310341, 0.042753232758620655]], "data12": [[0.007925724637681167, 0.016163793103448232], [0.12330163043478261, 0.016163793103448232], [0.12556612318840582, 0.016163793103448232], [0.12556612318840582, 0.02262931034482754], [0.12556612318840582, 0.35580549568965514], [0.12556612318840582, 0.3622710129310345], [0.12330163043478261, 0.3622710129310345], [0.007925724637681167, 0.3622710129310345], [0.005661231884057968, 0.3622710129310345], [0.005661231884057968, 0.35580549568965514], [0.005661231884057968, 0.02262931034482754], [0.005661231884057968, 0.016163793103448232], [0.007925724637681167, 0.016163793103448232]]}, "id": "el770445ae180d-b0c0-4314-ad8e-655f819f85e8", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704d18f6149-4b73-448a-9a99-602502a32929", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "el770433e6ff93-72fc-49ad-a349-c5872b183157"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+   }(mpld3);
+}else if(typeof define === "function" && define.amd){
+   // require.js is available: use it to load d3/mpld3
+   require.config({paths: {d3: "https://d3js.org/d3.v5"}});
+   require(["d3"], function(d3){
+      window.d3 = d3;
+      mpld3_load_lib("https://mpld3.github.io/js/mpld3.v0.5.11.js", function(){
+         
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+         mpld3.draw_figure("fig_el770445ae180d-b0c0-4314-ad8e-655f819f85e85495478379", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [19.683915878436366, 21.17569821946968], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [19.683915878436366, 21.17569821946968], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el7704798ab607-2e7a-4249-b5b9-e9e3fef8ffcf", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el770438ed9df7-40f2-4f3e-92d4-a7c352249962", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el770458a7b46f-7985-449e-88c8-2de6f822aae6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el7704188a08e9-5141-4ad5-81e4-cf8efe29d6cb", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el7704b5c788dd-ac66-4c33-bfca-e32227139617", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el770481e6b855-9109-4e5b-85ab-419740c26f6c", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el7704fa33c9b1-467f-4df2-aeba-10cd1d2dae01", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el7704ac761d16-416d-416f-9b64-fc373e9b427b", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el770406ac57b6-3197-4cd0-ad72-852b0d024e65", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el7704e83e578c-11c0-4dda-982f-d706a8889f1b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.03908766103059581, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704ea42e255-23e9-447c-ae95-2ec86f375055"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el77045110dc96-c358-4559-ba89-0a7d262e494a"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.3179822198275861], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704421ee4ec-bc5a-4ba7-b8ec-7cfc7f98dbd8"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.2694100215517241], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77040e7b9685-a37e-4905-89fd-8cb85c57f3cd"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.22221174568965507], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704617959ee-df60-43ab-8097-adb5de96df60"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.17541756465517233], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770444e55a00-b9cc-4eb8-a902-216f879e0077"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.1286233836206896], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704102fb255-e248-4b3c-a4cd-f3a92dc46e25"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.08223329741379315], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770494e32417-3a27-48dd-9ec7-52d20cdd4415"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.034267241379310365], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77048cf78cc0-eef1-4332-b0fd-f7117e66c33c"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.046483620258677], [19724.0, 20.059234800428477], [19725.0, 20.165525080287924], [19726.0, 20.35294638197227], [19727.0, 20.408216626030445], [19728.0, 20.431851561227294], [19729.0, 20.53497662079883], [19730.0, 20.64029570906687], [19731.0, 20.691710694969498], [19732.0, 20.751572933019975], [19733.0, 20.784106380492513], [19734.0, 20.800507231033766], [19735.0, 20.821995933719162], [19736.0, 20.810931193316733], [19737.0, 20.79369282965579], [19738.0, 20.778291156866633], [19739.0, 20.767051471080887], [19740.0, 20.75382787968941], [19741.0, 20.74399552438941], [19742.0, 20.743104983856167], [19743.0, 20.73335482300103], [19744.0, 20.722891009208848], [19745.0, 20.71861723367903], [19746.0, 20.724781161288238], [19747.0, 20.731973798320723], [19748.0, 20.73495733824089], [19749.0, 20.72751888495321], [19750.0, 20.694191851251198], [19751.0, 20.66177035475584], [19752.0, 20.60497952309854], [19753.0, 20.54566329032478], [19754.0, 20.47905825594679], [19755.0, 20.379999335425325], [19756.0, 20.31805362434581], [19757.0, 20.3034643879484], [19758.0, 20.285804365864884], [19759.0, 20.283719591468465], [19760.0, 20.27443229888915], [19761.0, 20.28894894233894], [19762.0, 20.29784227143825], [19763.0, 20.283793884051995], [19764.0, 20.268113679630847], [19765.0, 20.24510923844306], [19766.0, 20.24077743888297], [19767.0, 20.2435540906384], [19768.0, 20.246722803910323], [19769.0, 20.256263440031233], [19770.0, 20.25221115658703], [19771.0, 20.251654324483518], [19772.0, 20.254925980889727], [19773.0, 20.255475891269832], [19774.0, 20.23279361871599], [19775.0, 20.203913840212675], [19776.0, 20.186277525026178], [19777.0, 20.149136608406092], [19778.0, 20.160259932656167], [19779.0, 20.147011065015214], [19780.0, 20.160591109723473], [19781.0, 20.183359245431472], [19782.0, 20.232159340319853], [19783.0, 20.26531634024594], [19784.0, 20.293221687203108], [19785.0, 20.303121643825957], [19786.0, 20.303413303124454], [19787.0, 20.314956879121176], [19788.0, 20.347798972677126], [19789.0, 20.373426161500703], [19790.0, 20.429688662594828], [19791.0, 20.491660570961905], [19792.0, 20.52403666475326], [19793.0, 20.564614295731005], [19794.0, 20.635131379229737], [19795.0, 20.686362854131378], [19796.0, 20.779233531971826], [19797.0, 20.810209929840305], [19798.0, 20.859651037648103], [19799.0, 20.903302789627617], [19800.0, 20.93527516477224], [19801.0, 20.968392525600002], [19802.0, 20.978459726967582], [19803.0, 20.984161539279985], [19804.0, 20.991940281376344], [19805.0, 21.007122340248404], [19806.0, 20.984993754759497], [19807.0, 20.95551568937341], [19808.0, 20.93918896991822], [19809.0, 20.92753385945259], [19810.0, 20.936820238000536], [19811.0, 20.94143383466032], [19812.0, 20.94358646948083], [19813.0, 20.95311101595888], [19814.0, 21.006819227040594], [19815.0, 21.038970916382947], [19816.0, 21.057742498974715], [19817.0, 21.07308326563969], [19818.0, 21.0760784908014], [19819.0, 21.0831342598605], [19820.0, 21.09467418309136], [19821.0, 21.107889931240894], [19822.0, 21.10419218780665], [19822.0, 20.630034441921776], [19822.0, 20.630034441921776], [19821.0, 20.590707054173233], [19820.0, 20.58582297582073], [19819.0, 20.57839659935061], [19818.0, 20.5720866949352], [19817.0, 20.563806978710666], [19816.0, 20.54501862946432], [19815.0, 20.551937465654337], [19814.0, 20.553313350570825], [19813.0, 20.569583486679004], [19812.0, 20.535976042424178], [19811.0, 20.492353505950216], [19810.0, 20.462775803192713], [19809.0, 20.428956920035223], [19808.0, 20.367448729981838], [19807.0, 20.311143053331715], [19806.0, 20.223106060029142], [19805.0, 20.12620835237087], [19804.0, 20.073400653131635], [19803.0, 20.039031927304176], [19802.0, 20.008013987174525], [19801.0, 19.983956459600115], [19800.0, 19.95331795106866], [19799.0, 19.919139430305393], [19798.0, 19.89674233663087], [19797.0, 19.889397244699225], [19796.0, 19.862493666680855], [19795.0, 19.860976922368604], [19794.0, 19.827350648787277], [19793.0, 19.819420943414997], [19792.0, 19.800782973990557], [19791.0, 19.774316583740863], [19790.0, 19.788625212074464], [19789.0, 19.797404610489906], [19788.0, 19.77501280335153], [19787.0, 19.76372218743932], [19786.0, 19.751893896337545], [19785.0, 19.751724166665152], [19784.0, 19.752211705032202], [19783.0, 19.760797766817404], [19782.0, 19.771065208992965], [19781.0, 19.784799337952425], [19780.0, 19.78028834664404], [19779.0, 19.78318375913893], [19778.0, 19.775754836764882], [19777.0, 19.782217295099603], [19776.0, 19.76193675025504], [19775.0, 19.76324535294798], [19774.0, 19.770004364502075], [19773.0, 19.776326634249962], [19772.0, 19.78350748228254], [19771.0, 19.802667982157473], [19770.0, 19.80328652946698], [19769.0, 19.809852195230675], [19768.0, 19.83682502263821], [19767.0, 19.86432947526139], [19766.0, 19.88313419838703], [19765.0, 19.885489077538725], [19764.0, 19.880407759968964], [19763.0, 19.880818914295084], [19762.0, 19.886833331472864], [19761.0, 19.90851764324693], [19760.0, 19.95191691874354], [19759.0, 19.96731063847726], [19758.0, 19.96716770182914], [19757.0, 19.963666464647314], [19756.0, 19.95665045194428], [19755.0, 19.927752592005305], [19754.0, 19.870297215781406], [19753.0, 19.842741130737945], [19752.0, 19.8456539266795], [19751.0, 19.849709234543344], [19750.0, 19.869791339635334], [19749.0, 19.887656264480842], [19748.0, 19.92749240263261], [19747.0, 19.950448470062923], [19746.0, 19.98106423007214], [19745.0, 20.007548987160067], [19744.0, 19.994118260682757], [19743.0, 19.96869589260895], [19742.0, 19.943112057479038], [19741.0, 19.973997017968205], [19740.0, 19.986023180478483], [19739.0, 19.988923769304375], [19738.0, 20.002277130445858], [19737.0, 20.00393676526337], [19736.0, 20.00105036276404], [19735.0, 19.983116383232815], [19734.0, 19.96806997289065], [19733.0, 19.94936537119182], [19732.0, 19.934498084945243], [19731.0, 19.93061725976587], [19730.0, 19.92096792277134], [19729.0, 19.940134190631184], [19728.0, 19.960703987364223], [19727.0, 19.940010875288287], [19726.0, 19.92718321069083], [19725.0, 19.998965786435587], [19724.0, 20.046483620258677]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el77043adc8ee2-7fc8-4610-988b-262f440b621f"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77047ae59bd0-6095-473b-9d24-01f741e5781d"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el7704d8845ac6-1b7e-4422-889e-55fba755d431"}], "images": [], "sharex": ["el770433e6ff93-72fc-49ad-a349-c5872b183157"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.608773442224284, 2.6709691246335], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.608773442224284, 2.6709691246335], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el770433e6ff93-72fc-49ad-a349-c5872b183157", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el7704ea3d63a2-9283-4b7a-a69e-9445627e052d", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el77045c5c4adb-8f84-4b48-860d-11d9feac6ce6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el77047c5505c6-f386-476f-a774-ab90872e134a", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77049a933b1f-b930-4814-ba7b-b0f0d3e03cec", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77044a0368f4-348a-49f6-9974-d735b3202412", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el77048ebd9e60-6445-4c10-84df-ddd84a675942", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el7704f6f98c5f-9dea-45a1-a628-c0c1231f23ea", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el77042efa6426-fab3-41d6-b324-e5a44f1d4891", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el770491457229-cb4e-47a8-9063-09743111ac65", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el77048c41dec8-fe6f-4195-a125-bbd05ff58f16", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el77048bd08737-e189-4bad-90f9-3ba8a66f0aab", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704370c6e93-a368-4d62-8d60-d3eb5d1fdcde"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el770408711734-e292-45c1-b3b1-7e7a77446de8"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704092c74f4-c081-4f7e-b788-9eb630a7504d"}, {"text": "Z\u5206\u6570", "position": [0.04189311594202899, 0.32262931034482756], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d50061c-5bf4-430c-8721-506228f86ed1"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.04189311594202899, 0.27409752155172407], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704a01165a0-019f-4630-b0ce-9d9815afe9e0"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.04189311594202899, 0.22572737068965512], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d312cda-b814-4363-b400-3355aea7c44c"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.04189311594202899, 0.17719558189655168], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704d4a491c9-4098-4772-859a-514efefba89a"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.04189311594202899, 0.12862338362068962], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704603e6e83-fc96-4fea-aa06-a6f309396a24"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.04189311594202899, 0.08223329741379307], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770496517d22-f991-4409-914a-03d176f3e29d"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.04189311594202899, 0.03426724137931031], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770430df1766-87d5-4a28-9e27-f5babe84823b"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704d18f6149-4b73-448a-9a99-602502a32929"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77044e30c531-08f0-494c-a6b3-51930d7da068"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el770467c4c71f-9d12-40e9-a4fc-7cf1feacff4a"}], "images": [], "sharex": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd"], "sharey": []}], "data": {"data01": [[19723.0, 20.049671415301123, 20.049671415301123, NaN, NaN, 0.0], [19724.0, 20.056047005386027, 20.052859210343577, 20.059234800428477, 20.046483620258677, 0.9999999999997213], [19725.0, 20.141017879398117, 20.082245433361756, 20.165525080287924, 19.998965786435587, 1.4114480117444388], [19726.0, 20.31352288524094, 20.14006479633155, 20.35294638197227, 19.92718321069083, 1.6296204144414261], [19727.0, 20.310309567970624, 20.174113750659366, 20.408216626030445, 19.940010875288287, 1.1635552711206305], [19728.0, 20.307097892477724, 20.19627777429576, 20.431851561227294, 19.960703987364223, 0.9408527122261993], [19729.0, 20.485221194230487, 20.237555405715007, 20.53497662079883, 19.940134190631184, 1.665421133093549], [19730.0, 20.582166687347797, 20.280631815919104, 20.64029570906687, 19.92096792277134, 1.676759203097495], [19731.0, 20.555421268956323, 20.311163977367684, 20.691710694969498, 19.93061725976587, 1.2837177686247654], [19732.0, 20.62987929351694, 20.34303550898261, 20.751572933019975, 19.934498084945243, 1.4042472863298592], [19733.0, 20.603739544437712, 20.366735875842167, 20.784106380492513, 19.94936537119182, 1.1356991735393211], [19734.0, 20.577368589282706, 20.384288601962208, 20.800507231033766, 19.96806997289065, 0.9277815735984448], [19735.0, 20.62176683664133, 20.40255615847599, 20.821995933719162, 19.983116383232815, 1.045254604374392], [19736.0, 20.45064083237757, 20.405990778040387, 20.810931193316733, 20.00105036276404, 0.22052653996866042], [19737.0, 20.298351069328287, 20.39881479745958, 20.79369282965579, 20.00393676526337, -0.5088342219117054], [19738.0, 20.262324336606213, 20.390284143656245, 20.778291156866633, 20.002277130445858, -0.6595747122779454], [19739.0, 20.181243244774787, 20.37798762019263, 20.767051471080887, 19.988923769304375, -1.0113731973230835], [19740.0, 20.232869998236335, 20.369925530083947, 20.75382787968941, 19.986023180478483, -0.7140124669122967], [19741.0, 20.162269610886234, 20.358996271178807, 20.74399552438941, 19.973997017968205, -1.0219586591507477], [19742.0, 20.041241260954727, 20.343108520667602, 20.743104983856167, 19.943112057479038, -1.5093496442770846], [19743.0, 20.2080081580489, 20.35102535780499, 20.73335482300103, 19.96869589260895, -0.7481359025402636], [19744.0, 20.20563254820227, 20.358504634945803, 20.722891009208848, 19.994118260682757, -0.8390658791932567], [19745.0, 20.23258738887308, 20.36308311041955, 20.71861723367903, 20.007548987160067, -0.7340826829790957], [19746.0, 20.110314590453754, 20.35292269568019, 20.724781161288238, 19.98106423007214, -1.304841103077914], [19747.0, 20.076078338203256, 20.341211134191823, 20.731973798320723, 19.950448470062923, -1.3570016806984868], [19748.0, 20.107372617376264, 20.33122487043675, 20.73495733824089, 19.92749240263261, -1.108913802637646], [19749.0, 20.012475279836053, 20.307587574717026, 20.72751888495321, 19.887656264480842, -1.4055265120145033], [19750.0, 20.070247101872642, 20.281991595443266, 20.694191851251198, 19.869791339635334, -1.0273865219010796], [19751.0, 20.030385253082784, 20.255739794649593, 20.66177035475584, 19.849709234543344, -1.1100373405777106], [19752.0, 20.021417898305472, 20.22531672488902, 20.60497952309854, 19.8456539266795, -1.0741048506470945], [19753.0, 19.981449257284552, 20.194202210531362, 20.54566329032478, 19.842741130737945, -1.2106771729709693], [19754.0, 20.186879095937467, 20.174677735864098, 20.47905825594679, 19.870297215781406, 0.08017175389577924], [19755.0, 20.205731393665694, 20.153875963715315, 20.379999335425325, 19.927752592005305, 0.4586472380827661], [19756.0, 20.120162320972128, 20.137352038145046, 20.31805362434581, 19.95665045194428, -0.1902552991850361], [19757.0, 20.222618832384466, 20.133565426297857, 20.3034643879484, 19.963666464647314, 1.0483101864952], [19758.0, 20.12073648758938, 20.126486033847012, 20.285804365864884, 19.96716770182914, -0.0721768321926403], [19759.0, 20.161824867291877, 20.125515114972863, 20.283719591468465, 19.96731063847726, 0.45902307094354367], [19760.0, 19.98605987510592, 20.113174608816344, 20.27443229888915, 19.95191691874354, -1.5765416663606333], [19761.0, 19.8734432904181, 20.098733292792936, 20.28894894233894, 19.90851764324693, -2.3687851437307486], [19762.0, 19.91333143420703, 20.092337801455557, 20.29784227143825, 19.886833331472864, -1.7421165317095202], [19763.0, 20.007380112408594, 20.08230639917354, 20.283793884051995, 19.880818914295084, -0.7437314214343712], [19764.0, 20.044718960729607, 20.074260719799906, 20.268113679630847, 19.880407759968964, -0.3047852258336564], [19765.0, 20.053356152692803, 20.065299157990893, 20.24510923844306, 19.885489077538725, -0.13284021972579593], [19766.0, 20.043447803335898, 20.061955818635, 20.24077743888297, 19.88313419838703, -0.20699974950944558], [19767.0, 19.915797624501174, 20.053941782949895, 20.2435540906384, 19.86432947526139, -1.4571222736834564], [19768.0, 19.864015223863724, 20.041773913274266, 20.246722803910323, 19.83682502263821, -1.734663592067946], [19769.0, 19.838153366969767, 20.033057817630954, 20.256263440031233, 19.809852195230675, -1.7464116590366348], [19770.0, 19.964067609793673, 20.027748843027005, 20.25221115658703, 19.80328652946698, -0.5674113593799609], [19771.0, 20.01863145895254, 20.027161153320495, 20.251654324483518, 19.802667982157473, -0.07599068001725912], [19772.0, 19.86252946361829, 20.019216731586134, 20.254925980889727, 19.78350748228254, -1.3294961350119212], [19773.0, 19.91513988075979, 20.015901262759897, 20.255475891269832, 19.776326634249962, -0.8411690555615732], [19774.0, 19.896833672920177, 20.001398991609033, 20.23279361871599, 19.770004364502075, -0.903783462876365], [19775.0, 19.849343493091602, 19.983579596580327, 20.203913840212675, 19.76324535294798, -1.2184769945493665], [19776.0, 19.93071314217771, 19.97410713764061, 20.186277525026178, 19.76193675025504, -0.40904855760141084], [19777.0, 20.054015114629323, 19.965676951752847, 20.149136608406092, 19.782217295099603, 0.9630254900503065], [19778.0, 20.167345146742964, 19.968007384710525, 20.160259932656167, 19.775754836764882, 2.0737073621391047], [19779.0, 20.10362541462272, 19.96509741207707, 20.147011065015214, 19.78318375913893, 1.5230083098023615], [19780.0, 20.09290619723962, 19.970439728183756, 20.160591109723473, 19.78028834664404, 1.2880944441656426], [19781.0, 20.146234560582, 19.98407929169195, 20.183359245431472, 19.784799337952425, 1.6274117476161214], [19782.0, 20.26399109349625, 20.00161227465641, 20.232159340319853, 19.771065208992965, 2.276141039442822], [19783.0, 20.236275689913743, 20.01305705353167, 20.26531634024594, 19.760797766817404, 1.7697555502478706], [19784.0, 20.237911812449383, 20.022716696117655, 20.293221687203108, 19.752211705032202, 1.591062075921153], [19785.0, 20.147480335250798, 20.027422905245555, 20.303121643825957, 19.751724166665152, 0.8709320225651368], [19786.0, 20.048061693044755, 20.027653599731, 20.303413303124454, 19.751893896337545, 0.148013600701017], [19787.0, 20.149516295486194, 20.03933953328025, 20.314956879121176, 19.76372218743932, 0.7994907713067828], [19788.0, 20.305342318545296, 20.061405888014328, 20.347798972677126, 19.77501280335153, 1.7035078260928038], [19789.0, 20.31834332658928, 20.085415385995304, 20.373426161500703, 19.797404610489906, 1.6174946245343378], [19790.0, 20.438898636580504, 20.109156937334646, 20.429688662594828, 19.788625212074464, 2.057466848114343], [19791.0, 20.49526425928729, 20.132988577351384, 20.491660570961905, 19.774316583740863, 2.0200946178657966], [19792.0, 20.450954304028798, 20.16240981937191, 20.52403666475326, 19.800782973990557, 1.5958134101056896], [19793.0, 20.50729588478166, 20.192017619573, 20.564614295731005, 19.819420943414997, 1.6923299931691247], [19794.0, 20.681301561630278, 20.231241014008507, 20.635131379229737, 19.827350648787277, 2.2286273027347523], [19795.0, 20.6979209779213, 20.27366988824999, 20.686362854131378, 19.860976922368604, 2.0560131853240438], [19796.0, 20.87458736370472, 20.32086359932634, 20.779233531971826, 19.862493666680855, 2.416056224205457], [19797.0, 20.632814873497765, 20.349803587269765, 20.810209929840305, 19.889397244699225, 1.2293978603678268], [19798.0, 20.73520714413731, 20.378196687139486, 20.859651037648103, 19.89674233663087, 1.4830500819887558], [19799.0, 20.764113871163147, 20.411221109966505, 20.903302789627617, 19.919139430305393, 1.4342853058040026], [19800.0, 20.75441515631858, 20.44429655792045, 20.93527516477224, 19.95331795106866, 1.2632672547044204], [19801.0, 20.78379325417415, 20.47617449260006, 20.968392525600002, 19.983956459600115, 1.2499288565241393], [19802.0, 20.60523838291608, 20.493236857071054, 20.978459726967582, 20.008013987174525, 0.46164982235446217], [19803.0, 20.60347321433435, 20.51159673329208, 20.984161539279985, 20.039031927304176, 0.38884182604415857], [19804.0, 20.659386491687545, 20.53267046725399, 20.991940281376344, 20.073400653131635, 0.5518151663231129], [19805.0, 20.827377916363716, 20.566665346309637, 21.007122340248404, 20.12620835237087, 1.183827586537643], [19806.0, 20.795752914738372, 20.60404990739432, 20.984993754759497, 20.223106060029142, 1.0064633340056761], [19807.0, 20.735105574651072, 20.633329371352563, 20.95551568937341, 20.311143053331715, 0.6317847630756561], [19808.0, 20.705131890494638, 20.65331884995003, 20.93918896991822, 20.367448729981838, 0.3624935726082442], [19809.0, 20.816874122466867, 20.678245389743907, 20.92753385945259, 20.428956920035223, 1.1121953043793862], [19810.0, 20.869951253634856, 20.699798020596624, 20.936820238000536, 20.462775803192713, 1.4357576677993142], [19811.0, 20.837177253460172, 20.716893670305268, 20.94143383466032, 20.492353505950216, 1.07137699395916], [19812.0, 20.90870601697353, 20.739781255952504, 20.94358646948083, 20.535976042424178, 1.6577079466865061], [19813.0, 20.938615792110355, 20.76134725131894, 20.95311101595888, 20.569583486679004, 1.8488220767282015], [19814.0, 21.05568231136566, 20.78006628880571, 21.006819227040594, 20.553313350570825, 2.4309808261399644], [19815.0, 21.005679022179947, 20.795454191018642, 21.038970916382947, 20.551937465654337, 1.7265740646504182], [19816.0, 20.99311482772219, 20.801380564219517, 21.057742498974715, 20.54501862946432, 1.4958091472180672], [19817.0, 20.974106032610994, 20.818445122175177, 21.07308326563969, 20.563806978710666, 1.222604817314116], [19818.0, 20.847956557999805, 20.8240825928683, 21.0760784908014, 20.5720866949352, 0.18947899808941915], [19819.0, 20.897770605908278, 20.830765429605556, 21.0831342598605, 20.57839659935061, 0.5310099209560319], [19820.0, 20.944078153328288, 20.840248579456045, 21.09467418309136, 20.58582297582073, 0.816188091046595], [19821.0, 20.964791519194556, 20.849298492707064, 21.107889931240894, 20.590707054173233, 0.89324710162345], [19822.0, 20.96153482605906, 20.867113314864213, 21.10419218780665, 20.630034441921776, 0.7965409150377899]], "data02": [[0.0, 0.0]], "data03": [[19761.0, 19.8734432904181, -2.3687851437307486], [19768.0, 19.864015223863724, -1.734663592067946]], "data04": [[19723.0, 20.049671415301123, 0.0], [19754.0, 20.186879095937467, 0.08017175389577924], [19757.0, 20.222618832384466, 1.0483101864952], [19759.0, 20.161824867291877, 0.45902307094354367], [19765.0, 20.053356152692803, -0.13284021972579593], [19771.0, 20.01863145895254, -0.07599068001725912], [19777.0, 20.054015114629323, 0.9630254900503065]], "data05": [[0.8902853260869565, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9016077898550725, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9129302536231885, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338]], "data06": [[0.8902853260869565, 0.22221174568965507], [0.9129302536231885, 0.22221174568965507], [0.9129302536231885, 0.24484105603448264], [0.8902853260869565, 0.24484105603448264]], "data07": [[0.9016077898550725, 0.0907192887931035, 0.04275323275862071]], "data08": [[0.8880208333333334, 0.016163793103448176], [0.992074275362319, 0.016163793103448176], [0.994338768115942, 0.016163793103448176], [0.994338768115942, 0.022629310344827624], [0.994338768115942, 0.35119881465517233], [0.994338768115942, 0.3576643318965518], [0.992074275362319, 0.3576643318965518], [0.8880208333333334, 0.3576643318965518], [0.8857563405797102, 0.3576643318965518], [0.8857563405797102, 0.35119881465517233], [0.8857563405797102, 0.022629310344827624], [0.8857563405797102, 0.016163793103448176], [0.8880208333333334, 0.016163793103448176]], "data09": [[72.0, 124.58406724935247, 417.5276430167518, 271.05585513305215], [1176.0, 124.58406724935247, 417.5276430167518, 271.05585513305215]], "data10": [[0.010190217391304351, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.021512681159420295, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.03283514492753624, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034]], "data11": [[0.021512681159420295, 0.09071928879310341, 0.042753232758620655]], "data12": [[0.007925724637681167, 0.016163793103448232], [0.12330163043478261, 0.016163793103448232], [0.12556612318840582, 0.016163793103448232], [0.12556612318840582, 0.02262931034482754], [0.12556612318840582, 0.35580549568965514], [0.12556612318840582, 0.3622710129310345], [0.12330163043478261, 0.3622710129310345], [0.007925724637681167, 0.3622710129310345], [0.005661231884057968, 0.3622710129310345], [0.005661231884057968, 0.35580549568965514], [0.005661231884057968, 0.02262931034482754], [0.005661231884057968, 0.016163793103448232], [0.007925724637681167, 0.016163793103448232]]}, "id": "el770445ae180d-b0c0-4314-ad8e-655f819f85e8", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704d18f6149-4b73-448a-9a99-602502a32929", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "el770433e6ff93-72fc-49ad-a349-c5872b183157"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+      });
+    });
+}else{
+    // require.js not available: dynamically load d3 & mpld3
+    mpld3_load_lib("https://d3js.org/d3.v5.js", function(){
+         mpld3_load_lib("https://mpld3.github.io/js/mpld3.v0.5.11.js", function(){
+                 
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["id"];
+    HtmlTooltipPlugin.prototype.defaultProps = {labels:null,
+                                                target:null,
+                                                hoffset:0,
+                                                voffset:10,
+                                                targets:null};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+        var obj = mpld3.get_element(this.props.id);
+        var labels = this.props.labels;
+        var targets = this.props.targets;
+        var tooltip = d3.select("body").append("div")
+            .attr("class", "mpld3-tooltip")
+            .style("position", "absolute")
+            .style("z-index", "10")
+            .style("visibility", "hidden");
+
+        obj.elements()
+            .on("mouseover", function(d, i){
+                tooltip.html(labels[i])
+                    .style("visibility", "visible");
+            })
+            .on("mousemove", function(d, i){
+                tooltip
+                .style("top", d3.event.pageY + this.props.voffset + "px")
+                .style("left",d3.event.pageX + this.props.hoffset + "px");
+            }.bind(this))
+            .on("mousedown.callout", function(d, i){
+                window.open(targets[i],"_blank");
+            })
+            .on("mouseout", function(d, i){
+                tooltip.style("visibility", "hidden");
+            });
+    };
+    
+        mpld3.register_plugin("vline_plugin", VLinePlugin);
+        VLinePlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        VLinePlugin.prototype.constructor = VLinePlugin;
+        function VLinePlugin(fig, props){
+            mpld3.Plugin.call(this, fig, props);
+            this.axes_ids = props.axes_ids;
+            this.color = props.color || 'blue';
+            this.alpha = (props.alpha !== undefined) ? props.alpha : 0.5;
+            this.linewidth = props.linewidth || 1;
+        }
+        VLinePlugin.prototype.draw = function(){
+            var fig = this.fig;
+            var axes = [];
+            var vlines = [];
+            for (var i=0; i<this.axes_ids.length; i++){
+                var ax = mpld3.get_element(this.axes_ids[i], fig);
+                if(!ax) continue;
+                axes.push(ax);
+                var line = ax.axes.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", 0).attr("y2", ax.height)
+                    .style("stroke", this.color)
+                    .style("stroke-width", this.linewidth)
+                    .style("opacity", 0.0);
+                vlines.push(line);
+            }
+            var that = this;
+            function updateFromAxis(axIdx, mouseX){
+                // 归一化位置（0..1）
+                var ratio = mouseX / axes[axIdx].width;
+                ratio = Math.max(0, Math.min(1, ratio));
+                for (var j=0; j<axes.length; j++){
+                    var xpix = ratio * axes[j].width;
+                    vlines[j].attr("x1", xpix)
+                            .attr("x2", xpix)
+                            .attr("y1", 0)
+                            .attr("y2", axes[j].height)
+                            .style("opacity", that.alpha);
+                }
+            }
+            function hide(){
+                for (var j=0; j<vlines.length; j++){
+                    vlines[j].style("opacity", 0.0);
+                }
+            }
+            // 为每个axes注册mousemove
+            for (let i=0; i<axes.length; i++){
+                axes[i].axes.on("mousemove.vline", function(){
+                    var m = d3.mouse(this);
+                    updateFromAxis(i, m[0]);
+                });
+                axes[i].axes.on("mouseleave.vline", function(){ hide(); });
+            }
+        };
+        
+                 mpld3.draw_figure("fig_el770445ae180d-b0c0-4314-ad8e-655f819f85e85495478379", {"width": 1200.0, "height": 1000.0, "axes": [{"bbox": [0.06, 0.5633333333333332, 0.9199999999999999, 0.3866666666666667], "xlim": [19718.05, 19826.95], "ylim": [19.683915878436366, 21.17569821946968], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [19.683915878436366, 21.17569821946968], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 9, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "lines": [{"data": "data01", "xindex": 0, "yindex": 1, "coordinates": "data", "id": "el7704798ab607-2e7a-4249-b5b9-e9e3fef8ffcf", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 2, "coordinates": "data", "id": "el770438ed9df7-40f2-4f3e-92d4-a7c352249962", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 3, "coordinates": "data", "id": "el770458a7b46f-7985-449e-88c8-2de6f822aae6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data01", "xindex": 0, "yindex": 4, "coordinates": "data", "id": "el7704188a08e9-5141-4ad5-81e4-cf8efe29d6cb", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el7704b5c788dd-ac66-4c33-bfca-e32227139617", "color": "#000000", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el770481e6b855-9109-4e5b-85ab-419740c26f6c", "color": "#0000FF", "linewidth": 1.0, "dasharray": "6,6", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el7704fa33c9b1-467f-4df2-aeba-10cd1d2dae01", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data05", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el7704ac761d16-416d-416f-9b64-fc373e9b427b", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data06", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "L", "L", "Z"], "id": "el770406ac57b6-3197-4cd0-ad72-852b0d024e65", "dasharray": "none", "alpha": 1, "facecolor": "rgba(128, 128, 128, 0.2)", "edgecolor": "rgba(128, 128, 128, 0.2)", "edgewidth": 1.0, "zorder": 1000001.0}, {"data": "data08", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el7704e83e578c-11c0-4dda-982f-d706a8889f1b", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u4ef7\u683c", "position": [-0.03908766103059581, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704ea42e255-23e9-447c-ae95-2ec86f375055"}, {"text": "\u5747\u503c\u56de\u5f52\u7b56\u7565 - \u4ef7\u683c\u4e0e\u5e03\u6797\u5e26 (\u7a97\u53e3=N/A, \u8fdb\u573aZ=2.0, \u51fa\u573aZ=0.0)", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 14.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el77045110dc96-c358-4559-ba89-0a7d262e494a"}, {"text": "\u6536\u76d8\u4ef7", "position": [0.9219882246376813, 0.3179822198275861], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704421ee4ec-bc5a-4ba7-b8ec-7cfc7f98dbd8"}, {"text": "\u5747\u503c\u7ebf", "position": [0.9219882246376813, 0.2694100215517241], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77040e7b9685-a37e-4905-89fd-8cb85c57f3cd"}, {"text": "\u00b12.0\u03c3\u901a\u9053", "position": [0.9219882246376813, 0.22221174568965507], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704617959ee-df60-43ab-8097-adb5de96df60"}, {"text": "\u4e0a\u8f68(+2.0\u03c3)", "position": [0.9219882246376813, 0.17541756465517233], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770444e55a00-b9cc-4eb8-a902-216f879e0077"}, {"text": "\u4e0b\u8f68(-2.0\u03c3)", "position": [0.9219882246376813, 0.1286233836206896], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704102fb255-e248-4b3c-a4cd-f3a92dc46e25"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.9219882246376813, 0.08223329741379315], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770494e32417-3a27-48dd-9ec7-52d20cdd4415"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.9219882246376813, 0.034267241379310365], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77048cf78cc0-eef1-4332-b0fd-f7117e66c33c"}], "collections": [{"offsets": "data02", "xindex": 0, "yindex": 1, "paths": [[[[19724.0, 20.046483620258677], [19724.0, 20.059234800428477], [19725.0, 20.165525080287924], [19726.0, 20.35294638197227], [19727.0, 20.408216626030445], [19728.0, 20.431851561227294], [19729.0, 20.53497662079883], [19730.0, 20.64029570906687], [19731.0, 20.691710694969498], [19732.0, 20.751572933019975], [19733.0, 20.784106380492513], [19734.0, 20.800507231033766], [19735.0, 20.821995933719162], [19736.0, 20.810931193316733], [19737.0, 20.79369282965579], [19738.0, 20.778291156866633], [19739.0, 20.767051471080887], [19740.0, 20.75382787968941], [19741.0, 20.74399552438941], [19742.0, 20.743104983856167], [19743.0, 20.73335482300103], [19744.0, 20.722891009208848], [19745.0, 20.71861723367903], [19746.0, 20.724781161288238], [19747.0, 20.731973798320723], [19748.0, 20.73495733824089], [19749.0, 20.72751888495321], [19750.0, 20.694191851251198], [19751.0, 20.66177035475584], [19752.0, 20.60497952309854], [19753.0, 20.54566329032478], [19754.0, 20.47905825594679], [19755.0, 20.379999335425325], [19756.0, 20.31805362434581], [19757.0, 20.3034643879484], [19758.0, 20.285804365864884], [19759.0, 20.283719591468465], [19760.0, 20.27443229888915], [19761.0, 20.28894894233894], [19762.0, 20.29784227143825], [19763.0, 20.283793884051995], [19764.0, 20.268113679630847], [19765.0, 20.24510923844306], [19766.0, 20.24077743888297], [19767.0, 20.2435540906384], [19768.0, 20.246722803910323], [19769.0, 20.256263440031233], [19770.0, 20.25221115658703], [19771.0, 20.251654324483518], [19772.0, 20.254925980889727], [19773.0, 20.255475891269832], [19774.0, 20.23279361871599], [19775.0, 20.203913840212675], [19776.0, 20.186277525026178], [19777.0, 20.149136608406092], [19778.0, 20.160259932656167], [19779.0, 20.147011065015214], [19780.0, 20.160591109723473], [19781.0, 20.183359245431472], [19782.0, 20.232159340319853], [19783.0, 20.26531634024594], [19784.0, 20.293221687203108], [19785.0, 20.303121643825957], [19786.0, 20.303413303124454], [19787.0, 20.314956879121176], [19788.0, 20.347798972677126], [19789.0, 20.373426161500703], [19790.0, 20.429688662594828], [19791.0, 20.491660570961905], [19792.0, 20.52403666475326], [19793.0, 20.564614295731005], [19794.0, 20.635131379229737], [19795.0, 20.686362854131378], [19796.0, 20.779233531971826], [19797.0, 20.810209929840305], [19798.0, 20.859651037648103], [19799.0, 20.903302789627617], [19800.0, 20.93527516477224], [19801.0, 20.968392525600002], [19802.0, 20.978459726967582], [19803.0, 20.984161539279985], [19804.0, 20.991940281376344], [19805.0, 21.007122340248404], [19806.0, 20.984993754759497], [19807.0, 20.95551568937341], [19808.0, 20.93918896991822], [19809.0, 20.92753385945259], [19810.0, 20.936820238000536], [19811.0, 20.94143383466032], [19812.0, 20.94358646948083], [19813.0, 20.95311101595888], [19814.0, 21.006819227040594], [19815.0, 21.038970916382947], [19816.0, 21.057742498974715], [19817.0, 21.07308326563969], [19818.0, 21.0760784908014], [19819.0, 21.0831342598605], [19820.0, 21.09467418309136], [19821.0, 21.107889931240894], [19822.0, 21.10419218780665], [19822.0, 20.630034441921776], [19822.0, 20.630034441921776], [19821.0, 20.590707054173233], [19820.0, 20.58582297582073], [19819.0, 20.57839659935061], [19818.0, 20.5720866949352], [19817.0, 20.563806978710666], [19816.0, 20.54501862946432], [19815.0, 20.551937465654337], [19814.0, 20.553313350570825], [19813.0, 20.569583486679004], [19812.0, 20.535976042424178], [19811.0, 20.492353505950216], [19810.0, 20.462775803192713], [19809.0, 20.428956920035223], [19808.0, 20.367448729981838], [19807.0, 20.311143053331715], [19806.0, 20.223106060029142], [19805.0, 20.12620835237087], [19804.0, 20.073400653131635], [19803.0, 20.039031927304176], [19802.0, 20.008013987174525], [19801.0, 19.983956459600115], [19800.0, 19.95331795106866], [19799.0, 19.919139430305393], [19798.0, 19.89674233663087], [19797.0, 19.889397244699225], [19796.0, 19.862493666680855], [19795.0, 19.860976922368604], [19794.0, 19.827350648787277], [19793.0, 19.819420943414997], [19792.0, 19.800782973990557], [19791.0, 19.774316583740863], [19790.0, 19.788625212074464], [19789.0, 19.797404610489906], [19788.0, 19.77501280335153], [19787.0, 19.76372218743932], [19786.0, 19.751893896337545], [19785.0, 19.751724166665152], [19784.0, 19.752211705032202], [19783.0, 19.760797766817404], [19782.0, 19.771065208992965], [19781.0, 19.784799337952425], [19780.0, 19.78028834664404], [19779.0, 19.78318375913893], [19778.0, 19.775754836764882], [19777.0, 19.782217295099603], [19776.0, 19.76193675025504], [19775.0, 19.76324535294798], [19774.0, 19.770004364502075], [19773.0, 19.776326634249962], [19772.0, 19.78350748228254], [19771.0, 19.802667982157473], [19770.0, 19.80328652946698], [19769.0, 19.809852195230675], [19768.0, 19.83682502263821], [19767.0, 19.86432947526139], [19766.0, 19.88313419838703], [19765.0, 19.885489077538725], [19764.0, 19.880407759968964], [19763.0, 19.880818914295084], [19762.0, 19.886833331472864], [19761.0, 19.90851764324693], [19760.0, 19.95191691874354], [19759.0, 19.96731063847726], [19758.0, 19.96716770182914], [19757.0, 19.963666464647314], [19756.0, 19.95665045194428], [19755.0, 19.927752592005305], [19754.0, 19.870297215781406], [19753.0, 19.842741130737945], [19752.0, 19.8456539266795], [19751.0, 19.849709234543344], [19750.0, 19.869791339635334], [19749.0, 19.887656264480842], [19748.0, 19.92749240263261], [19747.0, 19.950448470062923], [19746.0, 19.98106423007214], [19745.0, 20.007548987160067], [19744.0, 19.994118260682757], [19743.0, 19.96869589260895], [19742.0, 19.943112057479038], [19741.0, 19.973997017968205], [19740.0, 19.986023180478483], [19739.0, 19.988923769304375], [19738.0, 20.002277130445858], [19737.0, 20.00393676526337], [19736.0, 20.00105036276404], [19735.0, 19.983116383232815], [19734.0, 19.96806997289065], [19733.0, 19.94936537119182], [19732.0, 19.934498084945243], [19731.0, 19.93061725976587], [19730.0, 19.92096792277134], [19729.0, 19.940134190631184], [19728.0, 19.960703987364223], [19727.0, 19.940010875288287], [19726.0, 19.92718321069083], [19725.0, 19.998965786435587], [19724.0, 20.046483620258677]], ["M", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "Z"]]], "pathtransforms": [], "alphas": [0.2], "edgecolors": ["rgba(128, 128, 128, 0.2)"], "facecolors": ["rgba(128, 128, 128, 0.2)"], "edgewidths": [1.0], "offsetcoordinates": "display", "pathcoordinates": "data", "zorder": 1, "id": "el77043adc8ee2-7fc8-4610-988b-262f440b621f"}, {"offsets": "data03", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835"}, {"offsets": "data04", "xindex": 0, "yindex": 1, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624"}, {"offsets": "data07", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77047ae59bd0-6095-473b-9d24-01f741e5781d"}, {"offsets": "data07", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el7704d8845ac6-1b7e-4422-889e-55fba755d431"}], "images": [], "sharex": ["el770433e6ff93-72fc-49ad-a349-c5872b183157"], "sharey": []}, {"bbox": [0.06, 0.07999999999999996, 0.9199999999999999, 0.38666666666666666], "xlim": [19718.05, 19826.95], "ylim": [-2.608773442224284, 2.6709691246335], "xdomain": [[2023, 11, 27, 1, 12, 0, 0.0], [2024, 3, 13, 22, 48, 0, 0.0]], "ydomain": [-2.608773442224284, 2.6709691246335], "xscale": "date", "yscale": "linear", "axes": [{"position": "bottom", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}, {"position": "left", "nticks": 7, "tickvalues": null, "tickformat_formatter": "", "tickformat": null, "scale": "linear", "fontsize": 10.0, "grid": {"gridOn": true, "color": "#B0B0B0", "dasharray": "none", "alpha": 0.3}, "visible": true}], "axesbg": "#FFFFFF", "axesbgalpha": null, "zoomable": true, "id": "el770433e6ff93-72fc-49ad-a349-c5872b183157", "lines": [{"data": "data01", "xindex": 0, "yindex": 5, "coordinates": "data", "id": "el7704ea3d63a2-9283-4b7a-a69e-9445627e052d", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 1, "coordinates": "display", "id": "el77045c5c4adb-8f84-4b48-860d-11d9feac6ce6", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 2, "coordinates": "display", "id": "el77047c5505c6-f386-476f-a774-ab90872e134a", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77049a933b1f-b930-4814-ba7b-b0f0d3e03cec", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 2, "drawstyle": "default"}, {"data": "data09", "xindex": 0, "yindex": 3, "coordinates": "display", "id": "el77044a0368f4-348a-49f6-9974-d735b3202412", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 2, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 1, "coordinates": "axes", "id": "el77048ebd9e60-6445-4c10-84df-ddd84a675942", "color": "#800080", "linewidth": 1.5, "dasharray": "none", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 2, "coordinates": "axes", "id": "el7704f6f98c5f-9dea-45a1-a628-c0c1231f23ea", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 3, "coordinates": "axes", "id": "el77042efa6426-fab3-41d6-b324-e5a44f1d4891", "color": "#FFA500", "linewidth": 1.0, "dasharray": "2,2", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 4, "coordinates": "axes", "id": "el770491457229-cb4e-47a8-9063-09743111ac65", "color": "#008000", "linewidth": 1.0, "dasharray": "4,4,2,4", "alpha": 1, "zorder": 1000002.0, "drawstyle": "default"}, {"data": "data10", "xindex": 0, "yindex": 5, "coordinates": "axes", "id": "el77048c41dec8-fe6f-4195-a125-bbd05ff58f16", "color": "#0000FF", "linewidth": 0.8, "dasharray": "6,6", "alpha": 0.5, "zorder": 1000002.0, "drawstyle": "default"}], "paths": [{"data": "data12", "xindex": 0, "yindex": 1, "coordinates": "axes", "pathcodes": ["M", "L", "S", "L", "S", "L", "S", "L", "S", "Z"], "id": "el77048bd08737-e189-4bad-90f9-3ba8a66f0aab", "dasharray": "none", "alpha": 0.8, "facecolor": "rgba(255, 255, 255, 0.8)", "edgecolor": "rgba(204, 204, 204, 0.8)", "edgewidth": 1.0, "zorder": 1000000.0}], "markers": [], "texts": [{"text": "\u65e5\u671f", "position": [0.5, -0.07054597701149426], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "hanging", "rotation": -0.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704370c6e93-a368-4d62-8d60-d3eb5d1fdcde"}, {"text": "Z\u5206\u6570", "position": [-0.026519726247987117, 0.5], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -90.0, "fontsize": 11.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el770408711734-e292-45c1-b3b1-7e7a77446de8"}, {"text": "Z\u5206\u6570\u6307\u6807", "position": [0.5, 1.021551724137931], "coordinates": "axes", "h_anchor": "middle", "v_baseline": "auto", "rotation": -0.0, "fontsize": 12.0, "color": "#000000", "alpha": 1, "zorder": 3, "id": "el7704092c74f4-c081-4f7e-b788-9eb630a7504d"}, {"text": "Z\u5206\u6570", "position": [0.04189311594202899, 0.32262931034482756], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d50061c-5bf4-430c-8721-506228f86ed1"}, {"text": "\u8fdb\u573a\u7ebf(Z=-2.0)", "position": [0.04189311594202899, 0.27409752155172407], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704a01165a0-019f-4630-b0ce-9d9815afe9e0"}, {"text": "\u8d85\u6da8\u7ebf(Z=+2.0)", "position": [0.04189311594202899, 0.22572737068965512], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el77046d312cda-b814-4363-b400-3355aea7c44c"}, {"text": "\u51fa\u573a\u7ebf(Z=0.0)", "position": [0.04189311594202899, 0.17719558189655168], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704d4a491c9-4098-4772-859a-514efefba89a"}, {"text": "\u5747\u503c\u7ebf(Z=0)", "position": [0.04189311594202899, 0.12862338362068962], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el7704603e6e83-fc96-4fea-aa06-a6f309396a24"}, {"text": "\u4e70\u5165\u4fe1\u53f7", "position": [0.04189311594202899, 0.08223329741379307], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770496517d22-f991-4409-914a-03d176f3e29d"}, {"text": "\u5356\u51fa\u4fe1\u53f7", "position": [0.04189311594202899, 0.03426724137931031], "coordinates": "axes", "h_anchor": "start", "v_baseline": "auto", "rotation": -0.0, "fontsize": 9.0, "color": "#000000", "alpha": 1, "zorder": 1000003.0, "id": "el770430df1766-87d5-4a28-9e27-f5babe84823b"}], "collections": [{"offsets": "data03", "xindex": 0, "yindex": 2, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el7704d18f6149-4b73-448a-9a99-602502a32929"}, {"offsets": "data04", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "data", "pathcoordinates": "display", "zorder": 5, "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd"}, {"offsets": "data11", "xindex": 0, "yindex": 1, "paths": [[[[0.0, 0.5], [-0.5, -0.5], [0.5, -0.5]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#008000"], "facecolors": ["#008000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el77044e30c531-08f0-494c-a6b3-51930d7da068"}, {"offsets": "data11", "xindex": 0, "yindex": 2, "paths": [[[[-6.123233995736766e-17, -0.5], [0.5000000000000001, 0.49999999999999994], [-0.49999999999999994, 0.5000000000000001]], ["M", "L", "L", "Z"]]], "pathtransforms": [[13.88888888888889, 0.0, 0.0, 13.88888888888889, 0.0, 0.0]], "alphas": [null], "edgecolors": ["#FF0000"], "facecolors": ["#FF0000"], "edgewidths": [1.0], "offsetcoordinates": "axes", "pathcoordinates": "display", "zorder": 1000001.0, "id": "el770467c4c71f-9d12-40e9-a4fc-7cf1feacff4a"}], "images": [], "sharex": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd"], "sharey": []}], "data": {"data01": [[19723.0, 20.049671415301123, 20.049671415301123, NaN, NaN, 0.0], [19724.0, 20.056047005386027, 20.052859210343577, 20.059234800428477, 20.046483620258677, 0.9999999999997213], [19725.0, 20.141017879398117, 20.082245433361756, 20.165525080287924, 19.998965786435587, 1.4114480117444388], [19726.0, 20.31352288524094, 20.14006479633155, 20.35294638197227, 19.92718321069083, 1.6296204144414261], [19727.0, 20.310309567970624, 20.174113750659366, 20.408216626030445, 19.940010875288287, 1.1635552711206305], [19728.0, 20.307097892477724, 20.19627777429576, 20.431851561227294, 19.960703987364223, 0.9408527122261993], [19729.0, 20.485221194230487, 20.237555405715007, 20.53497662079883, 19.940134190631184, 1.665421133093549], [19730.0, 20.582166687347797, 20.280631815919104, 20.64029570906687, 19.92096792277134, 1.676759203097495], [19731.0, 20.555421268956323, 20.311163977367684, 20.691710694969498, 19.93061725976587, 1.2837177686247654], [19732.0, 20.62987929351694, 20.34303550898261, 20.751572933019975, 19.934498084945243, 1.4042472863298592], [19733.0, 20.603739544437712, 20.366735875842167, 20.784106380492513, 19.94936537119182, 1.1356991735393211], [19734.0, 20.577368589282706, 20.384288601962208, 20.800507231033766, 19.96806997289065, 0.9277815735984448], [19735.0, 20.62176683664133, 20.40255615847599, 20.821995933719162, 19.983116383232815, 1.045254604374392], [19736.0, 20.45064083237757, 20.405990778040387, 20.810931193316733, 20.00105036276404, 0.22052653996866042], [19737.0, 20.298351069328287, 20.39881479745958, 20.79369282965579, 20.00393676526337, -0.5088342219117054], [19738.0, 20.262324336606213, 20.390284143656245, 20.778291156866633, 20.002277130445858, -0.6595747122779454], [19739.0, 20.181243244774787, 20.37798762019263, 20.767051471080887, 19.988923769304375, -1.0113731973230835], [19740.0, 20.232869998236335, 20.369925530083947, 20.75382787968941, 19.986023180478483, -0.7140124669122967], [19741.0, 20.162269610886234, 20.358996271178807, 20.74399552438941, 19.973997017968205, -1.0219586591507477], [19742.0, 20.041241260954727, 20.343108520667602, 20.743104983856167, 19.943112057479038, -1.5093496442770846], [19743.0, 20.2080081580489, 20.35102535780499, 20.73335482300103, 19.96869589260895, -0.7481359025402636], [19744.0, 20.20563254820227, 20.358504634945803, 20.722891009208848, 19.994118260682757, -0.8390658791932567], [19745.0, 20.23258738887308, 20.36308311041955, 20.71861723367903, 20.007548987160067, -0.7340826829790957], [19746.0, 20.110314590453754, 20.35292269568019, 20.724781161288238, 19.98106423007214, -1.304841103077914], [19747.0, 20.076078338203256, 20.341211134191823, 20.731973798320723, 19.950448470062923, -1.3570016806984868], [19748.0, 20.107372617376264, 20.33122487043675, 20.73495733824089, 19.92749240263261, -1.108913802637646], [19749.0, 20.012475279836053, 20.307587574717026, 20.72751888495321, 19.887656264480842, -1.4055265120145033], [19750.0, 20.070247101872642, 20.281991595443266, 20.694191851251198, 19.869791339635334, -1.0273865219010796], [19751.0, 20.030385253082784, 20.255739794649593, 20.66177035475584, 19.849709234543344, -1.1100373405777106], [19752.0, 20.021417898305472, 20.22531672488902, 20.60497952309854, 19.8456539266795, -1.0741048506470945], [19753.0, 19.981449257284552, 20.194202210531362, 20.54566329032478, 19.842741130737945, -1.2106771729709693], [19754.0, 20.186879095937467, 20.174677735864098, 20.47905825594679, 19.870297215781406, 0.08017175389577924], [19755.0, 20.205731393665694, 20.153875963715315, 20.379999335425325, 19.927752592005305, 0.4586472380827661], [19756.0, 20.120162320972128, 20.137352038145046, 20.31805362434581, 19.95665045194428, -0.1902552991850361], [19757.0, 20.222618832384466, 20.133565426297857, 20.3034643879484, 19.963666464647314, 1.0483101864952], [19758.0, 20.12073648758938, 20.126486033847012, 20.285804365864884, 19.96716770182914, -0.0721768321926403], [19759.0, 20.161824867291877, 20.125515114972863, 20.283719591468465, 19.96731063847726, 0.45902307094354367], [19760.0, 19.98605987510592, 20.113174608816344, 20.27443229888915, 19.95191691874354, -1.5765416663606333], [19761.0, 19.8734432904181, 20.098733292792936, 20.28894894233894, 19.90851764324693, -2.3687851437307486], [19762.0, 19.91333143420703, 20.092337801455557, 20.29784227143825, 19.886833331472864, -1.7421165317095202], [19763.0, 20.007380112408594, 20.08230639917354, 20.283793884051995, 19.880818914295084, -0.7437314214343712], [19764.0, 20.044718960729607, 20.074260719799906, 20.268113679630847, 19.880407759968964, -0.3047852258336564], [19765.0, 20.053356152692803, 20.065299157990893, 20.24510923844306, 19.885489077538725, -0.13284021972579593], [19766.0, 20.043447803335898, 20.061955818635, 20.24077743888297, 19.88313419838703, -0.20699974950944558], [19767.0, 19.915797624501174, 20.053941782949895, 20.2435540906384, 19.86432947526139, -1.4571222736834564], [19768.0, 19.864015223863724, 20.041773913274266, 20.246722803910323, 19.83682502263821, -1.734663592067946], [19769.0, 19.838153366969767, 20.033057817630954, 20.256263440031233, 19.809852195230675, -1.7464116590366348], [19770.0, 19.964067609793673, 20.027748843027005, 20.25221115658703, 19.80328652946698, -0.5674113593799609], [19771.0, 20.01863145895254, 20.027161153320495, 20.251654324483518, 19.802667982157473, -0.07599068001725912], [19772.0, 19.86252946361829, 20.019216731586134, 20.254925980889727, 19.78350748228254, -1.3294961350119212], [19773.0, 19.91513988075979, 20.015901262759897, 20.255475891269832, 19.776326634249962, -0.8411690555615732], [19774.0, 19.896833672920177, 20.001398991609033, 20.23279361871599, 19.770004364502075, -0.903783462876365], [19775.0, 19.849343493091602, 19.983579596580327, 20.203913840212675, 19.76324535294798, -1.2184769945493665], [19776.0, 19.93071314217771, 19.97410713764061, 20.186277525026178, 19.76193675025504, -0.40904855760141084], [19777.0, 20.054015114629323, 19.965676951752847, 20.149136608406092, 19.782217295099603, 0.9630254900503065], [19778.0, 20.167345146742964, 19.968007384710525, 20.160259932656167, 19.775754836764882, 2.0737073621391047], [19779.0, 20.10362541462272, 19.96509741207707, 20.147011065015214, 19.78318375913893, 1.5230083098023615], [19780.0, 20.09290619723962, 19.970439728183756, 20.160591109723473, 19.78028834664404, 1.2880944441656426], [19781.0, 20.146234560582, 19.98407929169195, 20.183359245431472, 19.784799337952425, 1.6274117476161214], [19782.0, 20.26399109349625, 20.00161227465641, 20.232159340319853, 19.771065208992965, 2.276141039442822], [19783.0, 20.236275689913743, 20.01305705353167, 20.26531634024594, 19.760797766817404, 1.7697555502478706], [19784.0, 20.237911812449383, 20.022716696117655, 20.293221687203108, 19.752211705032202, 1.591062075921153], [19785.0, 20.147480335250798, 20.027422905245555, 20.303121643825957, 19.751724166665152, 0.8709320225651368], [19786.0, 20.048061693044755, 20.027653599731, 20.303413303124454, 19.751893896337545, 0.148013600701017], [19787.0, 20.149516295486194, 20.03933953328025, 20.314956879121176, 19.76372218743932, 0.7994907713067828], [19788.0, 20.305342318545296, 20.061405888014328, 20.347798972677126, 19.77501280335153, 1.7035078260928038], [19789.0, 20.31834332658928, 20.085415385995304, 20.373426161500703, 19.797404610489906, 1.6174946245343378], [19790.0, 20.438898636580504, 20.109156937334646, 20.429688662594828, 19.788625212074464, 2.057466848114343], [19791.0, 20.49526425928729, 20.132988577351384, 20.491660570961905, 19.774316583740863, 2.0200946178657966], [19792.0, 20.450954304028798, 20.16240981937191, 20.52403666475326, 19.800782973990557, 1.5958134101056896], [19793.0, 20.50729588478166, 20.192017619573, 20.564614295731005, 19.819420943414997, 1.6923299931691247], [19794.0, 20.681301561630278, 20.231241014008507, 20.635131379229737, 19.827350648787277, 2.2286273027347523], [19795.0, 20.6979209779213, 20.27366988824999, 20.686362854131378, 19.860976922368604, 2.0560131853240438], [19796.0, 20.87458736370472, 20.32086359932634, 20.779233531971826, 19.862493666680855, 2.416056224205457], [19797.0, 20.632814873497765, 20.349803587269765, 20.810209929840305, 19.889397244699225, 1.2293978603678268], [19798.0, 20.73520714413731, 20.378196687139486, 20.859651037648103, 19.89674233663087, 1.4830500819887558], [19799.0, 20.764113871163147, 20.411221109966505, 20.903302789627617, 19.919139430305393, 1.4342853058040026], [19800.0, 20.75441515631858, 20.44429655792045, 20.93527516477224, 19.95331795106866, 1.2632672547044204], [19801.0, 20.78379325417415, 20.47617449260006, 20.968392525600002, 19.983956459600115, 1.2499288565241393], [19802.0, 20.60523838291608, 20.493236857071054, 20.978459726967582, 20.008013987174525, 0.46164982235446217], [19803.0, 20.60347321433435, 20.51159673329208, 20.984161539279985, 20.039031927304176, 0.38884182604415857], [19804.0, 20.659386491687545, 20.53267046725399, 20.991940281376344, 20.073400653131635, 0.5518151663231129], [19805.0, 20.827377916363716, 20.566665346309637, 21.007122340248404, 20.12620835237087, 1.183827586537643], [19806.0, 20.795752914738372, 20.60404990739432, 20.984993754759497, 20.223106060029142, 1.0064633340056761], [19807.0, 20.735105574651072, 20.633329371352563, 20.95551568937341, 20.311143053331715, 0.6317847630756561], [19808.0, 20.705131890494638, 20.65331884995003, 20.93918896991822, 20.367448729981838, 0.3624935726082442], [19809.0, 20.816874122466867, 20.678245389743907, 20.92753385945259, 20.428956920035223, 1.1121953043793862], [19810.0, 20.869951253634856, 20.699798020596624, 20.936820238000536, 20.462775803192713, 1.4357576677993142], [19811.0, 20.837177253460172, 20.716893670305268, 20.94143383466032, 20.492353505950216, 1.07137699395916], [19812.0, 20.90870601697353, 20.739781255952504, 20.94358646948083, 20.535976042424178, 1.6577079466865061], [19813.0, 20.938615792110355, 20.76134725131894, 20.95311101595888, 20.569583486679004, 1.8488220767282015], [19814.0, 21.05568231136566, 20.78006628880571, 21.006819227040594, 20.553313350570825, 2.4309808261399644], [19815.0, 21.005679022179947, 20.795454191018642, 21.038970916382947, 20.551937465654337, 1.7265740646504182], [19816.0, 20.99311482772219, 20.801380564219517, 21.057742498974715, 20.54501862946432, 1.4958091472180672], [19817.0, 20.974106032610994, 20.818445122175177, 21.07308326563969, 20.563806978710666, 1.222604817314116], [19818.0, 20.847956557999805, 20.8240825928683, 21.0760784908014, 20.5720866949352, 0.18947899808941915], [19819.0, 20.897770605908278, 20.830765429605556, 21.0831342598605, 20.57839659935061, 0.5310099209560319], [19820.0, 20.944078153328288, 20.840248579456045, 21.09467418309136, 20.58582297582073, 0.816188091046595], [19821.0, 20.964791519194556, 20.849298492707064, 21.107889931240894, 20.590707054173233, 0.89324710162345], [19822.0, 20.96153482605906, 20.867113314864213, 21.10419218780665, 20.630034441921776, 0.7965409150377899]], "data02": [[0.0, 0.0]], "data03": [[19761.0, 19.8734432904181, -2.3687851437307486], [19768.0, 19.864015223863724, -1.734663592067946]], "data04": [[19723.0, 20.049671415301123, 0.0], [19754.0, 20.186879095937467, 0.08017175389577924], [19757.0, 20.222618832384466, 1.0483101864952], [19759.0, 20.161824867291877, 0.45902307094354367], [19765.0, 20.053356152692803, -0.13284021972579593], [19771.0, 20.01863145895254, -0.07599068001725912], [19777.0, 20.054015114629323, 0.9630254900503065]], "data05": [[0.8902853260869565, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9016077898550725, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338], [0.9129302536231885, 0.32929687499999993, 0.2807246767241379, 0.18673221982758612, 0.13993803879310338]], "data06": [[0.8902853260869565, 0.22221174568965507], [0.9129302536231885, 0.22221174568965507], [0.9129302536231885, 0.24484105603448264], [0.8902853260869565, 0.24484105603448264]], "data07": [[0.9016077898550725, 0.0907192887931035, 0.04275323275862071]], "data08": [[0.8880208333333334, 0.016163793103448176], [0.992074275362319, 0.016163793103448176], [0.994338768115942, 0.016163793103448176], [0.994338768115942, 0.022629310344827624], [0.994338768115942, 0.35119881465517233], [0.994338768115942, 0.3576643318965518], [0.992074275362319, 0.3576643318965518], [0.8880208333333334, 0.3576643318965518], [0.8857563405797102, 0.3576643318965518], [0.8857563405797102, 0.35119881465517233], [0.8857563405797102, 0.022629310344827624], [0.8857563405797102, 0.016163793103448176], [0.8880208333333334, 0.016163793103448176]], "data09": [[72.0, 124.58406724935247, 417.5276430167518, 271.05585513305215], [1176.0, 124.58406724935247, 417.5276430167518, 271.05585513305215]], "data10": [[0.010190217391304351, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.021512681159420295, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034], [0.03283514492753624, 0.33394396551724137, 0.2854121767241379, 0.2370420258620689, 0.18851023706896547, 0.1399380387931034]], "data11": [[0.021512681159420295, 0.09071928879310341, 0.042753232758620655]], "data12": [[0.007925724637681167, 0.016163793103448232], [0.12330163043478261, 0.016163793103448232], [0.12556612318840582, 0.016163793103448232], [0.12556612318840582, 0.02262931034482754], [0.12556612318840582, 0.35580549568965514], [0.12556612318840582, 0.3622710129310345], [0.12330163043478261, 0.3622710129310345], [0.007925724637681167, 0.3622710129310345], [0.005661231884057968, 0.3622710129310345], [0.005661231884057968, 0.35580549568965514], [0.005661231884057968, 0.02262931034482754], [0.005661231884057968, 0.016163793103448232], [0.007925724637681167, 0.016163793103448232]]}, "id": "el770445ae180d-b0c0-4314-ad8e-655f819f85e8", "plugins": [{"type": "reset"}, {"type": "zoom", "button": true, "enabled": false}, {"type": "boxzoom", "button": true, "enabled": false}, {"type": "htmltooltip", "id": "el770475e22cdb-6c73-4ded-894c-87a9ef1ca835", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704277ddaea-8bd5-4c09-903d-a6eb2c2e1624", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el7704d18f6149-4b73-448a-9a99-602502a32929", "labels": ["\u65e5\u671f: 2024-02-08<br>\u6536\u76d8\u4ef7: 19.87<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 189.44\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.60x<br>Z\u5206\u6570: -2.369", "\u65e5\u671f: 2024-02-15<br>\u6536\u76d8\u4ef7: 19.86<br>\u4fe1\u53f7: \u4e70\u5165<br>\u6210\u4ea4\u91cf: 497.19\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.33x<br>Z\u5206\u6570: -1.735"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "htmltooltip", "id": "el770417fee16b-7dfa-46e9-a41e-e7d3b9b66cdd", "labels": ["\u65e5\u671f: 2024-01-01<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 157.20\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.00x<br>Z\u5206\u6570: 0.000", "\u65e5\u671f: 2024-02-01<br>\u6536\u76d8\u4ef7: 20.19<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 359.68\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.69x<br>Z\u5206\u6570: 0.080", "\u65e5\u671f: 2024-02-04<br>\u6536\u76d8\u4ef7: 20.22<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 484.87\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.41x<br>Z\u5206\u6570: 1.048", "\u65e5\u671f: 2024-02-06<br>\u6536\u76d8\u4ef7: 20.16<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 214.28\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.64x<br>Z\u5206\u6570: 0.459", "\u65e5\u671f: 2024-02-12<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 117.26\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.42x<br>Z\u5206\u6570: -0.133", "\u65e5\u671f: 2024-02-18<br>\u6536\u76d8\u4ef7: 20.02<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 487.72\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 1.40x<br>Z\u5206\u6570: -0.076", "\u65e5\u671f: 2024-02-24<br>\u6536\u76d8\u4ef7: 20.05<br>\u4fe1\u53f7: \u5356\u51fa<br>\u6210\u4ea4\u91cf: 333.73\u4e07<br>\u6210\u4ea4\u91cf\u6bd4: 0.98x<br>Z\u5206\u6570: 0.963"], "targets": null, "hoffset": 10, "voffset": 10}, {"type": "vline_plugin", "axes_ids": ["el7704cd560e46-2453-44dc-9f3b-60a1c6587ffd", "el770433e6ff93-72fc-49ad-a349-c5872b183157"], "color": "blue", "linewidth": 1, "alpha": 0.4}]});
+            })
+         });
+}
+</script><style>
+.mpld3-wrapper{position:relative;text-align:left;}
+.mpld3-figure{display:block;margin:0;}
+.mpld3-figure > svg{display:block;margin:0;}
+/* 工具栏容器样式 - 确保始终可点击 */
+.mpld3-toolbar{
+  position:absolute!important;
+  top:50%!important;
+  left:0!important;
+  right:auto!important;
+  transform:translateY(-50%)!important;
+  margin:0!important;
+  padding:8px!important;
+  z-index:10000!important;
+  pointer-events:auto!important;
+  background:rgba(255,255,255,0.9)!important;
+  border-radius:4px!important;
+  box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;
+}
+/* 工具栏所有交互元素样式 */
+.mpld3-toolbar button,
+.mpld3-toolbar a,
+.mpld3-toolbar .mpld3-toolbar-button,
+.mpld3-toolbar [class*='toolbar'],
+.mpld3-toolbar [role='button']{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  position:relative!important;
+  z-index:10001!important;
+  display:inline-block!important;
+  margin:2px!important;
+  padding:4px!important;
+  min-width:24px!important;
+  min-height:24px!important;
+}
+/* 确保工具栏不被SVG遮挡 */
+.mpld3-figure > svg{
+  pointer-events:auto!important;
+}
+</style><script>
+(function(){
+  var initAttempts = 0;
+  var maxAttempts = 10;
+  var toolbarMonitorInterval = null;
+  
+  // 修复工具栏按钮状态
+  function fixToolbarButtons(toolbar){
+    if(!toolbar) return false;
+    
+    // 查找所有可能的按钮元素
+    var selectors = ['button', 'a', '.mpld3-toolbar-button', '[class*="toolbar"]', '[role="button"]'];
+    var allButtons = [];
+    selectors.forEach(function(sel){
+      try{
+        var elements = toolbar.querySelectorAll(sel);
+        for(var i=0; i<elements.length; i++){
+          if(allButtons.indexOf(elements[i]) === -1){
+            allButtons.push(elements[i]);
+          }
+        }
+      }catch(e){}
+    });
+    
+    // 修复每个按钮
+    var fixed = false;
+    for(var i=0; i<allButtons.length; i++){
+      var btn = allButtons[i];
+      if(btn.style.pointerEvents !== 'auto' || btn.style.cursor !== 'pointer'){
+        btn.style.pointerEvents = 'auto';
+        btn.style.cursor = 'pointer';
+        btn.style.position = 'relative';
+        btn.style.zIndex = '10001';
+        fixed = true;
+      }
+      // 确保按钮可点击
+      if(btn.hasAttribute('disabled')){
+        btn.removeAttribute('disabled');
+        fixed = true;
+      }
+    }
+    
+    // 修复工具栏容器
+    if(toolbar.style.pointerEvents !== 'auto' || parseInt(toolbar.style.zIndex) < 10000){
+      toolbar.style.pointerEvents = 'auto';
+      toolbar.style.zIndex = '10000';
+      fixed = true;
+    }
+    
+    return fixed;
+  }
+  
+  function initToolbar(){
+    initAttempts++;
+    try{
+      var wrapper = document.currentScript ? document.currentScript.parentElement : null;
+      if(!wrapper) wrapper = document.querySelector('.mpld3-wrapper:last-child');
+      if(!wrapper){
+        if(initAttempts < maxAttempts){
+          setTimeout(initToolbar, 200);
+        }
+        return;
+      }
+      
+      var toolbar = wrapper.querySelector('.mpld3-toolbar');
+      if(!toolbar){
+        if(initAttempts < maxAttempts){
+          setTimeout(initToolbar, 200);
+        }
+        return;
+      }
+      
+      // 确保工具栏在正确的父元素中
+      if(toolbar.parentElement !== wrapper){
+        wrapper.appendChild(toolbar);
+      }
+      
+      // 修复工具栏按钮状态
+      fixToolbarButtons(toolbar);
+      
+      // 默认激活移动工具（平移工具）
+      function activatePanTool(){
+        var toolbarButtons = toolbar.querySelectorAll('.mpld3-toolbar-button, button, a, [class*="toolbar"], [role="button"]');
+        var panButton = null;
+        
+        // 方法1: 通过title属性查找
+        for(var i=0; i<toolbarButtons.length; i++){
+          var title = (toolbarButtons[i].getAttribute('title') || '').toLowerCase();
+          if(title.indexOf('pan') >= 0 || title.indexOf('move') >= 0 || title.indexOf('平移') >= 0){
+            panButton = toolbarButtons[i];
+            break;
+          }
+        }
+        
+        // 方法2: 如果没找到，尝试第二个按钮（通常是平移工具）
+        if(!panButton && toolbarButtons.length >= 2){
+          panButton = toolbarButtons[1];
+        }
+        
+        // 激活平移工具
+        if(panButton){
+          setTimeout(function(){
+            try{
+              if(panButton.click){
+                panButton.click();
+              } else if(panButton.dispatchEvent){
+                var clickEvent = new MouseEvent('click', {bubbles: true, cancelable: true});
+                panButton.dispatchEvent(clickEvent);
+              }
+            }catch(e){console.log('Pan tool activation:', e);}
+          }, 200);
+        }
+      }
+      
+      // 只在第一次成功初始化时激活平移工具
+      if(initAttempts === 1){
+        activatePanTool();
+      }
+      
+      // 启动工具栏状态监控
+      if(!toolbarMonitorInterval){
+        toolbarMonitorInterval = setInterval(function(){
+          var currentToolbar = wrapper.querySelector('.mpld3-toolbar');
+          if(currentToolbar){
+            fixToolbarButtons(currentToolbar);
+          }
+        }, 1000);
+      }
+      
+    }catch(e){console.error('Toolbar init error:', e);}
+  }
+  
+  // 多种方式确保执行时机正确
+  function startInit(){
+    if(document.readyState === 'complete' || document.readyState === 'interactive'){
+      setTimeout(initToolbar, 100);
+    }else{
+      document.addEventListener('DOMContentLoaded', function(){setTimeout(initToolbar, 100);});
+      window.addEventListener('load', function(){setTimeout(initToolbar, 200);});
+    }
+    // 立即尝试一次
+    setTimeout(initToolbar, 50);
+  }
+  
+  startInit();
+})();
+</script></div>
