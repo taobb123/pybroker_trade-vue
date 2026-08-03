@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/stores/auth'
+import { useQuotaStore } from '@/stores/quota'
 
 const auth = useAuthStore()
+const quota = useQuotaStore()
 const router = useRouter()
 
 const form = reactive({
@@ -31,6 +33,7 @@ onMounted(() => {
     return
   }
   syncForm()
+  void quota.refresh()
 })
 
 watch(
@@ -38,12 +41,15 @@ watch(
   () => syncForm(),
 )
 
-function save() {
-  auth.updateProfile({
-    nickname: form.nickname,
-    email: form.email,
-    phone: form.phone,
-  })
+async function save() {
+  try {
+    await auth.updateProfile({
+      nickname: form.nickname,
+      phone: form.phone,
+    })
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e))
+  }
 }
 </script>
 
@@ -77,7 +83,8 @@ function save() {
           </div>
           <div class="space-y-1.5">
             <Label for="acc-email">邮箱</Label>
-            <Input id="acc-email" v-model="form.email" type="email" />
+            <Input id="acc-email" v-model="form.email" type="email" disabled />
+            <p class="text-[11px] text-muted-foreground">邮箱注册后不可修改</p>
           </div>
           <div class="space-y-1.5">
             <Label for="acc-phone">手机号</Label>
@@ -91,6 +98,26 @@ function save() {
           <div class="flex items-center justify-between gap-3">
             <span class="text-muted-foreground">会员等级</span>
             <span class="font-medium">{{ auth.planLabel }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">日运行配额</span>
+            <span class="font-medium">{{ auth.quotaHint }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">今日已用 / 剩余</span>
+            <span class="font-medium tabular-nums">
+              {{ quota.usedToday }}
+              /
+              {{ quota.isUnlimited ? '不限' : quota.remainingToday }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">报告导出</span>
+            <span class="font-medium">{{ quota.canExportReports() ? '已开通' : 'Pro 权益' }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">到期时间</span>
+            <span class="font-mono text-xs">{{ auth.user.expireAt ? new Date(auth.user.expireAt).toLocaleString('zh-CN', { hour12: false }) : '—' }}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
             <span class="text-muted-foreground">邀请码</span>

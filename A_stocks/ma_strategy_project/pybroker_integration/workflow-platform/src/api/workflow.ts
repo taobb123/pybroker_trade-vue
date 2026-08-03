@@ -9,6 +9,7 @@ import type {
   WorkspaceOutput,
   WorkspacePathRef,
 } from '@/api/types'
+import { resolveStepTier } from '@/config/businessRules'
 
 export type { WorkflowStep, RunResult, RunPayload, TablePreview } from '@/api/types'
 
@@ -62,6 +63,11 @@ function mapStep(s: Record<string, unknown>): WorkflowStep {
     type,
     tool: s.tool ? String(s.tool) : undefined,
     category: mapCategory(s),
+    tier: resolveStepTier({
+      id: String(s.id ?? s.name),
+      tier: s.tier,
+      highlight: s.highlight,
+    }),
     description: s.note ? String(s.note) : s.frequency_note ? String(s.frequency_note) : undefined,
     tags,
     note: s.note ? String(s.note) : undefined,
@@ -121,6 +127,7 @@ const MOCK_STEPS: WorkflowStep[] = [
     title: '市场温度计 - 每日仓位报告',
     type: 'script',
     highlight: 'core',
+    tier: 'advanced',
     frequency: 'daily',
     frequency_note: 'V2.3',
     run_modes: [
@@ -137,6 +144,7 @@ const MOCK_STEPS: WorkflowStep[] = [
     title: '形态建仓信号（突破回踩 / 下跌放量反转）',
     type: 'script',
     highlight: 'chain',
+    tier: 'advanced',
     frequency: 'daily',
     frequency_note: '跟随 fetch_vp_six_combo · combo4+6',
     symbols_paste: true,

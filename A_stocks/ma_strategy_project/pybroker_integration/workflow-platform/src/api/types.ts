@@ -35,6 +35,8 @@ export type WorkflowStep = {
   /** frontend_tool 时的工具名，如 filter_stock_codes */
   tool?: string
   category: 'daily' | 'biweekly' | 'tool' | 'core' | 'chain' | 'weekly'
+  /** 会员门控：缺省 basic；advanced 需 Pro/Team */
+  tier?: 'basic' | 'advanced'
   description?: string
   tags?: string[]
   note?: string

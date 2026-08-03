@@ -1,8 +1,20 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { type PlanTier, useAuthStore } from '@/stores/auth'
+import { PLAN_RULES } from '@/config/businessRules'
+import { useQuotaStore } from '@/stores/quota'
+import { apiSetMembershipFree } from '@/api/membership'
+import {
+  createPaymentOrder,
+  listPaymentOrders,
+  simulatePaymentCallbackFail,
+  simulatePaymentPay,
+  type PaymentChannelId,
+  type ServerPaymentOrder,
+} from '@/api/payment'
 
-export type OrderStatus = 'paid' | 'pending' | 'cancelled'
+export type OrderStatus = 'paid' | 'pending' | 'cancelled' | 'failed'
+export type BillingChannel = PaymentChannelId | 'local'
 
 export interface BillingOrder {
   id: string
@@ -10,112 +22,148 @@ export interface BillingOrder {
   amountYuan: number
   status: OrderStatus
   paidAt: string
-  channel: 'mock'
+  channel: BillingChannel
+  periodDays?: number
 }
 
-const ORDERS_KEY = 'workflow-platform:billing-orders:v1'
+export const PLAN_CATALOG = (['free', 'pro', 'team'] as PlanTier[]).map((id) => {
+  const r = PLAN_RULES[id]
+  return {
+    id: r.id,
+    name: r.name,
+    priceLabel: r.priceLabel,
+    amountYuan: r.priceYuanPerMonth,
+    purchasable: r.purchasable,
+    features: r.features,
+    cta: r.cta,
+    dailyRunQuota: r.dailyRunQuota,
+  }
+})
 
-export const PLAN_CATALOG: Array<{
-  id: PlanTier
-  name: string
-  priceLabel: string
-  amountYuan: number
-  purchasable: boolean
-  features: string[]
-  cta: string
-}> = [
-  {
-    id: 'free',
-    name: 'Free',
-    priceLabel: '¥0',
-    amountYuan: 0,
-    purchasable: true,
-    features: ['基础工作流', '每天有限次数', '本地运行历史'],
-    cta: '使用 Free',
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    priceLabel: '¥39 / 月',
-    amountYuan: 39,
-    purchasable: true,
-    features: ['更高运行次数', '高级策略', '云端保存（预留）'],
-    cta: '升级 Pro',
-  },
-  {
-    id: 'team',
-    name: 'Team',
-    priceLabel: '联系客服',
-    amountYuan: 0,
-    purchasable: false,
-    features: ['席位协作（预留）', '统一账单', '优先支持'],
-    cta: '联系客服',
-  },
-]
-
-function loadOrders(): BillingOrder[] {
-  try {
-    const raw = localStorage.getItem(ORDERS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as BillingOrder[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
+function fromServerOrder(order: ServerPaymentOrder): BillingOrder {
+  return {
+    id: order.id,
+    plan: order.plan as PlanTier,
+    amountYuan: order.amount_yuan,
+    status: order.status,
+    paidAt: order.paid_at || order.created_at,
+    channel: order.channel,
+    periodDays: order.period_days,
   }
 }
 
-function persistOrders(list: BillingOrder[]) {
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(list))
-}
-
-function orderId() {
-  const t = new Date()
-  const stamp = [
-    t.getFullYear(),
-    String(t.getMonth() + 1).padStart(2, '0'),
-    String(t.getDate()).padStart(2, '0'),
-    String(t.getHours()).padStart(2, '0'),
-    String(t.getMinutes()).padStart(2, '0'),
-    String(t.getSeconds()).padStart(2, '0'),
-  ].join('')
-  return `ORD-${stamp}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
-}
-
 export const useBillingStore = defineStore('billing', () => {
-  const orders = ref<BillingOrder[]>(loadOrders())
+  const orders = ref<BillingOrder[]>([])
 
   const sortedOrders = computed(() =>
     [...orders.value].sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1)),
   )
 
-  function mockCheckout(plan: PlanTier): { ok: boolean; reason?: string } {
+  async function refreshOrders() {
+    try {
+      const list = await listPaymentOrders()
+      orders.value = list.map(fromServerOrder)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function applyPaidAndSync(serverOrder: ServerPaymentOrder) {
+    const auth = useAuthStore()
+    const quota = useQuotaStore()
+    if (serverOrder.status !== 'paid') {
+      return { ok: false as const, reason: '订单未支付' }
+    }
+    await auth.bootstrap()
+    await quota.refresh()
+    await refreshOrders()
+    return { ok: true as const, order: fromServerOrder(serverOrder) }
+  }
+
+  async function switchToFree(): Promise<{ ok: boolean; reason?: string }> {
+    const auth = useAuthStore()
+    const quota = useQuotaStore()
+    if (!auth.user) return { ok: false, reason: '请先登录' }
+    try {
+      await apiSetMembershipFree()
+      await auth.bootstrap()
+      await quota.refresh()
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  async function checkoutPro(channel: PaymentChannelId): Promise<{ ok: boolean; reason?: string }> {
     const auth = useAuthStore()
     if (!auth.user) return { ok: false, reason: '请先登录' }
 
-    const item = PLAN_CATALOG.find((p) => p.id === plan)
-    if (!item) return { ok: false, reason: '未知套餐' }
-    if (!item.purchasable) return { ok: false, reason: 'Team 请联系客服' }
+    try {
+      const created = await createPaymentOrder({
+        plan: 'pro',
+        channel,
+      })
+      orders.value = [fromServerOrder(created.order), ...orders.value.filter((o) => o.id !== created.order.id)]
 
-    if (plan !== 'free') {
-      const order: BillingOrder = {
-        id: orderId(),
-        plan,
-        amountYuan: item.amountYuan,
-        status: 'paid',
-        paidAt: new Date().toISOString(),
-        channel: 'mock',
-      }
-      orders.value = [order, ...orders.value]
-      persistOrders(orders.value)
+      const paid = await simulatePaymentPay(created.order.id)
+      const applied = await applyPaidAndSync(paid)
+      if (!applied.ok) return applied
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
     }
+  }
 
-    auth.setPlan(plan)
-    return { ok: true }
+  /** 只下单，不回调——留下 pending 供 Admin 纠偏 */
+  async function createProPending(
+    channel: PaymentChannelId,
+  ): Promise<{ ok: boolean; reason?: string; orderId?: string }> {
+    const auth = useAuthStore()
+    if (!auth.user) return { ok: false, reason: '请先登录' }
+    try {
+      const created = await createPaymentOrder({ plan: 'pro', channel })
+      orders.value = [
+        fromServerOrder(created.order),
+        ...orders.value.filter((o) => o.id !== created.order.id),
+      ]
+      await refreshOrders()
+      return { ok: true, orderId: created.order.id }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  /** 下单后模拟渠道回调失败 → failed */
+  async function createProThenFailCallback(
+    channel: PaymentChannelId,
+  ): Promise<{ ok: boolean; reason?: string; orderId?: string }> {
+    const auth = useAuthStore()
+    if (!auth.user) return { ok: false, reason: '请先登录' }
+    try {
+      const created = await createPaymentOrder({ plan: 'pro', channel })
+      const failed = await simulatePaymentCallbackFail(created.order.id, channel)
+      orders.value = [
+        fromServerOrder(failed),
+        ...orders.value.filter((o) => o.id !== failed.id),
+      ]
+      await refreshOrders()
+      return {
+        ok: true,
+        orderId: failed.id,
+        reason: `回调失败，订单 ${failed.id} 已标记 failed`,
+      }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+    }
   }
 
   return {
     orders,
     sortedOrders,
-    mockCheckout,
+    refreshOrders,
+    switchToFree,
+    checkoutPro,
+    createProPending,
+    createProThenFailCallback,
   }
 })

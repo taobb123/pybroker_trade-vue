@@ -1,35 +1,30 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-chcp 65001 >nul
+
 title workflow_server :8765
 
 where python >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] 未找到 python，请先安装并加入 PATH。
+  echo [ERROR] python not found. Install Python and add it to PATH.
   pause
   exit /b 1
 )
 
-REM 若 8765 已在监听，则不再重复启动
-powershell -NoProfile -Command "try { $c = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction Stop; if ($c) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
-if not errorlevel 1 (
-  echo [OK] workflow_server 已在 127.0.0.1:8765 运行，跳过启动。
-  echo 浏览器旧台: http://127.0.0.1:8765/
-  timeout /t 3 >nul
-  exit /b 0
-)
+REM If port 8765 is already listening, kill old process so new code is loaded.
+powershell -NoProfile -Command "try { $cs = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction Stop; foreach ($c in @($cs)) { if ($c.OwningProcess) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue } } } catch { }" >nul 2>&1
+timeout /t 1 >nul
 
-echo 启动 workflow_server ...
+echo Starting workflow_server ...
 echo   http://127.0.0.1:8765/
-echo 关闭本窗口即停止后端。
+echo Close this window to stop the backend.
 echo.
 
 python -m uvicorn workflow_server:app --host 127.0.0.1 --port 8765
 set EXITCODE=%ERRORLEVEL%
 if not "%EXITCODE%"=="0" (
   echo.
-  echo [ERROR] workflow_server 退出码 %EXITCODE%
+  echo [ERROR] workflow_server exit code %EXITCODE%
   pause
 )
 exit /b %EXITCODE%

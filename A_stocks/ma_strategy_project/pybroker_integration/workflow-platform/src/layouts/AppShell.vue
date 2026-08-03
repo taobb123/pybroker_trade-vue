@@ -7,6 +7,7 @@ import {
   History,
   FileBarChart2,
   Activity,
+  Shield,
 } from '@lucide/vue'
 import {
   Sidebar,
@@ -27,28 +28,38 @@ import {
 import { Separator } from '@/components/ui/separator'
 import BackToTop from '@/components/BackToTop.vue'
 import UserAccountMenu from '@/components/account/UserAccountMenu.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 const mainScroll = ref<HTMLElement | null>(null)
 
-const nav = [
-  { to: '/', label: '总览', icon: LayoutDashboard },
-  { to: '/usage', label: '用量', icon: Activity },
-  { to: '/workflows', label: '工作流', icon: Workflow },
-  { to: '/runs', label: '运行记录', icon: History },
-  { to: '/reports', label: '报告', icon: FileBarChart2 },
-] as const
+const nav = computed(() => {
+  const base = [
+    { to: '/', label: '总览', icon: LayoutDashboard },
+    { to: '/usage', label: '用量', icon: Activity },
+    { to: '/workflows', label: '工作流', icon: Workflow },
+    { to: '/runs', label: '运行记录', icon: History },
+    { to: '/reports', label: '报告', icon: FileBarChart2 },
+  ]
+  if (auth.user?.role === 'admin') {
+    base.push({ to: '/admin', label: '管理', icon: Shield })
+  }
+  return base
+})
 
 const pageTitle = computed(() => {
   const metaTitle = route.meta.title
   if (typeof metaTitle === 'string' && metaTitle) return metaTitle
-  const hit = nav.find((n) => n.to === route.path)
+  const hit = nav.value.find((n) => n.to === route.path)
   return hit?.label ?? '工作流平台'
 })
 
 const isNarrow = computed(() => route.path === '/account')
 const contentMax = computed(() => {
-  if (route.path.startsWith('/billing') || route.path === '/usage') return 'max-w-5xl'
+  if (route.path.startsWith('/billing') || route.path === '/usage' || route.path === '/admin') {
+    return 'max-w-5xl'
+  }
   if (isNarrow.value) return 'max-w-lg'
   return 'max-w-4xl'
 })

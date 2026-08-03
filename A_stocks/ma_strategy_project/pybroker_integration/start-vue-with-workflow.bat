@@ -1,26 +1,26 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-chcp 65001 >nul
-title Vue 工作流平台 - 后端+前端
+
+title Vue Workflow Platform
 
 echo ========================================
-echo  Vue 工作流平台一键启动
+echo  Vue Workflow Platform
 echo  1^) workflow_server  :8765
-echo  2^) Vue 前端         :5173
+echo  2^) Vue frontend     :5173
 echo ========================================
 echo.
 
 where python >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] 未找到 python，请先安装并加入 PATH。
+  echo [ERROR] python not found. Install Python and add it to PATH.
   pause
   exit /b 1
 )
 
 where npm >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] 未找到 npm，请先安装 Node.js 并加入 PATH。
+  echo [ERROR] npm not found. Install Node.js and add it to PATH.
   pause
   exit /b 1
 )
@@ -30,17 +30,17 @@ set "FRONT=%~dp0workflow-platform"
 set "URL=http://127.0.0.1:5173/"
 
 if not exist "%API_BAT%" (
-  echo [ERROR] 缺少 start-workflow-server.bat
+  echo [ERROR] missing start-workflow-server.bat
   pause
   exit /b 1
 )
 if not exist "%FRONT%\package.json" (
-  echo [ERROR] 缺少 workflow-platform
+  echo [ERROR] missing workflow-platform
   pause
   exit /b 1
 )
 
-echo [1/2] 启动 / 复用 backend :8765 ...
+echo [1/2] Starting backend :8765 ...
 start "workflow_server :8765" "%API_BAT%"
 
 cd /d "%FRONT%"
@@ -54,8 +54,9 @@ if not exist "node_modules\" (
   )
 )
 
-echo [2/2] 启动 Vue :5173 ...
-echo 关闭本窗口停止前端；后端在另一窗口，关那个窗口才停 API。
+echo [2/2] Starting Vue :5173 ...
+echo Close this window to stop frontend.
+echo Close the backend window to stop API.
 echo.
 
 start "" /b powershell -NoProfile -ExecutionPolicy Bypass -File "%FRONT%\wait-and-open.ps1" -Url "%URL%" -TimeoutSec 90
@@ -64,7 +65,7 @@ call npm run dev
 set EXITCODE=%ERRORLEVEL%
 if not "%EXITCODE%"=="0" (
   echo.
-  echo [ERROR] Vite 退出码 %EXITCODE%
+  echo [ERROR] Vite exit code %EXITCODE%
   pause
 )
 exit /b %EXITCODE%

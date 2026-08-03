@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { fetchWorkspaceFile } from '@/api/workflow'
 import { copyTextToClipboard } from '@/api/tableCopy'
+import { trackEvent } from '@/api/events'
+import { useQuotaStore } from '@/stores/quota'
 
 const props = defineProps<{
   path: string
 }>()
 
+const quota = useQuotaStore()
+const router = useRouter()
 const loading = ref(false)
 const exists = ref(false)
 const raw = ref('')
@@ -39,6 +44,12 @@ async function load(path: string) {
 }
 
 async function onCopy() {
+  const gate = quota.assertCanExport()
+  if (!gate.ok) {
+    alert(gate.reason)
+    void router.push('/billing/plans')
+    return
+  }
   if (!raw.value.trim()) {
     alert('文本无内容可复制。')
     return
@@ -48,6 +59,7 @@ async function onCopy() {
     alert('复制失败，请手动选中文本复制。')
     return
   }
+  trackEvent('export_report', { kind: 'text_copy', path: props.path })
   copyFlash.value = '已复制'
   if (copyFlashTimer) clearTimeout(copyFlashTimer)
   copyFlashTimer = setTimeout(() => {
@@ -69,7 +81,15 @@ watch(
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="font-mono text-[11px] text-muted-foreground">{{ path || '未选择文本' }}</p>
       <Button
-        v-if="exists && raw"
+        v-if="exists && raw && !quota.canExportReports()"
+        size="sm"
+        variant="outline"
+        @click="router.push('/billing/plans')"
+      >
+        导出需 Pro
+      </Button>
+      <Button
+        v-else-if="exists && raw"
         size="sm"
         variant="outline"
         class="border-rose-300 text-rose-700 hover:bg-rose-50"
@@ -88,6 +108,7 @@ watch(
         <template v-if="nonEmptyLineCount !== lineCount">
           （非空 {{ nonEmptyLineCount }}）
         </template>
+        <template v-if="!quota.canExportReports()"> · 复制需 Pro</template>
       </p>
       <pre
         class="max-h-[min(70vh,720px)] overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed"

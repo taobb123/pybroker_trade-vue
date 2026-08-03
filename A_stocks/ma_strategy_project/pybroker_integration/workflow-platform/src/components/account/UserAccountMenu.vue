@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { ChevronsUpDown, CreditCard, LogOut, Settings, UserRound } from '@lucide/vue'
+import { ChevronsUpDown, CreditCard, LogOut, Settings, Shield, UserRound } from '@lucide/vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +84,10 @@ function logout() {
             <DropdownMenuItem @click="go('/billing/plans')">
               <CreditCard />
               会员 / 账单
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="auth.user.role === 'admin'" @click="go('/admin')">
+              <Shield />
+              管理后台
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" @click="logout">

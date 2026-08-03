@@ -51,8 +51,11 @@ function openOutput(path: string) {
   void router.push('/reports')
 }
 
-function onRun() {
-  void store.runStep(props.step)
+async function onRun() {
+  const result = await store.runStep(props.step)
+  if (result && 'blocked' in result && result.blocked) {
+    alert(result.reason)
+  }
 }
 </script>
 

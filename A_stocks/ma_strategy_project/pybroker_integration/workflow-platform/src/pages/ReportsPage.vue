@@ -37,6 +37,7 @@ import {
   tableRowsToCopyText,
 } from '@/api/tableCopy'
 import { fetchWorkspaceTable, resolveLatestGlob, type TablePreview } from '@/api/workflow'
+import { trackEvent } from '@/api/events'
 import {
   isImageWorkspacePath,
   isMarkdownWorkspacePath,
@@ -44,8 +45,12 @@ import {
 } from '@/api/workspacePreview'
 import { isPathOutput, type WorkspaceOutput } from '@/api/types'
 import { useWorkflowStore } from '@/stores/workflow'
+import { useQuotaStore } from '@/stores/quota'
+import { useRouter } from 'vue-router'
 
 const store = useWorkflowStore()
+const quota = useQuotaStore()
+const router = useRouter()
 const tableLoading = ref(false)
 const tableData = ref<TablePreview | null>(null)
 const copyFlash = ref('')
@@ -124,6 +129,12 @@ function flashCopied(_label: string) {
 }
 
 async function onCopyTable() {
+  const gate = quota.assertCanExport()
+  if (!gate.ok) {
+    alert(gate.reason)
+    void router.push('/billing/plans')
+    return
+  }
   const data = tableData.value
   const path = activePath.value
   if (!data?.headers?.length || !data.rows) {
@@ -141,6 +152,7 @@ async function onCopyTable() {
       alert('复制失败，请手动选中表格复制。')
       return
     }
+    trackEvent('export_report', { kind: 'table_copy', path })
     flashCopied('复制全部')
     return
   }
@@ -158,7 +170,40 @@ async function onCopyTable() {
     alert('复制失败，请手动选中表格复制。')
     return
   }
+  trackEvent('export_report', { kind: 'codes_copy', path })
   flashCopied('复制股票代码列')
+}
+
+function onDownloadCsv() {
+  const gate = quota.assertCanExport()
+  if (!gate.ok) {
+    alert(gate.reason)
+    void router.push('/billing/plans')
+    return
+  }
+  const data = tableData.value
+  if (!data?.headers?.length || !data.rows) {
+    alert('表格无内容可导出。')
+    return
+  }
+  const escape = (cell: unknown) => {
+    const s = String(cell ?? '')
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+  const lines = [
+    data.headers.map(escape).join(','),
+    ...data.rows.map((row) => row.map(escape).join(',')),
+  ]
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const base = (activePath.value.split(/[/\\]/).pop() || 'export.csv').replace(/\.csv$/i, '')
+  a.href = url
+  a.download = `${base}-export.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  trackEvent('export_report', { kind: 'csv_download', path: activePath.value })
 }
 
 function syncTabToPath(path: string) {
@@ -360,16 +405,36 @@ async function onPickOutput(out: WorkspaceOutput) {
             <template v-else>
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="font-mono text-[11px] text-muted-foreground">{{ activePath || '未选择表' }}</p>
-                <Button
-                  v-if="canCopyTable"
-                  size="sm"
-                  variant="outline"
-                  class="border-rose-300 text-rose-700 hover:bg-rose-50"
-                  @click="onCopyTable"
-                >
-                  {{ copyFlash || (activeIsTodayHighLow ? '复制全部' : '复制股票代码列') }}
-                </Button>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Button
+                    v-if="canCopyTable && !quota.canExportReports()"
+                    size="sm"
+                    variant="outline"
+                    @click="router.push('/billing/plans')"
+                  >
+                    导出需 Pro
+                  </Button>
+                  <template v-else-if="canCopyTable">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      class="border-rose-300 text-rose-700 hover:bg-rose-50"
+                      @click="onCopyTable"
+                    >
+                      {{ copyFlash || (activeIsTodayHighLow ? '复制全部' : '复制股票代码列') }}
+                    </Button>
+                    <Button size="sm" variant="outline" @click="onDownloadCsv">
+                      下载 CSV
+                    </Button>
+                  </template>
+                </div>
               </div>
+              <p
+                v-if="canCopyTable && !quota.canExportReports()"
+                class="text-[11px] text-muted-foreground"
+              >
+                可预览表格；复制 / 下载为 Pro 权益（report.export）
+              </p>
               <p v-if="tableLoading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
               <template v-else-if="tableData">
                 <p

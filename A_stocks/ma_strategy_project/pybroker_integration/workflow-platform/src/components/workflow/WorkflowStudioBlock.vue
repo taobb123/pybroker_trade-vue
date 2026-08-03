@@ -67,6 +67,8 @@ import {
   workspacePathSuffix,
 } from '@/api/workspacePreview'
 import { useWorkflowStore } from '@/stores/workflow'
+import { useQuotaStore } from '@/stores/quota'
+import { isAdvancedStep } from '@/config/businessRules'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -77,7 +79,11 @@ const props = defineProps<{
 }>()
 
 const store = useWorkflowStore()
+const quota = useQuotaStore()
 const router = useRouter()
+
+const isAdvanced = computed(() => isAdvancedStep(props.step))
+const advancedLocked = computed(() => isAdvanced.value && !quota.canRunAdvanced())
 const draft = computed(() => store.ensureDraft(props.step))
 
 const strategyOpen = ref(false)
@@ -194,6 +200,7 @@ const durationLabel = computed(() => {
 })
 
 const busyOrRunning = computed(() => Boolean(props.busy || running.value))
+const runDisabled = computed(() => busyOrRunning.value || advancedLocked.value)
 
 const tableOutputs = computed(() =>
   (props.step.workspaceOutputs ?? []).filter(
@@ -353,6 +360,11 @@ function collapseTable() {
 }
 
 async function onRun() {
+  if (advancedLocked.value) {
+    alert('该策略为高级策略，当前档位不可用。请升级 Pro / Team 后运行。')
+    void router.push('/billing/plans')
+    return
+  }
   if (strategies.value[0]?.kind === 'combo' && draft.value.symbolsText.trim() && !draft.value.comboId) {
     alert('粘贴股票列表时请先选择形态 ID（策略）')
     strategyOpen.value = true
@@ -361,7 +373,11 @@ async function onRun() {
   running.value = true
   const result = await store.runStep(props.step, { openSheet: false })
   running.value = false
-  if (result?.exit_code === 0) {
+  if (result && 'blocked' in result && result.blocked) {
+    alert(result.reason)
+    return
+  }
+  if (result && 'exit_code' in result && result.exit_code === 0) {
     tableExpanded.value = true
     tableVisible.value = true
     await loadRecentPreview(true)
@@ -473,6 +489,9 @@ watch([tableHost, tableExpanded], () => {
             >
               小工具 · 即时
             </Badge>
+            <Badge v-else-if="isAdvanced" variant="secondary">
+              高级 · Pro
+            </Badge>
           </div>
           <div v-if="!isCodeFilterTool" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span :class="cn('font-medium', statusClass)">● {{ statusLabel }}</span>
@@ -519,11 +538,20 @@ watch([tableHost, tableExpanded], () => {
           <Button
             v-if="step.runnable"
             size="sm"
-            :disabled="busyOrRunning"
+            :disabled="runDisabled"
+            :title="advancedLocked ? '高级策略 · 需 Pro / Team' : undefined"
             @click="onRun"
           >
             <Play class="size-3.5" />
-            运行
+            {{ advancedLocked ? '需 Pro' : '运行' }}
+          </Button>
+          <Button
+            v-if="advancedLocked"
+            size="sm"
+            variant="outline"
+            @click="router.push('/billing/plans')"
+          >
+            升级
           </Button>
           <Button
             v-if="step.runnable"

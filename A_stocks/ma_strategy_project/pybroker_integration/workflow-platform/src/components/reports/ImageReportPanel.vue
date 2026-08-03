@@ -1,21 +1,29 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Button } from '@/components/ui/button'
 import { workspaceMediaUrl } from '@/api/workspacePreview'
+import { trackEvent } from '@/api/events'
+import { useQuotaStore } from '@/stores/quota'
 
 const props = defineProps<{
   path: string
 }>()
 
+const quota = useQuotaStore()
+const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const objectUrl = ref('')
 const note = ref('')
+const blobRef = ref<Blob | null>(null)
 
 function revoke() {
   if (objectUrl.value) {
     URL.revokeObjectURL(objectUrl.value)
     objectUrl.value = ''
   }
+  blobRef.value = null
 }
 
 async function load(path: string) {
@@ -39,6 +47,7 @@ async function load(path: string) {
       return
     }
     const blob = await res.blob()
+    blobRef.value = blob
     objectUrl.value = URL.createObjectURL(blob)
     note.value = '图形预览加载中…'
   } catch (e) {
@@ -50,12 +59,29 @@ async function load(path: string) {
 
 function onImgLoad(ev: Event) {
   const img = ev.target as HTMLImageElement
-  note.value = `图形预览 · ${img.naturalWidth || '?'}×${img.naturalHeight || '?'}px。可右键另存。`
+  note.value = `图形预览 · ${img.naturalWidth || '?'}×${img.naturalHeight || '?'}px`
 }
 
 function onImgError() {
   error.value = '图片解码失败。'
   revoke()
+}
+
+function onDownload() {
+  const gate = quota.assertCanExport()
+  if (!gate.ok) {
+    alert(gate.reason)
+    void router.push('/billing/plans')
+    return
+  }
+  if (!blobRef.value) return
+  const url = URL.createObjectURL(blobRef.value)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = props.path.split(/[/\\]/).pop() || 'chart.png'
+  a.click()
+  URL.revokeObjectURL(url)
+  trackEvent('export_report', { kind: 'image_download', path: props.path })
 }
 
 watch(
@@ -71,11 +97,32 @@ onBeforeUnmount(revoke)
 
 <template>
   <div class="space-y-2">
-    <p class="font-mono text-[11px] text-muted-foreground">{{ path || '未选择图形' }}</p>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="font-mono text-[11px] text-muted-foreground">{{ path || '未选择图形' }}</p>
+      <Button
+        v-if="objectUrl && !quota.canExportReports()"
+        size="sm"
+        variant="outline"
+        @click="router.push('/billing/plans')"
+      >
+        下载需 Pro
+      </Button>
+      <Button
+        v-else-if="objectUrl"
+        size="sm"
+        variant="outline"
+        @click="onDownload"
+      >
+        下载图片
+      </Button>
+    </div>
     <p v-if="loading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
     <p v-else-if="error" class="py-8 text-center text-sm text-amber-800">{{ error }}</p>
     <template v-else-if="objectUrl">
-      <p class="text-[11px] text-muted-foreground">{{ note }}</p>
+      <p class="text-[11px] text-muted-foreground">
+        {{ note }}
+        <template v-if="!quota.canExportReports()"> · 下载需 Pro</template>
+      </p>
       <div class="flex max-h-[min(95vh,2880px)] justify-center overflow-auto rounded-lg border bg-muted/20 p-3">
         <img
           :src="objectUrl"

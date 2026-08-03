@@ -46,7 +46,10 @@ async function runRecentStep(run: RunRecord, ev: Event) {
     void router.push({ path: '/workflows', query: { step: run.stepId } })
     return
   }
-  await store.runStep(step, { openSheet: false })
+  const result = await store.runStep(step, { openSheet: false })
+  if (result && 'blocked' in result && result.blocked) {
+    alert(result.reason)
+  }
 }
 </script>
 

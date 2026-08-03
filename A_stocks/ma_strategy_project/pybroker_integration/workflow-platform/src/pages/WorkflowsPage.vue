@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import WorkflowStudioBlock from '@/components/workflow/WorkflowStudioBlock.vue'
 import OutputSheet from '@/components/workflow/OutputSheet.vue'
 import { useWorkflowStore } from '@/stores/workflow'
+import { useQuotaStore } from '@/stores/quota'
 
 const store = useWorkflowStore()
+const quota = useQuotaStore()
 const route = useRoute()
+const router = useRouter()
 const query = ref('')
 const category = ref<'all' | 'daily' | 'biweekly' | 'core' | 'chain'>('all')
 const focusStepId = ref('')
 const expandAdvancedFor = ref('')
+
+const quotaTone = computed(() => {
+  if (quota.isUnlimited) return 'text-muted-foreground'
+  if (quota.remainingToday <= 0) return 'text-destructive'
+  if (quota.remainingToday <= 2) return 'text-amber-600'
+  return 'text-muted-foreground'
+})
 
 const filters = [
   ['all', '全部'],
@@ -64,6 +74,7 @@ async function focusStepFromRoute() {
 
 onMounted(async () => {
   await store.loadSteps()
+  void quota.refresh()
   await focusStepFromRoute()
 })
 
@@ -77,6 +88,32 @@ watch(
 
 <template>
   <div class="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
+    <div
+      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
+      :class="quota.remainingToday <= 0 && !quota.isUnlimited ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/30'"
+    >
+      <div class="space-y-0.5">
+        <p :class="['font-medium', quotaTone]">{{ quota.summaryLabel }}</p>
+        <p class="text-muted-foreground">
+          档位规则：{{ quota.planQuotaHint }} · 发起即计次 · 每分钟最多 10 次
+        </p>
+      </div>
+      <Button
+        v-if="!quota.isUnlimited && quota.remainingToday <= 0"
+        size="sm"
+        @click="router.push('/billing/plans')"
+      >
+        升级会员
+      </Button>
+    </div>
+
+    <div
+      v-if="quota.blockMessage"
+      class="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+    >
+      {{ quota.blockMessage }}
+    </div>
+
     <div class="flex flex-wrap items-center gap-2">
       <Input
         v-model="query"

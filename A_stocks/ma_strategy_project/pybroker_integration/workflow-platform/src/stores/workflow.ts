@@ -21,6 +21,12 @@ import {
   type WorkspaceOutput,
 } from '@/api/types'
 import { chainDcConceptToVpSixCombo } from '@/api/dcConceptChain'
+import { useQuotaStore } from '@/stores/quota'
+
+export type RunStepOutcome =
+  | RunResult
+  | { blocked: true; reason: string }
+  | undefined
 
 export const useWorkflowStore = defineStore('workflow', () => {
   const steps = ref<WorkflowStep[]>([])
@@ -72,11 +78,24 @@ export const useWorkflowStore = defineStore('workflow', () => {
     persistRuns()
   }
 
-  async function runStep(step: WorkflowStep, opts?: { openSheet?: boolean }) {
+  async function runStep(step: WorkflowStep, opts?: { openSheet?: boolean }): Promise<RunStepOutcome> {
     if (!step.runnable) return
+
+    const quota = useQuotaStore()
+    const gate = quota.assertCanRun(step)
+    if (!gate.ok) {
+      return { blocked: true, reason: gate.reason }
+    }
+
     const draft = ensureDraft(step)
     const payload = collectRunPayload(step, draft)
     if (payload === null) return
+
+    // 按规则：发起即计次（含后续失败）
+    const consumed = await quota.consume()
+    if (!consumed.ok) {
+      return { blocked: true, reason: consumed.reason }
+    }
 
     activeStep.value = step
     if (opts?.openSheet !== false) sheetOpen.value = true

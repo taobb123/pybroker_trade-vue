@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import KpiCard from '@/components/tremor/KpiCard.vue'
 import BarList from '@/components/tremor/BarList.vue'
 import UsageTrendChart from '@/components/charts/UsageTrendChart.vue'
 import { useUsageStore } from '@/stores/usage'
+import { fetchFunnel, type FunnelStep } from '@/api/events'
+import { useAuthStore } from '@/stores/auth'
 
 const usage = useUsageStore()
+const auth = useAuthStore()
+const funnel = ref<FunnelStep[]>([])
+const funnelError = ref('')
 
 const todayDelta = computed(() => {
   const pct = usage.kpi.todayDeltaPct
@@ -20,6 +25,24 @@ const todayTone = computed(() => {
   if (pct < 0) return 'down' as const
   return 'neutral' as const
 })
+
+const funnelBars = computed(() => {
+  const max = Math.max(1, ...funnel.value.map((s) => s.count))
+  return funnel.value.map((s) => ({
+    name: s.label,
+    value: s.count,
+    share: Math.round((s.count / max) * 100),
+  }))
+})
+
+onMounted(async () => {
+  if (!auth.isAuthenticated) return
+  try {
+    funnel.value = await fetchFunnel()
+  } catch (e) {
+    funnelError.value = e instanceof Error ? e.message : String(e)
+  }
+})
 </script>
 
 <template>
@@ -27,9 +50,43 @@ const todayTone = computed(() => {
     <div>
       <h2 class="text-base font-semibold tracking-tight">用量 / 访问</h2>
       <p class="text-xs text-muted-foreground">
-        平台访问与用量统计 · 与工作流总览分离 · 访问量为 Mock · 运行次数来自本地历史
+        M4 转化漏斗来自服务端 events · 下方访问趋势仍为 Mock 样板
       </p>
     </div>
+
+    <Card class="shadow-none">
+      <CardHeader class="pb-2">
+        <CardTitle class="text-sm font-semibold">转化漏斗（独立用户数）</CardTitle>
+        <CardDescription>
+          page_view → 注册 → run → 升级点击 → 支付成功
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p v-if="!auth.isAuthenticated" class="text-xs text-muted-foreground">登录后查看漏斗</p>
+        <p v-else-if="funnelError" class="text-xs text-destructive">{{ funnelError }}</p>
+        <div v-else-if="!funnel.length" class="text-xs text-muted-foreground">暂无数据</div>
+        <div v-else class="space-y-3">
+          <div class="grid gap-2 sm:grid-cols-5">
+            <div
+              v-for="s in funnel"
+              :key="s.key"
+              class="rounded-lg border px-3 py-2 text-center"
+            >
+              <p class="text-lg font-semibold tabular-nums">{{ s.count }}</p>
+              <p class="text-[11px] text-muted-foreground">{{ s.label }}</p>
+            </div>
+          </div>
+          <BarList
+            :items="
+              funnelBars.map((b) => ({
+                name: b.name,
+                value: b.value,
+              }))
+            "
+          />
+        </div>
+      </CardContent>
+    </Card>
 
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard
@@ -59,7 +116,7 @@ const todayTone = computed(() => {
     <Card class="shadow-none">
       <CardHeader class="pb-2">
         <CardTitle class="text-sm font-semibold">近 30 天访问</CardTitle>
-        <CardDescription>Mock 趋势 · 后续可接 Umami / 后端聚合</CardDescription>
+        <CardDescription>Mock 趋势 · 真漏斗见上方 events</CardDescription>
       </CardHeader>
       <CardContent>
         <UsageTrendChart :points="usage.trend" />

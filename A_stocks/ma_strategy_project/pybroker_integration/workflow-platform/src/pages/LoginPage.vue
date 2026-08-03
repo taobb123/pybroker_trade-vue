@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth'
+import { useQuotaStore } from '@/stores/quota'
 
 const auth = useAuthStore()
+const quota = useQuotaStore()
 const router = useRouter()
 const route = useRoute()
+const mode = ref<'login' | 'register'>('login')
+const busy = ref(false)
+const error = ref('')
 
 const form = reactive({
   email: 'demo@workflow.local',
+  password: 'demo1234',
+  nickname: '',
   phone: '',
 })
 
@@ -21,21 +28,36 @@ const redirectTo = computed(() => {
   return typeof q === 'string' && q.startsWith('/') ? q : '/'
 })
 
-function submit() {
-  auth.mockLogin({
-    email: form.email,
-    phone: form.phone,
-  })
-  void router.replace(redirectTo.value)
-}
-
-function oneClickDemo() {
-  auth.mockLogin({
-    email: 'demo@workflow.local',
-    phone: '13800000000',
-    nickname: '演示用户',
-  })
-  void router.replace(redirectTo.value)
+async function submit() {
+  error.value = ''
+  busy.value = true
+  try {
+    if (mode.value === 'login') {
+      await auth.login(form.email, form.password)
+    } else {
+      await auth.register({
+        email: form.email,
+        password: form.password,
+        nickname: form.nickname || undefined,
+        phone: form.phone || undefined,
+      })
+    }
+    await quota.refresh()
+    if (!auth.user?.onboardingDone) {
+      // 不把默认「/」带进引导，完成引导后走推荐策略
+      const q =
+        redirectTo.value && redirectTo.value !== '/'
+          ? { redirect: redirectTo.value }
+          : undefined
+      void router.replace({ path: '/onboarding', query: q })
+      return
+    }
+    void router.replace(redirectTo.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
 }
 </script>
 
@@ -43,9 +65,11 @@ function oneClickDemo() {
   <div class="flex min-h-svh items-center justify-center bg-background p-6">
     <Card class="w-full max-w-sm border-border/80 shadow-none">
       <CardHeader class="space-y-1">
-        <CardTitle class="text-xl tracking-tight">登录</CardTitle>
+        <CardTitle class="text-xl tracking-tight">
+          {{ mode === 'login' ? '登录' : '注册' }}
+        </CardTitle>
         <CardDescription>
-          样板模块 · Mock 登录（不接真实 Auth 内核）
+          M3 引导 · 服务端用户/会员 · 演示 demo@workflow.local / demo1234
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -57,40 +81,44 @@ function oneClickDemo() {
               v-model="form.email"
               type="email"
               autocomplete="username"
-              placeholder="name@example.com"
+              required
             />
           </div>
           <div class="space-y-1.5">
-            <Label for="phone">手机号（可选）</Label>
+            <Label for="password">密码</Label>
             <Input
-              id="phone"
-              v-model="form.phone"
-              type="tel"
-              autocomplete="tel"
-              placeholder="国内主路径预留"
+              id="password"
+              v-model="form.password"
+              type="password"
+              autocomplete="current-password"
+              required
+              minlength="6"
             />
           </div>
-          <Button type="submit" class="w-full">
-            继续
+          <template v-if="mode === 'register'">
+            <div class="space-y-1.5">
+              <Label for="nickname">昵称（可选）</Label>
+              <Input id="nickname" v-model="form.nickname" />
+            </div>
+            <div class="space-y-1.5">
+              <Label for="phone">手机号（可选）</Label>
+              <Input id="phone" v-model="form.phone" type="tel" />
+            </div>
+          </template>
+          <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+          <Button type="submit" class="w-full" :disabled="busy">
+            {{ busy ? '请稍候…' : mode === 'login' ? '登录' : '注册并登录' }}
           </Button>
         </form>
 
-        <div class="relative py-1">
-          <div class="absolute inset-0 flex items-center">
-            <span class="w-full border-t" />
-          </div>
-          <div class="relative flex justify-center text-xs uppercase">
-            <span class="bg-card px-2 text-muted-foreground">或</span>
-          </div>
-        </div>
-
-        <Button variant="outline" class="w-full" type="button" @click="oneClickDemo">
-          一键演示登录
+        <Button
+          variant="ghost"
+          class="w-full"
+          type="button"
+          @click="mode = mode === 'login' ? 'register' : 'login'"
+        >
+          {{ mode === 'login' ? '没有账号？注册' : '已有账号？登录' }}
         </Button>
-
-        <p class="text-center text-xs text-muted-foreground">
-          微信 / Google / GitHub 登录 · 下期对接托管 Auth
-        </p>
       </CardContent>
     </Card>
   </div>

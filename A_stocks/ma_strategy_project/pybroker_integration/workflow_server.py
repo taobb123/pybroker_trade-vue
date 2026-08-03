@@ -44,6 +44,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from payment_api import router as payment_router
+from auth_api import router as auth_router, seed_demo_user
+from membership_api import router as membership_router
+from onboarding_api import router as onboarding_router
+from events_api import router as events_router
+from admin_api import router as admin_router, seed_admin_user
+from db import init_db
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "workflow_runner.yaml"
 
@@ -398,6 +406,20 @@ def run_one_step(
 
 
 app = FastAPI(title="Stock pool workflow", version="1.0")
+app.include_router(payment_router)
+app.include_router(auth_router)
+app.include_router(membership_router)
+app.include_router(onboarding_router)
+app.include_router(events_router)
+app.include_router(admin_router)
+
+
+@app.on_event("startup")
+def _mvp_startup() -> None:
+    init_db()
+    seed_demo_user()
+    seed_admin_user()
+
 
 # 可选：同目录下其它静态资源
 static_dir = PROJECT_ROOT / "docs"

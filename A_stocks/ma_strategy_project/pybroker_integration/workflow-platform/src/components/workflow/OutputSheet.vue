@@ -25,6 +25,14 @@ function goReport() {
   void router.push('/reports')
 }
 
+async function onRerun() {
+  if (!store.activeStep) return
+  const result = await store.runStep(store.activeStep)
+  if (result && 'blocked' in result && result.blocked) {
+    alert(result.reason)
+  }
+}
+
 function openOutputLink(out: { path?: string; label: string; glob?: string }) {
   if (store.activeStep && out.path) {
     store.openStepOutput(store.activeStep, out.path)
@@ -85,7 +93,7 @@ function openOutputLink(out: { path?: string; label: string; glob?: string }) {
         <Button
           v-if="store.activeStep"
           :disabled="store.busy"
-          @click="store.runStep(store.activeStep)"
+          @click="onRerun"
         >
           重新运行
         </Button>
