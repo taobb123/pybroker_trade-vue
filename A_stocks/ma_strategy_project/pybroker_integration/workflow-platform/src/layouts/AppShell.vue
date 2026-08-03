@@ -6,10 +6,12 @@ import {
   Workflow,
   History,
   FileBarChart2,
+  Activity,
 } from '@lucide/vue'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -24,20 +26,31 @@ import {
 } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import BackToTop from '@/components/BackToTop.vue'
+import UserAccountMenu from '@/components/account/UserAccountMenu.vue'
 
 const route = useRoute()
 const mainScroll = ref<HTMLElement | null>(null)
 
 const nav = [
   { to: '/', label: '总览', icon: LayoutDashboard },
+  { to: '/usage', label: '用量', icon: Activity },
   { to: '/workflows', label: '工作流', icon: Workflow },
   { to: '/runs', label: '运行记录', icon: History },
   { to: '/reports', label: '报告', icon: FileBarChart2 },
 ] as const
 
 const pageTitle = computed(() => {
+  const metaTitle = route.meta.title
+  if (typeof metaTitle === 'string' && metaTitle) return metaTitle
   const hit = nav.find((n) => n.to === route.path)
   return hit?.label ?? '工作流平台'
+})
+
+const isNarrow = computed(() => route.path === '/account')
+const contentMax = computed(() => {
+  if (route.path.startsWith('/billing') || route.path === '/usage') return 'max-w-5xl'
+  if (isNarrow.value) return 'max-w-lg'
+  return 'max-w-4xl'
 })
 </script>
 
@@ -77,6 +90,10 @@ const pageTitle = computed(() => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter>
+        <UserAccountMenu />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
 
@@ -93,7 +110,10 @@ const pageTitle = computed(() => {
         ref="mainScroll"
         class="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4 md:p-5"
       >
-        <div class="mx-auto w-full max-w-4xl min-w-0">
+        <div
+          class="mx-auto w-full min-w-0"
+          :class="contentMax"
+        >
           <RouterView />
         </div>
       </div>

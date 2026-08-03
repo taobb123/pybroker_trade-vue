@@ -53,10 +53,17 @@ npx shadcn-vue@latest add <component> -y
 
 | 页面 | 状态 |
 |---|---|
-| 总览 Dashboard | KPI + 最近结果 BarList / 预览表 |
+| 登录 `/login` | **样板**：Mock 登录（邮箱/手机可选 + 一键演示）；不接真 Auth |
+| 用户中心 `/account` | **样板**：头像缩写 / 昵称 / 邮箱 / 手机 / 会员等级 / 邀请码 |
+| 会员套餐 `/billing/plans` | **样板**：Free / Pro / Team；Pro Mock 升档；Team 联系客服 |
+| 订单 `/billing/orders` | **样板**：Mock 订单列表（本地） |
+| 用量 `/usage` | **样板**：访问 KPI + 30 日趋势 + Top（访问 Mock；运行次数读本地历史） |
+| 总览 Dashboard | KPI + 最近结果 BarList / 预览表（工作流结果向，与用量分离） |
 | 工作流 Workflows | 按 YAML 动态输入（粘贴/形态ID/模式/池/编辑）+ 查看产物链接 |
 | 运行记录 Runs | 历史表 + 筛选 + 日志 Sheet + 跳转报告 |
 | 报告 Reports | 工作区表（CSV）+ 文档（Markdown）+ 文本（TXT）+ 图形（PNG）+ 预测 K 线（JSON/ECharts）+ 次要日志 |
+
+侧栏底部为账户菜单；未登录不阻断工作流主路径。
 
 运行历史保存在 `localStorage`（`workflow-platform:run-history:v1`）。
 
