@@ -10,7 +10,7 @@ import type {
   WorkspacePathRef,
 } from '@/api/types'
 import { resolveStepTier } from '@/config/businessRules'
-import { apiUrl } from '@/config/apiBase'
+import { apiUrl, apiRunUrl } from '@/config/apiBase'
 
 export type { WorkflowStep, RunResult, RunPayload, TablePreview } from '@/api/types'
 
@@ -207,7 +207,7 @@ export async function fetchWorkflowSteps(): Promise<WorkflowStep[]> {
 /** 与旧版 stock_pool_workflow「停止」一致：终止当前子进程 */
 export async function stopWorkflowRun(): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch(apiUrl('/api/run/stop'), { method: 'POST' })
+    const res = await fetch(apiRunUrl('/api/run/stop'), { method: 'POST' })
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {
       return { ok: false, message: `[停止请求失败] ${JSON.stringify(j)}` }
@@ -223,12 +223,25 @@ export async function runWorkflowStep(
   payload: RunPayload = {},
 ): Promise<RunResult> {
   try {
-    const res = await fetch(apiUrl(`/api/run/step/${encodeURIComponent(stepId)}`), {
+    const res = await fetch(apiRunUrl(`/api/run/step/${encodeURIComponent(stepId)}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    const j = await res.json()
+    const text = await res.text()
+    let j: Record<string, unknown> = {}
+    try {
+      j = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+    } catch {
+      return {
+        exit_code: 1,
+        merged_log: [
+          `# run failed · ${stepId}`,
+          `HTTP ${res.status}（响应不是 JSON，常见于网关超时/Worker 未反代）`,
+          text.slice(0, 2000),
+        ].join('\n'),
+      }
+    }
     if (!res.ok) {
       return {
         exit_code: 1,
@@ -240,20 +253,34 @@ export async function runWorkflowStep(
       merged_log: String(j.merged_log ?? ''),
       skipped: Boolean(j.skipped),
     }
-  } catch {
+  } catch (e) {
+    // 仅本地开发兜底 mock；线上必须暴露真实错误，避免误以为「跑成功」
+    const isLocal =
+      typeof location !== 'undefined' &&
+      (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    if (isLocal) {
+      return {
+        exit_code: 0,
+        merged_log: [
+          `# mock run · ${stepId}`,
+          'OK · server offline',
+          JSON.stringify(
+            [
+              { rank: 1, symbol: '600519', name: '贵州茅台', roc_20: 0.182 },
+              { rank: 2, symbol: '300750', name: '宁德时代', roc_20: 0.165 },
+            ],
+            null,
+            2,
+          ),
+        ].join('\n'),
+      }
+    }
     return {
-      exit_code: 0,
+      exit_code: 1,
       merged_log: [
-        `# mock run · ${stepId}`,
-        'OK · server offline',
-        JSON.stringify(
-          [
-            { rank: 1, symbol: '600519', name: '贵州茅台', roc_20: 0.182 },
-            { rank: 2, symbol: '300750', name: '宁德时代', roc_20: 0.165 },
-          ],
-          null,
-          2,
-        ),
+        `# run failed · ${stepId}`,
+        '请求后端失败（非 mock）。请检查 api.freealpha.lol 与 CORS。',
+        String(e),
       ].join('\n'),
     }
   }
@@ -262,7 +289,7 @@ export async function runWorkflowStep(
 export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<TablePreview> {
   try {
     const q = new URLSearchParams({ path, max_rows: String(maxRows) })
-    const res = await fetch(apiUrl(`/api/workspace/table?${q}`))
+    const res = await fetch(apiRunUrl(`/api/workspace/table?${q}`))
     if (!res.ok) {
       return {
         exists: false,
@@ -287,7 +314,7 @@ export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<
 export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     const q = new URLSearchParams({ path })
-    const res = await fetch(apiUrl(`/api/workspace/file?${q}`))
+    const res = await fetch(apiRunUrl(`/api/workspace/file?${q}`))
     if (!res.ok) return { exists: false, content: '' }
     return (await res.json()) as { exists: boolean; content: string }
   } catch {
@@ -297,7 +324,7 @@ export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolea
 
 export async function saveWorkspaceFile(path: string, content: string): Promise<boolean> {
   try {
-    const res = await fetch(apiUrl('/api/workspace/file'), {
+    const res = await fetch(apiRunUrl('/api/workspace/file'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, content }),
@@ -313,7 +340,7 @@ export async function resolveLatestGlob(
 ): Promise<{ rel_path?: string; exists?: boolean } | null> {
   try {
     const q = new URLSearchParams({ glob })
-    const res = await fetch(apiUrl(`/api/workspace/latest?${q}`))
+    const res = await fetch(apiRunUrl(`/api/workspace/latest?${q}`))
     if (!res.ok) return null
     return (await res.json()) as { rel_path?: string; exists?: boolean }
   } catch {
