@@ -172,6 +172,65 @@ railway domain
 
 限制：SQLite 在容器内，重部署可能丢库；完整策略数据未进镜像。
 
+### 1.3 GitHub → 香港 ECS 自动部署（已确认要做）
+
+推送到 `main` 且变更后端相关文件时，Actions 会 SSH 到服务器：`git pull` → 同步到 `~/workflow-api` → `systemctl restart workflow-api`。
+
+前端仍由 Cloudflare 构建；**本流水线只更新 API**。
+
+#### A. 服务器一次性初始化（SSH 执行）
+
+```bash
+# 1) 允许 GitHub Actions 用密钥登录（在你本机生成密钥后，把公钥写入服务器）
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+# 将本机生成的 deploy key 公钥内容追加到：
+#   ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# 2) clone 仓库（路径须与下方默认一致，或改 GitHub Secret）
+cd /root
+# 若仓库为私有，需配置 deploy key / PAT；公有可直接：
+git clone https://github.com/taobb123/pybroker_trade-vue.git
+# 若你的 GitHub 用户名/仓库不同，改成实际地址
+
+# 3) 确认 API 目录与 systemd 仍指向 /root/workflow-api（已有则可跳过）
+ls /root/workflow-api
+sudo systemctl status workflow-api --no-pager | head -15
+```
+
+本机生成专用部署密钥（不要用你日常登录密钥上传到 GitHub）：
+
+```powershell
+ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\workflow_ecs_deploy -N '""'
+# 公钥发给服务器 authorized_keys：
+# Get-Content $env:USERPROFILE\.ssh\workflow_ecs_deploy.pub
+# 私钥整段（含 BEGIN/END）粘到 GitHub Secret ECS_SSH_KEY
+```
+
+#### B. GitHub 仓库 Secrets
+
+路径：仓库 → **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | 必填 | 示例 |
+|--------|------|------|
+| `ECS_HOST` | 是 | `47.76.54.42` |
+| `ECS_USER` | 是 | `root` |
+| `ECS_SSH_KEY` | 是 | 上面私钥全文 |
+| `ECS_REPO_DIR` | 否 | 默认 `/root/pybroker_trade-vue` |
+| `ECS_APP_DIR` | 否 | 默认 `/root/workflow-api` |
+
+工作流文件：`.github/workflows/deploy-workflow-api.yml`  
+服务器同步脚本：`.../pybroker_integration/scripts/sync_workflow_api_on_server.sh`
+
+#### C. 验证
+
+1. 合并/推送上述文件到 `main`  
+2. GitHub → **Actions** → 看 **Deploy workflow-api (HK ECS)** 是否绿  
+3. 也可手动 **Run workflow**  
+4. 打开 `https://api.freealpha.lol/api/config` 确认仍 200  
+
+**注意：** 私有仓库时，服务器上 `git fetch` 需要额外凭证（deploy key 只读挂到该仓库，或 HTTPS PAT）。公有仓库一般无需。
+
 ---
 
 ## 2. 前端构建变量
