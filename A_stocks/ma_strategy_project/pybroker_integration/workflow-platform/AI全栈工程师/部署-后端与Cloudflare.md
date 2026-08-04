@@ -159,6 +159,17 @@ railway domain
 
 **本机进度（2026-08-04）：** CLI 已登录；因 **trial expired** + **仅国际卡支付**，测试路径改香港轻量。套餐开通后仍可按上表部署。
 
+**香港 ECS 实测进度（2026-08-04）：**
+
+| 项 | 状态 |
+|----|------|
+| 机器 | 阿里云香港 `47.76.54.42`，Ubuntu 22.04，2核2G |
+| API 目录 | `~/workflow-api`（zip 部署） |
+| DNS | `api.freealpha.lol` → 该 IP |
+| Caddy | 反代 `127.0.0.1:8765`，HTTPS 已通 |
+| 前端 | Cloudflare `VITE_API_BASE_URL=https://api.freealpha.lol`，登录已通 |
+| 注意 | `uvicorn` 须 **systemd 常驻**，否则关 SSH 后易 502 / Failed to fetch |
+
 限制：SQLite 在容器内，重部署可能丢库；完整策略数据未进镜像。
 
 ---
