@@ -98,11 +98,25 @@ def run_training_scripts(script_dir: str) -> bool:
         print(f"未找到训练脚本: {train1} 或 {train2}")
         return False
     for name, path in [('结果1', train1), ('结果2', train2)]:
-        print(f"正在运行 {name}: {path}")
-        ret = subprocess.run([sys.executable, path], cwd=script_dir)
+        print(f"正在运行 {name}: {path}", flush=True)
+        ret = subprocess.run(
+            [sys.executable, path],
+            cwd=script_dir,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+        )
+        if ret.stdout:
+            print(ret.stdout, end='' if ret.stdout.endswith('\n') else '\n', flush=True)
         if ret.returncode != 0:
-            print(f"运行失败，退出码: {ret.returncode}")
+            print(f"运行失败，退出码: {ret.returncode}", flush=True)
+            if ret.stderr:
+                print(ret.stderr, end='' if ret.stderr.endswith('\n') else '\n', flush=True)
             return False
+        if ret.stderr:
+            # 成功时也透出警告，便于线上排查
+            print(ret.stderr, end='' if ret.stderr.endswith('\n') else '\n', flush=True)
     return True
 
 
@@ -126,16 +140,15 @@ def main():
 
     if not args.no_run_training:
         if not run_training_scripts(script_dir):
-            return
+            sys.exit(1)
         print()
 
     if not os.path.isfile(result1_path):
         print(f"未找到 result1_last.csv，请先运行 train_model_shift.py 或去掉 --no-run-training。路径: {result1_path}")
-        return
+        sys.exit(1)
     if not os.path.isfile(result2_path):
         print(f"未找到 result2_last2.csv，请先运行 train_model_shift-2.py 或去掉 --no-run-training。路径: {result2_path}")
-        return
-
+        sys.exit(1)
     r1 = pd.read_csv(result1_path, encoding='utf-8-sig')
     r2 = pd.read_csv(result2_path, encoding='utf-8-sig')
 
@@ -147,8 +160,7 @@ def main():
         r2 = r2.drop(columns=['date_str'])
         if r2.empty:
             print("按交易日历筛选后结果2无数据，请检查 TRADING_DAYS_CSV 或日期列。")
-            return
-
+            sys.exit(1)
     # 结果1：每只股票一行
     r1 = r1.rename(columns={'current_price': 'yesterday_price', 'predicted_price': 'result1_pred'})
     r1 = r1[['symbol', 'date', 'yesterday_price', 'result1_pred']]
