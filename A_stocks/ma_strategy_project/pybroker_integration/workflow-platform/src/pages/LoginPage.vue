@@ -69,7 +69,7 @@ async function submit() {
           {{ mode === 'login' ? '登录' : '注册' }}
         </CardTitle>
         <CardDescription>
-          M3 引导 · 服务端用户/会员 · 演示 demo@workflow.local / demo1234
+          邀请内测 · 邮箱登录 · 演示账号 demo@workflow.local / demo1234
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">

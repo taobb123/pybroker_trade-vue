@@ -21,6 +21,11 @@ import {
   type PaymentChannelId,
 } from '@/api/payment'
 import { trackEvent } from '@/api/events'
+import {
+  SUPPORT_WECHAT_HINT,
+  SUPPORT_WECHAT_ID,
+  SUPPORT_WECHAT_QR_SRC,
+} from '@/config/supportContact'
 
 const auth = useAuthStore()
 const billing = useBillingStore()
@@ -28,10 +33,14 @@ const router = useRouter()
 const message = ref('')
 const busy = ref(false)
 const payOpen = ref(false)
+const teamOpen = ref(false)
 const channels = ref<PaymentChannel[]>([])
 const selectedChannel = ref<PaymentChannelId>('mock')
 
 const currentPlan = computed(() => auth.user?.plan ?? null)
+const proPrice = computed(
+  () => PLAN_CATALOG.find((p) => p.id === 'pro')?.amountYuan ?? 99,
+)
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
@@ -47,7 +56,7 @@ onMounted(async () => {
 async function choose(planId: (typeof PLAN_CATALOG)[number]['id'], purchasable: boolean) {
   message.value = ''
   if (!purchasable) {
-    message.value = 'Team 档请联系客服开通（本期不提供自助购买）'
+    teamOpen.value = true
     return
   }
   if (!auth.user) {
@@ -63,7 +72,9 @@ async function choose(planId: (typeof PLAN_CATALOG)[number]['id'], purchasable: 
     busy.value = true
     try {
       const res = await billing.switchToFree()
-      message.value = res.ok ? '已切换为 Free' : res.reason || '操作失败'
+      message.value = res.ok
+        ? '已切换为 Free（内测可自降；付费不退）'
+        : res.reason || '操作失败'
     } finally {
       busy.value = false
     }
@@ -86,44 +97,10 @@ async function confirmPay() {
     const res = await billing.checkoutPro(selectedChannel.value)
     payOpen.value = false
     if (!res.ok) {
-      message.value = res.reason || '支付失败'
+      message.value = res.reason || '开通失败'
       return
     }
-    message.value = res.reason
-      ? `支付完成（${res.reason}）`
-      : '支付成功 · 已升级为 Pro，可在订单页查看'
-  } finally {
-    busy.value = false
-  }
-}
-
-async function createPendingOnly() {
-  message.value = ''
-  busy.value = true
-  try {
-    const res = await billing.createProPending(selectedChannel.value)
-    payOpen.value = false
-    if (!res.ok) {
-      message.value = res.reason || '下单失败'
-      return
-    }
-    message.value = `已创建 pending 订单 ${res.orderId} · 可去管理后台「标记已付 / 取消」纠偏`
-  } finally {
-    busy.value = false
-  }
-}
-
-async function simulateCallbackFail() {
-  message.value = ''
-  busy.value = true
-  try {
-    const res = await billing.createProThenFailCallback(selectedChannel.value)
-    payOpen.value = false
-    if (!res.ok) {
-      message.value = res.reason || '模拟失败'
-      return
-    }
-    message.value = res.reason || '已模拟回调失败'
+    message.value = '内测开通成功 · 已升级为 Pro（付费不退）'
   } finally {
     busy.value = false
   }
@@ -136,7 +113,7 @@ async function simulateCallbackFail() {
       <div>
         <h2 class="text-base font-semibold tracking-tight">会员套餐</h2>
         <p class="text-xs text-muted-foreground">
-          R5 支付闭环 · 渠道下单 / 回调生效 · 当前
+          邀请内测 · Pro ¥{{ proPrice }} / 30 天 · 付费不退 · 当前
           <span class="font-medium text-foreground">{{ auth.planLabel }}</span>
         </p>
       </div>
@@ -185,16 +162,15 @@ async function simulateCallbackFail() {
     </div>
 
     <p class="text-xs text-muted-foreground">
-      微信 / 支付宝已接「下单→回调」形状；未配置商户密钥时为模拟确认。Stripe 预留。
+      内测阶段为邀请开通通道；正式微信 / 支付宝收款后替换。Team 扫码联系客服人工开通。付费不退。
     </p>
 
     <Sheet :open="payOpen" @update:open="payOpen = $event">
       <SheetContent class="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>选择支付方式</SheetTitle>
+          <SheetTitle>内测开通 Pro</SheetTitle>
           <SheetDescription>
-            Pro ¥{{ PLAN_CATALOG.find((p) => p.id === 'pro')?.amountYuan ?? 39 }} / 30 天 ·
-            确认后写入服务端订单并由回调生效权益
+            Pro ¥{{ proPrice }} / 30 天 · 确认后写入订单并立即生效权益 · 付费不退
           </SheetDescription>
         </SheetHeader>
 
@@ -214,17 +190,34 @@ async function simulateCallbackFail() {
 
         <SheetFooter class="flex-col gap-2 sm:flex-col">
           <Button class="w-full" :disabled="busy" @click="confirmPay">
-            {{ busy ? '处理中…' : '确认支付（模拟成功）' }}
-          </Button>
-          <Button class="w-full" variant="secondary" :disabled="busy" @click="createPendingOnly">
-            仅下单（留 pending）
-          </Button>
-          <Button class="w-full" variant="outline" :disabled="busy" @click="simulateCallbackFail">
-            模拟回调失败（→ failed）
+            {{ busy ? '处理中…' : '确认开通' }}
           </Button>
           <Button class="w-full" variant="ghost" :disabled="busy" @click="payOpen = false">
             关闭
           </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+
+    <Sheet :open="teamOpen" @update:open="teamOpen = $event">
+      <SheetContent class="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>联系客服开通 Team</SheetTitle>
+          <SheetDescription>{{ SUPPORT_WECHAT_HINT }}</SheetDescription>
+        </SheetHeader>
+        <div class="flex flex-col items-center gap-3 px-4 py-2">
+          <img
+            :src="SUPPORT_WECHAT_QR_SRC"
+            alt="客服微信二维码"
+            class="size-56 rounded-lg border bg-white object-contain p-2"
+          />
+          <p class="text-sm font-medium">微信号：{{ SUPPORT_WECHAT_ID }}</p>
+          <p class="text-center text-xs text-muted-foreground">
+            请将 public/support/wechat-qr.svg 替换为真实二维码图
+          </p>
+        </div>
+        <SheetFooter>
+          <Button class="w-full" variant="outline" @click="teamOpen = false">关闭</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

@@ -85,8 +85,8 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    priceYuanPerMonth: 39,
-    priceLabel: '¥39 / 月',
+    priceYuanPerMonth: 99,
+    priceLabel: '¥99 / 月',
     dailyRunQuota: 100,
     periodDays: 30,
     purchasable: true,
@@ -97,7 +97,7 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
       'workspace.cloud_save': true,
       'team.seats': false,
     },
-    features: ['每天 100 次运行', '高级策略', '报告导出', '云端保存（预留）'],
+    features: ['每天 100 次运行', '高级策略', '报告导出', '云端保存'],
     cta: '升级 Pro',
   },
   team: {
@@ -115,7 +115,7 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
       'workspace.cloud_save': true,
       'team.seats': true,
     },
-    features: ['不限运行次数', '高级策略', '席位协作（预留）', '优先支持'],
+    features: ['不限运行次数', '高级策略', '席位协作', '优先支持'],
     cta: '联系客服',
   },
 }

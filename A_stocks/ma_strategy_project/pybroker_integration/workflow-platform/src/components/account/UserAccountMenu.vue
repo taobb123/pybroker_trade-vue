@@ -106,7 +106,7 @@ function logout() {
         </div>
         <div class="grid min-w-0 flex-1 text-left text-sm leading-tight">
           <span class="truncate font-medium">未登录</span>
-          <span class="truncate text-xs text-muted-foreground">Mock 登录验收壳</span>
+          <span class="truncate text-xs text-muted-foreground">登录 / 注册</span>
         </div>
       </SidebarMenuButton>
     </SidebarMenuItem>

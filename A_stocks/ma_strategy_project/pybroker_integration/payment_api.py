@@ -26,7 +26,7 @@ ChannelId = Literal["wechat", "alipay", "mock"]
 
 PLAN_AMOUNT_YUAN: dict[str, int] = {
     "free": 0,
-    "pro": 39,
+    "pro": 99,
     "team": 0,
 }
 
@@ -69,26 +69,15 @@ class CallbackBody(BaseModel):
 
 @router.get("/channels")
 def list_channels():
+    # 邀请内测：不展示伪微信/支付宝；正式收款后再加真渠道
     return {
-        "provider": "simulate",
+        "provider": "invite_simulate",
         "channels": [
             {
-                "id": "wechat",
-                "label": "微信支付",
-                "mode": "simulate",
-                "hint": "未配置商户密钥 · 走模拟确认",
-            },
-            {
-                "id": "alipay",
-                "label": "支付宝",
-                "mode": "simulate",
-                "hint": "未配置商户密钥 · 走模拟确认",
-            },
-            {
                 "id": "mock",
-                "label": "演示支付",
+                "label": "内测开通",
                 "mode": "simulate",
-                "hint": "本地一键确认（开发）",
+                "hint": "邀请内测 · 确认后立即生效 · 付费不退",
             },
         ],
     }
