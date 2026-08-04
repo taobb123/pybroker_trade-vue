@@ -1,5 +1,7 @@
 /** 工作区产物路径分流：表格 / Markdown / 图片 / 纯文本 */
 
+import { apiUrl } from '@/config/apiBase'
+
 export function workspacePathSuffix(relPath: string): string {
   let s = String(relPath || '').toLowerCase()
   const q = s.indexOf('?')
@@ -25,7 +27,7 @@ export function isTextWorkspacePath(relPath: string): boolean {
 export function workspaceMediaUrl(relPath: string, bust = true): string {
   const q = new URLSearchParams({ path: relPath })
   if (bust) q.set('_t', String(Date.now()))
-  return `/api/workspace/media?${q}`
+  return apiUrl(`/api/workspace/media?${q}`)
 }
 
 function escapeHtmlText(s: string): string {

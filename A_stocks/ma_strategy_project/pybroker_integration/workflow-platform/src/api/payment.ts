@@ -1,4 +1,5 @@
 import { getToken } from '@/api/auth'
+import { apiUrl } from '@/config/apiBase'
 
 export type PaymentChannelId = 'wechat' | 'alipay' | 'mock'
 export type PaymentPlanId = 'free' | 'pro' | 'team'
@@ -44,7 +45,7 @@ async function readError(res: Response): Promise<string> {
 
 export async function fetchPaymentChannels(): Promise<PaymentChannel[]> {
   try {
-    const res = await fetch('/api/payment/channels')
+    const res = await fetch(apiUrl('/api/payment/channels'))
     if (!res.ok) throw new Error(await readError(res))
     const j = (await res.json()) as { channels?: PaymentChannel[] }
     return j.channels ?? []
@@ -59,7 +60,7 @@ export async function createPaymentOrder(input: {
   plan: PaymentPlanId
   channel: PaymentChannelId
 }): Promise<{ order: ServerPaymentOrder; simulatePath: string }> {
-  const res = await fetch('/api/payment/create', {
+  const res = await fetch(apiUrl('/api/payment/create'), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({
@@ -74,12 +75,12 @@ export async function createPaymentOrder(input: {
   }
   return {
     order: j.order,
-    simulatePath: j.pay?.simulate_path || `/api/payment/simulate-pay/${j.order.id}`,
+    simulatePath: j.pay?.simulate_path || apiUrl(`/api/payment/simulate-pay/${j.order.id}`),
   }
 }
 
 export async function getPaymentOrder(orderId: string): Promise<ServerPaymentOrder> {
-  const res = await fetch(`/api/payment/order/${encodeURIComponent(orderId)}`, {
+  const res = await fetch(apiUrl(`/api/payment/order/${encodeURIComponent(orderId)}`), {
     headers: { ...authHeaders() },
   })
   if (!res.ok) throw new Error(await readError(res))
@@ -88,14 +89,14 @@ export async function getPaymentOrder(orderId: string): Promise<ServerPaymentOrd
 }
 
 export async function listPaymentOrders(): Promise<ServerPaymentOrder[]> {
-  const res = await fetch('/api/payment/orders', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/payment/orders'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as { orders: ServerPaymentOrder[] }
   return j.orders ?? []
 }
 
 export async function simulatePaymentPay(orderId: string): Promise<ServerPaymentOrder> {
-  const res = await fetch(`/api/payment/simulate-pay/${encodeURIComponent(orderId)}`, {
+  const res = await fetch(apiUrl(`/api/payment/simulate-pay/${encodeURIComponent(orderId)}`), {
     method: 'POST',
     headers: { ...authHeaders() },
   })
@@ -109,7 +110,7 @@ export async function simulatePaymentCallbackFail(
   orderId: string,
   channel: PaymentChannelId,
 ): Promise<ServerPaymentOrder> {
-  const res = await fetch(`/api/payment/callback/${encodeURIComponent(channel)}`, {
+  const res = await fetch(apiUrl(`/api/payment/callback/${encodeURIComponent(channel)}`), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({

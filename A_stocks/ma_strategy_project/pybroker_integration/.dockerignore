@@ -1,0 +1,28 @@
+.git
+.gitignore
+__pycache__
+**/__pycache__
+*.pyc
+.pybrokercache
+*.db
+
+# 前端与文档构建
+workflow-platform/node_modules
+workflow-platform/dist
+workflow-platform/.env
+workflow-platform/.env.*
+
+# 大数据 / 笔记本 / 缓存（测试阶段 API 不需要）
+data/
+notebooks/
+tests/
+*.csv
+*.png
+*.xlsx
+*.xls
+*.parquet
+.ipynb_checkpoints
+
+# 本地脚本产物
+out_detail.txt
+*.bat

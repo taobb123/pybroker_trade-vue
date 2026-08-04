@@ -10,6 +10,7 @@ import type {
   WorkspacePathRef,
 } from '@/api/types'
 import { resolveStepTier } from '@/config/businessRules'
+import { apiUrl } from '@/config/apiBase'
 
 export type { WorkflowStep, RunResult, RunPayload, TablePreview } from '@/api/types'
 
@@ -192,7 +193,7 @@ function withoutWeeklyAndTool(steps: WorkflowStep[]): WorkflowStep[] {
 
 export async function fetchWorkflowSteps(): Promise<WorkflowStep[]> {
   try {
-    const res = await fetch('/api/config')
+    const res = await fetch(apiUrl('/api/config'))
     if (!res.ok) throw new Error(`config ${res.status}`)
     const cfg = await res.json()
     const steps = (cfg.steps ?? []) as Array<Record<string, unknown>>
@@ -206,7 +207,7 @@ export async function fetchWorkflowSteps(): Promise<WorkflowStep[]> {
 /** 与旧版 stock_pool_workflow「停止」一致：终止当前子进程 */
 export async function stopWorkflowRun(): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch('/api/run/stop', { method: 'POST' })
+    const res = await fetch(apiUrl('/api/run/stop'), { method: 'POST' })
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {
       return { ok: false, message: `[停止请求失败] ${JSON.stringify(j)}` }
@@ -222,7 +223,7 @@ export async function runWorkflowStep(
   payload: RunPayload = {},
 ): Promise<RunResult> {
   try {
-    const res = await fetch(`/api/run/step/${encodeURIComponent(stepId)}`, {
+    const res = await fetch(apiUrl(`/api/run/step/${encodeURIComponent(stepId)}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -261,7 +262,7 @@ export async function runWorkflowStep(
 export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<TablePreview> {
   try {
     const q = new URLSearchParams({ path, max_rows: String(maxRows) })
-    const res = await fetch(`/api/workspace/table?${q}`)
+    const res = await fetch(apiUrl(`/api/workspace/table?${q}`))
     if (!res.ok) {
       return {
         exists: false,
@@ -286,7 +287,7 @@ export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<
 export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     const q = new URLSearchParams({ path })
-    const res = await fetch(`/api/workspace/file?${q}`)
+    const res = await fetch(apiUrl(`/api/workspace/file?${q}`))
     if (!res.ok) return { exists: false, content: '' }
     return (await res.json()) as { exists: boolean; content: string }
   } catch {
@@ -296,7 +297,7 @@ export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolea
 
 export async function saveWorkspaceFile(path: string, content: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/workspace/file', {
+    const res = await fetch(apiUrl('/api/workspace/file'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, content }),
@@ -312,7 +313,7 @@ export async function resolveLatestGlob(
 ): Promise<{ rel_path?: string; exists?: boolean } | null> {
   try {
     const q = new URLSearchParams({ glob })
-    const res = await fetch(`/api/workspace/latest?${q}`)
+    const res = await fetch(apiUrl(`/api/workspace/latest?${q}`))
     if (!res.ok) return null
     return (await res.json()) as { rel_path?: string; exists?: boolean }
   } catch {

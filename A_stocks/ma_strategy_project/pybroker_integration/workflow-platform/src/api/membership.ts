@@ -1,4 +1,5 @@
 import { getToken } from '@/api/auth'
+import { apiUrl } from '@/config/apiBase'
 
 export type ServerQuota = {
   user_id: string
@@ -32,14 +33,14 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function fetchQuotaToday(): Promise<ServerQuota> {
-  const res = await fetch('/api/quota/today', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/quota/today'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as { quota: ServerQuota }
   return j.quota
 }
 
 export async function consumeQuotaRun(): Promise<ServerQuota> {
-  const res = await fetch('/api/quota/consume', {
+  const res = await fetch(apiUrl('/api/quota/consume'), {
     method: 'POST',
     headers: { ...authHeaders() },
   })
@@ -49,7 +50,7 @@ export async function consumeQuotaRun(): Promise<ServerQuota> {
 }
 
 export async function apiSetMembershipFree(): Promise<void> {
-  const res = await fetch('/api/membership/set-free', {
+  const res = await fetch(apiUrl('/api/membership/set-free'), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ confirm: true }),

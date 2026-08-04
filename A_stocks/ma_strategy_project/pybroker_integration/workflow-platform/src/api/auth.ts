@@ -1,3 +1,5 @@
+import { apiUrl } from '@/config/apiBase'
+
 export type PlanTier = 'free' | 'pro' | 'team'
 
 export type ServerUser = {
@@ -38,6 +40,9 @@ async function readError(res: Response): Promise<string> {
   if (res.status === 404) {
     return '接口不存在（404）。请重启 workflow_server 后再登录'
   }
+  if (res.status === 405) {
+    return '后端未接通（405）。请配置 VITE_API_BASE_URL 或本机启动 workflow_server'
+  }
   return `HTTP ${res.status}`
 }
 
@@ -52,7 +57,7 @@ export async function apiRegister(input: {
   nickname?: string
   phone?: string
 }): Promise<{ token: string; user: ServerUser }> {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -66,7 +71,7 @@ export async function apiLogin(input: {
   email: string
   password: string
 }): Promise<{ token: string; user: ServerUser }> {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -76,7 +81,7 @@ export async function apiLogin(input: {
 }
 
 export async function apiMe(): Promise<ServerUser> {
-  const res = await fetch('/api/auth/me', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/auth/me'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as { user: ServerUser }
   return j.user
@@ -86,7 +91,7 @@ export async function apiPatchMe(input: {
   nickname?: string
   phone?: string
 }): Promise<ServerUser> {
-  const res = await fetch('/api/auth/me', {
+  const res = await fetch(apiUrl('/api/auth/me'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(input),

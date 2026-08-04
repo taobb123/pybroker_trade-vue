@@ -40,6 +40,7 @@ _active_proc: subprocess.Popen[bytes] | None = None
 
 import yaml
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -406,6 +407,22 @@ def run_one_step(
 
 
 app = FastAPI(title="Stock pool workflow", version="1.0")
+
+# 跨域：线上前端（如 freealpha.lol）访问本 API
+# 例：CORS_ORIGINS=https://freealpha.lol,http://127.0.0.1:5173
+_cors_raw = os.environ.get(
+    "CORS_ORIGINS",
+    "http://127.0.0.1:5173,http://localhost:5173,https://freealpha.lol,https://www.freealpha.lol",
+)
+_cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins or ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(payment_router)
 app.include_router(auth_router)
 app.include_router(membership_router)

@@ -1,4 +1,5 @@
 import { getToken } from '@/api/auth'
+import { apiUrl } from '@/config/apiBase'
 
 export type EventName =
   | 'page_view'
@@ -23,7 +24,7 @@ function authHeaders(): HeadersInit {
 
 /** 埋点：失败静默，不阻断业务 */
 export function trackEvent(eventName: EventName, props?: Record<string, unknown>): void {
-  void fetch('/api/events/track', {
+  void fetch(apiUrl('/api/events/track'), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ event_name: eventName, props: props ?? {} }),
@@ -33,7 +34,7 @@ export function trackEvent(eventName: EventName, props?: Record<string, unknown>
 }
 
 export async function fetchFunnel(): Promise<FunnelStep[]> {
-  const res = await fetch('/api/events/funnel', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/events/funnel'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(`funnel ${res.status}`)
   const j = (await res.json()) as { steps?: FunnelStep[] }
   return j.steps ?? []

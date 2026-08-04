@@ -95,6 +95,18 @@ start-dev.bat
 浏览器打开 Vite 地址（默认 `http://127.0.0.1:5173`）。  
 `/api` 已代理到 `8765`；后端未启动时，Workflows 使用内置 mock 数据与模拟输出。
 
+## 线上 API 地址
+
+Cloudflare 只托管静态前端。构建时设置：
+
+```
+VITE_API_BASE_URL=https://你的后端域名
+```
+
+见 `.env.example` 与 `AI全栈工程师/部署-后端与Cloudflare.md`。
+
+测试阶段平台路径（已确认）：**香港 2 核轻量打通 API + `VITE_API_BASE_URL`（支付宝可购）；Railway 无国际卡则跳过；SAE 暂不上**。
+
 ## 与旧台关系
 
 - 旧台：`docs/stock_pool_workflow.html` 继续可用

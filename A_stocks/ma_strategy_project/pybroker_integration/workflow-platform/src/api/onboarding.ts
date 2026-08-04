@@ -2,6 +2,7 @@ import { getToken } from '@/api/auth'
 import type { ServerUser } from '@/api/auth'
 import type { ServerQuota } from '@/api/membership'
 import type { OnboardingPersonaId } from '@/config/businessRules'
+import { apiUrl } from '@/config/apiBase'
 
 export type OnboardingStatus = {
   done: boolean
@@ -38,7 +39,7 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
-  const res = await fetch('/api/onboarding/status', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/onboarding/status'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as OnboardingStatus & { ok?: boolean }
   return j
@@ -48,7 +49,7 @@ export async function completeOnboarding(input: {
   persona?: OnboardingPersonaId | null
   skipPersona?: boolean
 }): Promise<OnboardingCompleteResult> {
-  const res = await fetch('/api/onboarding/complete', {
+  const res = await fetch(apiUrl('/api/onboarding/complete'), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({

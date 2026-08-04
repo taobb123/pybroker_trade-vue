@@ -1,0 +1,14 @@
+# Railway：测试阶段后端（workflow_server）
+# Dashboard 中 Root Directory 须为：
+#   A_stocks/ma_strategy_project/pybroker_integration
+# （若用 CLI 在本目录 railway link / up，则无需改 Root Directory）
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "uvicorn workflow_server:app --host 0.0.0.0 --port $PORT"
+restartPolicyType = "ON_FAILURE"
+healthcheckPath = "/api/config"
+healthcheckTimeout = 30

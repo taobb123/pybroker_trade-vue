@@ -3,6 +3,7 @@ import type { ServerUser } from '@/api/auth'
 import type { ServerPaymentOrder } from '@/api/payment'
 import type { ServerQuota } from '@/api/membership'
 import type { PlanTier } from '@/stores/auth'
+import { apiUrl } from '@/config/apiBase'
 
 export type AdminUserRow = ServerUser & {
   today_used: number
@@ -31,7 +32,7 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function adminListUsers(): Promise<AdminUserRow[]> {
-  const res = await fetch('/api/admin/users', { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl('/api/admin/users'), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as { users: AdminUserRow[] }
   return j.users ?? []
@@ -41,7 +42,7 @@ export async function adminSetStatus(
   userId: string,
   status: 'active' | 'disabled',
 ): Promise<void> {
-  const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/status`, {
+  const res = await fetch(apiUrl(`/api/admin/users/${encodeURIComponent(userId)}/status`), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ status }),
@@ -54,7 +55,7 @@ export async function adminSetMembership(
   plan: PlanTier,
   periodDays?: number,
 ): Promise<void> {
-  const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/membership`, {
+  const res = await fetch(apiUrl(`/api/admin/users/${encodeURIComponent(userId)}/membership`), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ plan, period_days: periodDays ?? null }),
@@ -63,7 +64,7 @@ export async function adminSetMembership(
 }
 
 export async function adminAddBonus(userId: string, n = 3): Promise<ServerQuota> {
-  const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/bonus`, {
+  const res = await fetch(apiUrl(`/api/admin/users/${encodeURIComponent(userId)}/bonus`), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ n }),
@@ -75,7 +76,7 @@ export async function adminAddBonus(userId: string, n = 3): Promise<ServerQuota>
 
 export async function adminResetOnboarding(userId: string): Promise<void> {
   const res = await fetch(
-    `/api/admin/users/${encodeURIComponent(userId)}/reset-onboarding`,
+    apiUrl(`/api/admin/users/${encodeURIComponent(userId)}/reset-onboarding`),
     { method: 'POST', headers: { ...authHeaders() } },
   )
   if (!res.ok) throw new Error(await readError(res))
@@ -83,7 +84,7 @@ export async function adminResetOnboarding(userId: string): Promise<void> {
 
 export async function adminListOrders(status?: string): Promise<ServerPaymentOrder[]> {
   const q = status ? `?status=${encodeURIComponent(status)}` : ''
-  const res = await fetch(`/api/admin/orders${q}`, { headers: { ...authHeaders() } })
+  const res = await fetch(apiUrl(`/api/admin/orders${q}`), { headers: { ...authHeaders() } })
   if (!res.ok) throw new Error(await readError(res))
   const j = (await res.json()) as { orders: ServerPaymentOrder[] }
   return j.orders ?? []
@@ -93,7 +94,7 @@ export async function adminOrderAction(
   orderId: string,
   action: 'mark_paid' | 'cancel',
 ): Promise<ServerPaymentOrder> {
-  const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/action`, {
+  const res = await fetch(apiUrl(`/api/admin/orders/${encodeURIComponent(orderId)}/action`), {
     method: 'POST',
     headers: { ...authHeaders() },
     body: JSON.stringify({ action }),
