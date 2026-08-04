@@ -192,12 +192,24 @@ railway domain
 
 `/root/pybroker_trade-vue/A_stocks/ma_strategy_project/pybroker_integration`
 
-同步脚本会 `git pull`、安装 `requirements.txt` + `requirements-server.txt`、重启服务，并在首次迁移旧 SQLite。  
+同步脚本会 `git pull`、安装 `requirements.txt` + **`requirements-server.txt`（含 `lib-pybroker` / sklearn / numba）**、重启服务，并在首次迁移旧 SQLite。  
+安装后冒烟：`python -c "import pybroker,sklearn,numba"` 必须成功，否则部署失败。
+
 东财等脚本如需 Token：GitHub Secret `TUSHARE_TOKEN`，或写入 systemd 环境变量后 restart。
 
 冒烟：不应再出现 `脚本不存在: /root/workflow-api/fetch_...`。
 
-限制：SQLite 在容器内，重部署可能丢库；完整策略数据未进镜像。
+**与本地对齐说明：**
+
+| 能力 | 本地 | 线上（本方案） |
+|------|------|----------------|
+| PyBroker 回测 | ✅ | ✅ `lib-pybroker` |
+| sklearn / numba | ✅ | ✅ |
+| akshare / tushare / baostock | ✅ | ✅ |
+| TA-Lib（`import talib`） | 本机常有 | **默认不装**（需系统 `ta-lib` C 库）；多数 workflow 步骤不依赖 |
+| streamlit UI | 本机可选 | 不装 |
+
+限制：SQLite 在机器本地，重部署注意备份；完整行情仍依赖外网与 Token。
 
 ### 1.3 GitHub → 香港 ECS 自动部署（已确认要做）
 

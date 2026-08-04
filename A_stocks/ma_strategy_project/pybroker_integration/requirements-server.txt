@@ -1,13 +1,28 @@
-# 香港 ECS 跑策略脚本的额外依赖（在 requirements.txt 之上）
-# compute_today / train_model_shift 需要 pybroker + sklearn + numba
+# 香港 ECS：与本地策略能力对齐的完整依赖（叠在 requirements.txt 之上）
+# 覆盖：compute_today / train_model_shift* / 多数 workflow 脚本拉数与回测
+#
+# 说明：
+# - lib-pybroker = import pybroker（与本地一致）
+# - TA-Lib（import talib）需系统库，默认不强制；需要时另装，见部署文档
+# - 不含 streamlit / plotly 等本机交互 UI
+
+# 数据与数值
 pandas>=1.5.0
 numpy>=1.23.0
 requests>=2.28.0
 akshare>=1.11.0
 tushare>=1.2.0
+baostock>=0.8.8
+yfinance>=0.2.0
 pymysql>=1.0.0
 openpyxl>=3.0.0
-matplotlib>=3.5.0
+
+# PyBroker 策略栈（与本地对齐）
+lib-pybroker>=1.2.0
 scikit-learn>=1.2.0
 numba>=0.57.0
-lib-pybroker>=1.2.0
+joblib>=1.2.0
+diskcache>=5.6.0
+
+# 图表 / 导出（compute_today、报告图）
+matplotlib>=3.5.0

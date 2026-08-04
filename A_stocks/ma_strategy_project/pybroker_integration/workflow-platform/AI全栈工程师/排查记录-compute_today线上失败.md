@@ -36,11 +36,12 @@
 |----|------|
 | 退出码 | 训练失败 / 缺 CSV → `sys.exit(1)` |
 | 日志 | 子进程 stdout/stderr 捕获后打到父进程 stdout，网页可见 |
-| 依赖 | `requirements-server.txt` 增加 `scikit-learn` / `numba` / `lib-pybroker` |
+| 依赖 | `requirements-server.txt` **完整策略栈**：`lib-pybroker` / sklearn / numba / akshare 等 |
+| 部署 | `sync_workflow_api_on_server.sh` 安装后强制 `import pybroker` 冒烟；systemd 设 `PYTHONPATH` |
 
 ## 部署后验证
 
-1. 推送并等 HK ECS Deploy 绿  
-2. 重跑 `compute_today`：若仍失败，日志应出现**完整 traceback**  
-3. SSH 可选自检：  
-   `/root/.../pybroker_integration/.venv/bin/python -c "import pybroker,sklearn,numba"`
+1. 推送并等 HK ECS Deploy 绿（日志应出现 `OK pybroker` / `strategy deps ok`）  
+2. 重跑 `compute_today`：失败时应见完整 traceback；成功则与本地一致产出 CSV/JSON  
+3. SSH 可选：  
+   `/root/.../pybroker_integration/.venv/bin/python -c "import pybroker,sklearn,numba; print('ok')"`

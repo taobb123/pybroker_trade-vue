@@ -222,6 +222,15 @@ def build_env(cfg: dict[str, Any]) -> dict[str, str]:
     # 子进程 Python 尽量用 UTF-8 写 stdout/stderr，便于与网页 UTF-8 一致（可在 YAML extra_env 覆盖）
     env.setdefault("PYTHONUTF8", "1")
     env.setdefault("PYTHONIOENCODING", "utf-8:replace")
+    # 保证 data.* / pybroker_integration.* 可被策略脚本 import（与本地 sys.path 注入对齐）
+    root = Path(__file__).resolve().parent
+    parent = str(root.parent)
+    existing = env.get("PYTHONPATH", "")
+    parts = [p for p in existing.split(os.pathsep) if p]
+    for p in (parent, str(root)):
+        if p not in parts:
+            parts.insert(0, p)
+    env["PYTHONPATH"] = os.pathsep.join(parts)
     # 默认绕过本机 Clash/系统代理，避免 TuShare 经 127.0.0.1:7897 读超时
     # （可在 YAML data_sources.extra_env 显式设置 HTTP_PROXY 覆盖）
     for k in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):

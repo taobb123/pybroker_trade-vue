@@ -36,12 +36,32 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 pip install -q -U pip
+echo "pip install requirements.txt + requirements-server.txt (含 lib-pybroker)..."
 pip install -q -r requirements.txt
 if [[ -f requirements-server.txt ]]; then
-  pip install -q -r requirements-server.txt
+  pip install -r requirements-server.txt
 fi
 
 PYTHON_BIN="$SRC/.venv/bin/python"
+PARENT_DIR="$(dirname "$SRC")"
+
+# 冒烟：与本地一致的核心策略依赖必须可 import
+echo "smoke import: pybroker / sklearn / numba / matplotlib / akshare..."
+"$PYTHON_BIN" - <<'PY'
+import importlib
+need = ["pybroker", "sklearn", "numba", "matplotlib", "akshare", "pandas", "numpy"]
+missing = []
+for name in need:
+    try:
+        importlib.import_module(name)
+        print(f"OK {name}")
+    except Exception as e:
+        missing.append(f"{name}: {e}")
+        print(f"FAIL {name}: {e}")
+if missing:
+    raise SystemExit("strategy deps missing:\n" + "\n".join(missing))
+print("strategy deps ok")
+PY
 
 # 保留已有 systemd 环境变量（避免每次 deploy 冲掉 JWT / Token）
 if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
@@ -55,7 +75,7 @@ fi
 MVP_JWT_SECRET="${MVP_JWT_SECRET:-change-me-to-a-long-random-string}"
 TUSHARE_TOKEN="${TUSHARE_TOKEN:-}"
 
-# systemd：工作目录 = 全量 integration（含全部策略 .py）
+# systemd：工作目录 = 全量 integration；PYTHONPATH 含上级以便 data.* / pybroker_integration.*
 sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
 [Unit]
 Description=workflow_server FastAPI (full scripts)
@@ -66,6 +86,8 @@ WorkingDirectory=$SRC
 Environment=CORS_ORIGINS=https://freealpha.lol,https://www.freealpha.lol
 Environment=MVP_JWT_SECRET=$MVP_JWT_SECRET
 Environment=TUSHARE_TOKEN=$TUSHARE_TOKEN
+Environment=PYTHONPATH=$PARENT_DIR
+Environment=PYTHONUTF8=1
 ExecStart=$PYTHON_BIN -m uvicorn workflow_server:app --host 127.0.0.1 --port 8765
 Restart=always
 RestartSec=3
