@@ -185,6 +185,18 @@ railway domain
 
 电脑 WiFi / 手机流量都应只请求 `freealpha.lol`，不再依赖单独打通 `api.` 子域。
 
+### 1.5 全量策略脚本部署（已确认）
+
+此前 `/root/workflow-api` 只有登录 API，不含 `fetch_dc_concept_ma5.py` 等。  
+现改为 systemd 工作目录：
+
+`/root/pybroker_trade-vue/A_stocks/ma_strategy_project/pybroker_integration`
+
+同步脚本会 `git pull`、安装 `requirements.txt` + `requirements-server.txt`、重启服务，并在首次迁移旧 SQLite。  
+东财等脚本如需 Token：GitHub Secret `TUSHARE_TOKEN`，或写入 systemd 环境变量后 restart。
+
+冒烟：不应再出现 `脚本不存在: /root/workflow-api/fetch_...`。
+
 限制：SQLite 在容器内，重部署可能丢库；完整策略数据未进镜像。
 
 ### 1.3 GitHub → 香港 ECS 自动部署（已确认要做）
