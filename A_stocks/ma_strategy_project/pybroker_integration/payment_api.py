@@ -26,7 +26,7 @@ ChannelId = Literal["wechat", "alipay", "mock"]
 
 PLAN_AMOUNT_YUAN: dict[str, int] = {
     "free": 0,
-    "pro": 99,
+    "pro": 99,  # 006 决议 · 邀请内测
     "team": 0,
 }
 
