@@ -689,8 +689,73 @@ class RunStepBody(BaseModel):
     run_mode: str | None = None
 
 
+_jobs_lock = threading.Lock()
+_jobs: dict[str, dict[str, Any]] = {}
+
+
+def _job_set(job_id: str, **fields: Any) -> None:
+    with _jobs_lock:
+        cur = dict(_jobs.get(job_id) or {"id": job_id})
+        cur.update(fields)
+        _jobs[job_id] = cur
+
+
+def _job_get(job_id: str) -> dict[str, Any] | None:
+    with _jobs_lock:
+        j = _jobs.get(job_id)
+        return dict(j) if j else None
+
+
+def _run_step_job(
+    job_id: str,
+    cfg: dict[str, Any],
+    step: dict[str, Any],
+    extra: list[str] | None,
+    run_mode: str | None,
+) -> None:
+    from datetime import datetime, timezone
+
+    _job_set(job_id, status="running", started_at=datetime.now(timezone.utc).isoformat())
+    try:
+        result = run_one_step(cfg, step, extra, run_mode)
+        _job_set(
+            job_id,
+            status="done",
+            result=result,
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except HTTPException as e:
+        detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+        _job_set(
+            job_id,
+            status="done",
+            result={
+                "step_id": str(step.get("id") or ""),
+                "exit_code": 1,
+                "merged_log": detail,
+                "skipped": False,
+            },
+            error=detail,
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception as e:
+        _job_set(
+            job_id,
+            status="done",
+            result={
+                "step_id": str(step.get("id") or ""),
+                "exit_code": 1,
+                "merged_log": str(e),
+                "skipped": False,
+            },
+            error=str(e),
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+
 @app.post("/api/run/step/{step_id}")
 async def api_run_step(step_id: str, body: RunStepBody | None = None):
+    """同步执行（本地调试可用；经 Cloudflare Worker 时长任务易超时）。"""
     cfg = load_config()
     steps = cfg.get("steps") or []
     step = next((s for s in steps if str(s.get("id")) == step_id), None)
@@ -709,6 +774,58 @@ async def api_run_step(step_id: str, body: RunStepBody | None = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/run/step/{step_id}/async")
+async def api_run_step_async(step_id: str, body: RunStepBody | None = None):
+    """异步启动步骤，立即返回 job_id；前端轮询 /api/run/jobs/{id}（适合 Worker 同源短请求）。"""
+    import secrets
+    from datetime import datetime, timezone
+
+    cfg = load_config()
+    steps = cfg.get("steps") or []
+    step = next((s for s in steps if str(s.get("id")) == step_id), None)
+    if not step:
+        raise HTTPException(status_code=404, detail=f"未知步骤: {step_id}")
+    extra: list[str] | None = None
+    run_mode: str | None = None
+    if body is not None:
+        if body.extra_args:
+            extra = [str(a) for a in body.extra_args]
+        if body.run_mode:
+            run_mode = str(body.run_mode)
+
+    job_id = secrets.token_urlsafe(12)
+    _job_set(
+        job_id,
+        status="queued",
+        step_id=step_id,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    threading.Thread(
+        target=_run_step_job,
+        args=(job_id, cfg, step, extra, run_mode),
+        name=f"run-job-{job_id}",
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/run/jobs/{job_id}")
+def api_run_job(job_id: str):
+    job = _job_get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    out: dict[str, Any] = {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "step_id": job.get("step_id"),
+    }
+    if job.get("status") == "done" and isinstance(job.get("result"), dict):
+        out["result"] = job["result"]
+    if job.get("error"):
+        out["error"] = job["error"]
+    return out
 
 
 @app.post("/api/run/stop")

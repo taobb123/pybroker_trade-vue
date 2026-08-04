@@ -10,7 +10,7 @@ import type {
   WorkspacePathRef,
 } from '@/api/types'
 import { resolveStepTier } from '@/config/businessRules'
-import { apiUrl, apiRunUrl } from '@/config/apiBase'
+import { apiUrl } from '@/config/apiBase'
 
 export type { WorkflowStep, RunResult, RunPayload, TablePreview } from '@/api/types'
 
@@ -207,7 +207,7 @@ export async function fetchWorkflowSteps(): Promise<WorkflowStep[]> {
 /** 与旧版 stock_pool_workflow「停止」一致：终止当前子进程 */
 export async function stopWorkflowRun(): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch(apiRunUrl('/api/run/stop'), { method: 'POST' })
+    const res = await fetch(apiUrl('/api/run/stop'), { method: 'POST' })
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {
       return { ok: false, message: `[停止请求失败] ${JSON.stringify(j)}` }
@@ -218,46 +218,100 @@ export async function stopWorkflowRun(): Promise<{ ok: boolean; message: string 
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** 线上经 Worker：短请求启动 + 轮询；避免同步长连接被网关掐断后落入 mock */
 export async function runWorkflowStep(
   stepId: string,
   payload: RunPayload = {},
 ): Promise<RunResult> {
+  const isLocal =
+    typeof location !== 'undefined' &&
+    (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+
   try {
-    const res = await fetch(apiRunUrl(`/api/run/step/${encodeURIComponent(stepId)}`), {
+    // 1) 异步启动
+    const startRes = await fetch(apiUrl(`/api/run/step/${encodeURIComponent(stepId)}/async`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    const text = await res.text()
-    let j: Record<string, unknown> = {}
-    try {
-      j = text ? (JSON.parse(text) as Record<string, unknown>) : {}
-    } catch {
+    const startText = await startRes.text()
+    if (!startRes.ok) {
+      // 旧后端无 async 接口时回退同步（本地 uvicorn）
+      if (startRes.status === 404 && isLocal) {
+        return runWorkflowStepSync(stepId, payload)
+      }
       return {
         exit_code: 1,
         merged_log: [
           `# run failed · ${stepId}`,
-          `HTTP ${res.status}（响应不是 JSON，常见于网关超时/Worker 未反代）`,
-          text.slice(0, 2000),
+          `启动任务 HTTP ${startRes.status}`,
+          startText.slice(0, 2000),
         ].join('\n'),
       }
     }
-    if (!res.ok) {
+    let startJson: { job_id?: string } = {}
+    try {
+      startJson = JSON.parse(startText) as { job_id?: string }
+    } catch {
       return {
         exit_code: 1,
-        merged_log: JSON.stringify(j, null, 2),
+        merged_log: `# run failed · ${stepId}\n启动响应不是 JSON\n${startText.slice(0, 2000)}`,
+      }
+    }
+    const jobId = startJson.job_id
+    if (!jobId) {
+      return { exit_code: 1, merged_log: `# run failed · ${stepId}\n未返回 job_id` }
+    }
+
+    // 2) 轮询（同源短请求，可经 Worker）
+    const deadline = Date.now() + 30 * 60 * 1000
+    while (Date.now() < deadline) {
+      await sleep(1500)
+      const pollRes = await fetch(apiUrl(`/api/run/jobs/${encodeURIComponent(jobId)}`))
+      const pollText = await pollRes.text()
+      if (!pollRes.ok) {
+        return {
+          exit_code: 1,
+          merged_log: `# run failed · ${stepId}\n轮询 HTTP ${pollRes.status}\n${pollText.slice(0, 2000)}`,
+        }
+      }
+      let job: {
+        status?: string
+        result?: { exit_code?: number; merged_log?: string; skipped?: boolean }
+        error?: string
+      } = {}
+      try {
+        job = JSON.parse(pollText) as typeof job
+      } catch {
+        return {
+          exit_code: 1,
+          merged_log: `# run failed · ${stepId}\n轮询响应不是 JSON\n${pollText.slice(0, 2000)}`,
+        }
+      }
+      if (job.status === 'done') {
+        const result = job.result
+        if (result) {
+          return {
+            exit_code: Number(result.exit_code ?? 1),
+            merged_log: String(result.merged_log ?? job.error ?? ''),
+            skipped: Boolean(result.skipped),
+          }
+        }
+        return {
+          exit_code: 1,
+          merged_log: String(job.error || '任务结束但无结果'),
+        }
       }
     }
     return {
-      exit_code: Number(j.exit_code ?? 1),
-      merged_log: String(j.merged_log ?? ''),
-      skipped: Boolean(j.skipped),
+      exit_code: 1,
+      merged_log: `# run failed · ${stepId}\n等待超时（30 分钟）`,
     }
   } catch (e) {
-    // 仅本地开发兜底 mock；线上必须暴露真实错误，避免误以为「跑成功」
-    const isLocal =
-      typeof location !== 'undefined' &&
-      (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     if (isLocal) {
       return {
         exit_code: 0,
@@ -277,19 +331,44 @@ export async function runWorkflowStep(
     }
     return {
       exit_code: 1,
-      merged_log: [
-        `# run failed · ${stepId}`,
-        '请求后端失败（非 mock）。请检查 api.freealpha.lol 与 CORS。',
-        String(e),
-      ].join('\n'),
+      merged_log: [`# run failed · ${stepId}`, '请求后端失败（非 mock）。', String(e)].join('\n'),
     }
+  }
+}
+
+async function runWorkflowStepSync(
+  stepId: string,
+  payload: RunPayload = {},
+): Promise<RunResult> {
+  const res = await fetch(apiUrl(`/api/run/step/${encodeURIComponent(stepId)}`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  let j: Record<string, unknown> = {}
+  try {
+    j = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+  } catch {
+    return {
+      exit_code: 1,
+      merged_log: `# run failed · ${stepId}\nHTTP ${res.status}\n${text.slice(0, 2000)}`,
+    }
+  }
+  if (!res.ok) {
+    return { exit_code: 1, merged_log: JSON.stringify(j, null, 2) }
+  }
+  return {
+    exit_code: Number(j.exit_code ?? 1),
+    merged_log: String(j.merged_log ?? ''),
+    skipped: Boolean(j.skipped),
   }
 }
 
 export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<TablePreview> {
   try {
     const q = new URLSearchParams({ path, max_rows: String(maxRows) })
-    const res = await fetch(apiRunUrl(`/api/workspace/table?${q}`))
+    const res = await fetch(apiUrl(`/api/workspace/table?${q}`))
     if (!res.ok) {
       return {
         exists: false,
@@ -314,7 +393,7 @@ export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<
 export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     const q = new URLSearchParams({ path })
-    const res = await fetch(apiRunUrl(`/api/workspace/file?${q}`))
+    const res = await fetch(apiUrl(`/api/workspace/file?${q}`))
     if (!res.ok) return { exists: false, content: '' }
     return (await res.json()) as { exists: boolean; content: string }
   } catch {
@@ -324,7 +403,7 @@ export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolea
 
 export async function saveWorkspaceFile(path: string, content: string): Promise<boolean> {
   try {
-    const res = await fetch(apiRunUrl('/api/workspace/file'), {
+    const res = await fetch(apiUrl('/api/workspace/file'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, content }),
@@ -340,7 +419,7 @@ export async function resolveLatestGlob(
 ): Promise<{ rel_path?: string; exists?: boolean } | null> {
   try {
     const q = new URLSearchParams({ glob })
-    const res = await fetch(apiRunUrl(`/api/workspace/latest?${q}`))
+    const res = await fetch(apiUrl(`/api/workspace/latest?${q}`))
     if (!res.ok) return null
     return (await res.json()) as { rel_path?: string; exists?: boolean }
   } catch {
