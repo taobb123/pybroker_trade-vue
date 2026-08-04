@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# 在香港 ECS 上执行：从 git 仓库同步 API 文件到 ~/workflow-api 并重启服务
+# 香港 ECS：git pull 全量 pybroker_integration，安装依赖，systemd 在该目录跑 uvicorn
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/root/pybroker_trade-vue}"
-APP_DIR="${APP_DIR:-/root/workflow-api}"
 SRC="$REPO_DIR/A_stocks/ma_strategy_project/pybroker_integration"
 BRANCH="${DEPLOY_BRANCH:-main}"
+SERVICE_NAME="${SERVICE_NAME:-workflow-api}"
+OLD_APP_DIR="${OLD_APP_DIR:-/root/workflow-api}"
 
 if [[ ! -d "$REPO_DIR/.git" ]]; then
-  echo "ERROR: $REPO_DIR 不是 git 仓库。请先在服务器执行一次性初始化（见部署文档 §1.3）。"
+  echo "ERROR: $REPO_DIR 不是 git 仓库。请先按部署文档初始化 clone。"
   exit 1
 fi
 
@@ -17,36 +18,72 @@ git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-mkdir -p "$APP_DIR/config"
-FILES=(
-  workflow_server.py
-  db.py
-  auth_api.py
-  admin_api.py
-  membership_api.py
-  membership_service.py
-  payment_api.py
-  onboarding_api.py
-  events_api.py
-  events_service.py
-  rate_limit.py
-  requirements.txt
-)
-for f in "${FILES[@]}"; do
-  cp -f "$SRC/$f" "$APP_DIR/$f"
-done
-if [[ -f "$SRC/config/workflow_runner.yaml" ]]; then
-  cp -f "$SRC/config/workflow_runner.yaml" "$APP_DIR/config/workflow_runner.yaml"
+if [[ ! -d "$SRC" ]]; then
+  echo "ERROR: 缺少目录 $SRC"
+  exit 1
 fi
 
-cd "$APP_DIR"
+# 迁移旧精简部署的 SQLite（仅首次）
+if [[ -d "$OLD_APP_DIR/.pybrokercache" && ! -d "$SRC/.pybrokercache" ]]; then
+  echo "migrate sqlite cache from $OLD_APP_DIR"
+  cp -a "$OLD_APP_DIR/.pybrokercache" "$SRC/.pybrokercache"
+fi
+
+cd "$SRC"
 if [[ ! -d .venv ]]; then
   python3 -m venv .venv
 fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
+pip install -q -U pip
 pip install -q -r requirements.txt
+if [[ -f requirements-server.txt ]]; then
+  pip install -q -r requirements-server.txt
+fi
 
-sudo systemctl restart workflow-api
-sudo systemctl is-active workflow-api
-echo "deploy ok: $(date -Is)"
+PYTHON_BIN="$SRC/.venv/bin/python"
+
+# 保留已有 systemd 环境变量（避免每次 deploy 冲掉 JWT / Token）
+if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+  if [[ -z "${MVP_JWT_SECRET:-}" ]]; then
+    MVP_JWT_SECRET="$(grep -E '^Environment=MVP_JWT_SECRET=' "/etc/systemd/system/${SERVICE_NAME}.service" | head -1 | sed 's/^Environment=MVP_JWT_SECRET=//' || true)"
+  fi
+  if [[ -z "${TUSHARE_TOKEN:-}" ]]; then
+    TUSHARE_TOKEN="$(grep -E '^Environment=TUSHARE_TOKEN=' "/etc/systemd/system/${SERVICE_NAME}.service" | head -1 | sed 's/^Environment=TUSHARE_TOKEN=//' || true)"
+  fi
+fi
+MVP_JWT_SECRET="${MVP_JWT_SECRET:-change-me-to-a-long-random-string}"
+TUSHARE_TOKEN="${TUSHARE_TOKEN:-}"
+
+# systemd：工作目录 = 全量 integration（含全部策略 .py）
+sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
+[Unit]
+Description=workflow_server FastAPI (full scripts)
+After=network.target
+
+[Service]
+WorkingDirectory=$SRC
+Environment=CORS_ORIGINS=https://freealpha.lol,https://www.freealpha.lol
+Environment=MVP_JWT_SECRET=$MVP_JWT_SECRET
+Environment=TUSHARE_TOKEN=$TUSHARE_TOKEN
+ExecStart=$PYTHON_BIN -m uvicorn workflow_server:app --host 127.0.0.1 --port 8765
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable "$SERVICE_NAME"
+sudo systemctl restart "$SERVICE_NAME"
+sudo systemctl is-active "$SERVICE_NAME"
+
+# 冒烟：关键脚本应在工作目录可见
+if [[ -f "$SRC/fetch_dc_concept_ma5.py" ]]; then
+  echo "script ok: fetch_dc_concept_ma5.py"
+else
+  echo "WARN: fetch_dc_concept_ma5.py missing after pull"
+fi
+
+echo "deploy full ok: $(date -Is) root=$SRC"

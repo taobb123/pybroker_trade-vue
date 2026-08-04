@@ -359,7 +359,10 @@ def run_one_step(
     if not script_path.is_file():
         raise HTTPException(status_code=400, detail=f"脚本不存在: {script_path}")
 
-    py = str(cfg.get("python_executable") or "python")
+    py = str(cfg.get("python_executable") or "").strip()
+    # 空或字面量 python → 用当前解释器（systemd/venv 下即带依赖的 .venv）
+    if not py or py in ("python", "python3"):
+        py = sys.executable
     cmd = [py, str(script_path)] + [str(a) for a in args]
     env = build_env(cfg)
 
