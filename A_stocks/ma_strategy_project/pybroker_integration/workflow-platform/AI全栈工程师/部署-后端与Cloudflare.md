@@ -169,6 +169,21 @@ railway domain
 | Caddy | 反代 `127.0.0.1:8765`，HTTPS 已通 |
 | 前端 | Cloudflare `VITE_API_BASE_URL=https://api.freealpha.lol`，登录已通 |
 | 注意 | `uvicorn` 须 **systemd 常驻**，否则关 SSH 后易 502 / Failed to fetch |
+| DNS 代理 | `api` 可用橙云；**手机登录**建议前端走同源 `/api`（Worker 反代），构建时 **清空** `VITE_API_BASE_URL` |
+| SSL | Cloudflare 对源站用 **Full / Full strict**（Caddy 已签证书） |
+
+### 1.4 手机登录验收：同源 `/api` 反代（推荐）
+
+现象：电脑能登、手机蜂窝「无法连接」——页面在 Cloudflare，登录却直连 `api.`，部分运营商不稳定。
+
+做法：
+
+1. 仓库已含 `workflow-platform/worker.js`：把 `https://freealpha.lol/api/*` 反代到 `API_ORIGIN`（默认 `https://api.freealpha.lol`）  
+2. Cloudflare 构建变量：**删除或清空** `VITE_API_BASE_URL`（必须为空，前端才用相对路径 `/api`）  
+3. 重新 Deploy 前端（`npm run build` + `wrangler deploy`）  
+4. 手机流量打开站点登录；可在手机访问 `https://freealpha.lol/api/config` 应返回 JSON  
+
+电脑 WiFi / 手机流量都应只请求 `freealpha.lol`，不再依赖单独打通 `api.` 子域。
 
 限制：SQLite 在容器内，重部署可能丢库；完整策略数据未进镜像。
 
