@@ -13,8 +13,8 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：待选(candidate/trial/confirming) + 待选后通过(entry)
-自动推东财自选「量能」（MX_APIKEY 或 config/mx_apikey.txt；--skip-mx-push 可关）。
+跑完后：仅「待选后通过」(entry) 自动推东财自选「量能」
+（MX_APIKEY 或 config/mx_apikey.txt；--skip-mx-push 可关）。
 同时对 combo4/6 全观察池计算估值 upside，排名前 N（默认 2）推东财自选「估值因子」；
 以及 Q / M+ / M- 排名 Top2 分别推「Q」「M加」「M减」。
 
@@ -119,7 +119,7 @@ STATE_PRINT_ORDER = (
     "invalid",
 )
 
-# 推送东财自选「量能」：待选 / 待选后通过
+# 推送东财自选「量能」：仅待选后通过（entry）；待选仍写入 CSV select_tag，但不推送
 SELECT_TAG_BY_STATE = {
     "candidate": "待选",
     "trial": "待选",
@@ -1351,8 +1351,9 @@ def prune_invalid_watch_pools(results: List[PatternResult]) -> List[str]:
 
 def collect_mx_push_symbols(results: List[PatternResult]) -> Tuple[List[str], List[str], List[str]]:
     """
-    返回 (待选代码, 待选后通过代码, 合并去重后的推送列表)。
-    待选 = candidate/trial/confirming；待选后通过 = entry。
+    返回 (待选代码, 待选后通过代码, 实际推送列表)。
+    待选 = candidate/trial/confirming（仅统计）；待选后通过 = entry。
+    推送列表只含待选后通过。
     """
     dai: List[str] = []
     tong: List[str] = []
@@ -1367,13 +1368,7 @@ def collect_mx_push_symbols(results: List[PatternResult]) -> Tuple[List[str], Li
         elif tag == "待选后通过" and sym not in seen_t:
             seen_t.add(sym)
             tong.append(sym)
-    merged: List[str] = []
-    seen = set()
-    for s in dai + tong:
-        if s not in seen:
-            seen.add(s)
-            merged.append(s)
-    return dai, tong, merged
+    return dai, tong, list(tong)
 
 
 def push_selected_to_mx_group(
@@ -1381,14 +1376,14 @@ def push_selected_to_mx_group(
     *,
     group_name: str = MX_PUSH_GROUP_DEFAULT,
 ) -> List[str]:
-    dai, tong, merged = collect_mx_push_symbols(results)
+    dai, tong, to_push = collect_mx_push_symbols(results)
     notes = [
-        f"待选 {len(dai)} 只 · 待选后通过 {len(tong)} 只 · 合计推送 {len(merged)} 只 →「{group_name}」"
+        f"待选 {len(dai)} 只（不推送）· 待选后通过 {len(tong)} 只 · 推送 {len(to_push)} 只 →「{group_name}」"
     ]
-    if not merged:
-        notes.append("无需推送（无待选/待选后通过）")
+    if not to_push:
+        notes.append("无需推送（无待选后通过）")
         return notes
-    _ok, push_notes = add_symbols_to_group(merged, group_name=group_name)
+    _ok, push_notes = add_symbols_to_group(to_push, group_name=group_name)
     notes.extend(push_notes)
     return notes
 
@@ -1755,7 +1750,7 @@ def main() -> None:
     parser.add_argument(
         "--mx-group",
         default=MX_PUSH_GROUP_DEFAULT,
-        help="待选/待选后通过推送的东财自选分组名（默认：量能）",
+        help="待选后通过推送的东财自选分组名（默认：量能）",
     )
     parser.add_argument(
         "--value-mx-group",
@@ -1771,7 +1766,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-mx-push",
         action="store_true",
-        help="不推送形态待选到东财自选「量能」",
+        help="不推送形态「待选后通过」到东财自选「量能」",
     )
     parser.add_argument(
         "--skip-value-rank",
