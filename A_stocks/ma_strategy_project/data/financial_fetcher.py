@@ -5,6 +5,21 @@
 支持从API获取股票财务数据，用于事件驱动策略（财报策略）
 """
 
+import os
+import sys
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+try:
+    from path_bootstrap import prefer_ma_strategy_project_root
+
+    prefer_ma_strategy_project_root(__file__)
+except Exception:
+    if _ROOT in sys.path:
+        sys.path.remove(_ROOT)
+    sys.path.insert(0, _ROOT)
+
 import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, List

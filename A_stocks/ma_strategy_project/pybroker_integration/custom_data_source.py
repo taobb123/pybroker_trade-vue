@@ -11,8 +11,11 @@ from typing import Optional
 import pandas as pd
 from pybroker.data import DataSource
 
-# 添加项目根目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加 ma_strategy_project 到路径最前（必须先于本包 config/，才能 import config.db_config）
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT in sys.path:
+    sys.path.remove(_PROJECT_ROOT)
+sys.path.insert(0, _PROJECT_ROOT)
 
 # 禁用代理（如果需要使用代理，请注释掉以下代码）
 os.environ.pop('HTTP_PROXY', None)

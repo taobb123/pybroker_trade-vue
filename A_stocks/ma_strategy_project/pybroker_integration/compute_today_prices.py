@@ -18,6 +18,21 @@ import subprocess
 import argparse
 import pandas as pd
 
+# cwd 常为 pybroker_integration：先保证上级 ma_strategy_project 的 config/data 优先
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+if _PROJECT_ROOT in sys.path:
+    sys.path.remove(_PROJECT_ROOT)
+sys.path.insert(0, _PROJECT_ROOT)
+try:
+    from path_bootstrap import prefer_ma_strategy_project_root
+
+    prefer_ma_strategy_project_root(os.path.join(_PROJECT_ROOT, "data", "fetcher.py"))
+except Exception:
+    pass
+
 from train_model_symbols import load_train_model_shift_symbols, normalize_a_share_symbol
 from prediction_kline_chart import (
     CHART_SYMBOL_COUNT,
@@ -36,7 +51,7 @@ from prediction_kline_signal import SIGNAL_CSV_NAME, run_signal_pipeline
 
 
 # ---------- 可配置路径（可通过环境变量或命令行覆盖）----------
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = _SCRIPT_DIR
 
 # 结果1/结果2 的 CSV（由两个训练脚本生成）
 RESULT1_CSV = os.path.join(SCRIPT_DIR, 'result1_last.csv')

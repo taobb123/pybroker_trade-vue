@@ -10,11 +10,14 @@ from datetime import datetime, timedelta
 import os
 import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 _TRAIN_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 本目录：train_model_symbols 等；上级 ma_strategy_project 必须排在最前，
+# 否则会被本目录 config/ 抢占，导致找不到 config.db_config
 if _TRAIN_SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _TRAIN_SCRIPT_DIR)
+if PROJECT_ROOT in sys.path:
+    sys.path.remove(PROJECT_ROOT)
+sys.path.insert(0, PROJECT_ROOT)
 
 import pybroker
 from pybroker import ExecContext, Strategy, StrategyConfig, indicator, enable_caches
