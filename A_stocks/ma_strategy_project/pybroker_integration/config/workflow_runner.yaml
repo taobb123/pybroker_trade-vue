@@ -63,6 +63,7 @@ steps:
   script: fetch_vp_six_combo.py
   args: []
   highlight: chain
+  tier: advanced
   frequency: daily
   frequency_note: 跟随 fetch_a_low_ma5 · Phase2；watch4/6 滚动≤6交易日、同票留最新；可粘贴列表覆盖
   symbols_paste: true
@@ -268,6 +269,7 @@ steps:
   script: compute_today_prices.py
   args: []
   highlight: daily
+  tier: advanced
   frequency: daily
   workspace_inputs:
   - path: config/train_model_shift_symbols.txt

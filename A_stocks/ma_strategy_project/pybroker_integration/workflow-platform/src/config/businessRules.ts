@@ -43,6 +43,8 @@ export const RUN_RATE_WINDOW_SEC = 60
 export const ADVANCED_STEP_IDS = new Set<string>([
   'market_temperature',
   'fetch_pattern_entry',
+  'fetch_vp_six_combo',
+  'compute_today',
   'factor_Investing_strategy_pro',
   'risk-based_strategy',
 ])
@@ -82,6 +84,7 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
     features: [
       '每日好球预览（限 1 条）',
       '观察池 5 只',
+      'K线/做T档位需 Pro',
       '基础工作流',
       '每天 10 次运行',
     ],
@@ -105,6 +108,8 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
     features: [
       '完整好球雷达',
       '观察池 40 只',
+      '预测K线 + 做T档位',
+      '做T止盈止损 / 量价六组合',
       '每天 100 次运行',
       '高级策略',
       '报告导出',
