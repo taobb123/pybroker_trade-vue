@@ -89,7 +89,12 @@ prediction_data = {}  # {symbol: {'dates': [], 'predictions': [], 'prices': []}}
 
 def exec_fn(ctx: ExecContext):
     # 获取模型对下一个时间窗口的预测值
-    preds = ctx.preds('slr')
+    # walkforward 早期 bar / 个别标的可能尚未挂上模型，直接 preds 会抛 ValueError
+    try:
+        preds = ctx.preds('slr')
+    except ValueError as e:
+        print(f"[{ctx.symbol}] 跳过：{e}")
+        return
     if isinstance(preds, (list, np.ndarray)) and len(preds) > 0:
         prediction = float(preds[-1])
     else:
