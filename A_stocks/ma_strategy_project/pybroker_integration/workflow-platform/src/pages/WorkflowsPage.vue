@@ -56,6 +56,7 @@ const filtered = computed(() => {
 async function focusStepFromRoute() {
   const stepId = String(route.query.step ?? '').trim()
   const runId = String(route.query.run ?? '').trim()
+  const modeId = String(route.query.mode ?? '').trim()
   if (!stepId) {
     focusStepId.value = ''
     expandAdvancedFor.value = ''
@@ -67,6 +68,13 @@ async function focusStepFromRoute() {
   focusStepId.value = stepId
   // 最近运行进入：展开「高级/输入」
   expandAdvancedFor.value = stepId
+
+  const step = store.steps.find((s) => s.id === stepId)
+  if (step && modeId && step.runModes?.some((m) => m.id === modeId)) {
+    const draft = store.ensureDraft(step)
+    draft.runMode = modeId
+  }
+
   await nextTick()
   const el = document.getElementById(`wf-card-${stepId}`)
   el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -79,7 +87,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => [route.query.step, route.query.run, store.steps.length] as const,
+  () => [route.query.step, route.query.run, route.query.mode, store.steps.length] as const,
   () => {
     void focusStepFromRoute()
   },

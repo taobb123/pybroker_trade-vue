@@ -180,3 +180,22 @@ export function chartBlockTitle(chart: PredictionChart, historyDays: number): st
   }
   return title
 }
+
+/** 报告页精简：仅名称 */
+export function chartStockName(chart: PredictionChart): string {
+  const sig = getChartSignal(chart)
+  return sig?.stock_name || chart.symbol_name || chart.symbol || ''
+}
+
+/** 报告页精简：涨/跌文案 */
+export function chartRiseFallLabel(chart: PredictionChart): string {
+  const sig = getChartSignal(chart)
+  const label = sig?.predicted_direction_label || ''
+  if (label === '涨' || label === '跌') return label
+  const dir = sig?.predicted_direction
+  if (dir === 'up') return '涨'
+  if (dir === 'down') return '跌'
+  if (chart.pred_dir === 'up') return '涨'
+  if (chart.pred_dir === 'down') return '跌'
+  return label || '—'
+}

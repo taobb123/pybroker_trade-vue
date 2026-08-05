@@ -3,8 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { fetchWorkspaceFile } from '@/api/workflow'
 import {
-  chartBlockTitle,
-  getChartSignal,
+  chartRiseFallLabel,
+  chartStockName,
   isPredictionKlinePath,
   parsePredictionKlineJson,
   toCandlestickOption,
@@ -23,15 +23,10 @@ const charts: echarts.ECharts[] = []
 let resizeObserver: ResizeObserver | null = null
 let renderToken = 0
 
-const historyDays = computed(
-  () => payload.value?.history_days || payload.value?.charts?.[0]?.history_days || 20,
-)
-
 const headerTitle = computed(() => {
   if (!payload.value) return ''
   const n = payload.value.charts.length
-  const model = payload.value.model_label || payload.value.charts[0]?.model_label || '结果1+2 · 综合预测高低'
-  return `预测 K 线（结果1+2 综合高低）· ${n} 只 · ${model} · ${historyDays.value}+1 根`
+  return n > 1 ? `预测 K 线 · ${n} 只` : '预测 K 线'
 })
 
 function setHostRef(el: unknown, idx: number) {
@@ -132,28 +127,11 @@ function onWinResize() {
   charts.forEach((c) => c.resize())
 }
 
-function predBadgeClass(chart: PredictionChart): string {
-  const dir = getChartSignal(chart)?.predicted_direction || 'flat'
-  if (dir === 'up') return 'bg-gradient-to-b from-red-500 to-red-700 text-white border-red-400'
-  if (dir === 'down') return 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white border-emerald-400'
-  return 'bg-muted text-muted-foreground border-border'
-}
-
-function barBadgeClass(chart: PredictionChart): string {
-  const dir = getChartSignal(chart)?.t1_pred_direction || 'flat'
-  if (dir === 'red') return 'border-red-300 bg-red-50 text-red-700'
-  if (dir === 'green') return 'border-emerald-300 bg-emerald-50 text-emerald-700'
-  return 'border-border bg-muted text-muted-foreground'
-}
-
-function predBadgeText(chart: PredictionChart): string {
-  const sig = getChartSignal(chart)
-  return `预测${sig?.predicted_direction_label || sig?.predicted_direction || '?'}`
-}
-
-function barBadgeText(chart: PredictionChart): string {
-  const sig = getChartSignal(chart)
-  return `T+1 ${sig?.t1_pred_direction_label || sig?.t1_pred_direction || '信号'}`
+function riseFallClass(chart: PredictionChart): string {
+  const label = chartRiseFallLabel(chart)
+  if (label === '涨') return 'bg-red-600 text-white'
+  if (label === '跌') return 'bg-emerald-600 text-white'
+  return 'bg-muted text-muted-foreground'
 }
 
 onMounted(() => {
@@ -179,12 +157,7 @@ watch(
 
 <template>
   <div class="space-y-3">
-    <div v-if="payload" class="space-y-1">
-      <p class="text-sm font-semibold text-foreground">{{ headerTitle }}</p>
-      <p class="text-[11px] text-muted-foreground">
-        🟧 高/低 = 四数综合区间 · 非真实开收 · 红涨绿跌 · 末根 = 未来预测日
-      </p>
-    </div>
+    <p v-if="payload" class="text-sm font-semibold text-foreground">{{ headerTitle }}</p>
 
     <p v-if="loading" class="py-10 text-center text-sm text-muted-foreground">加载预测 K 线…</p>
     <p
@@ -200,22 +173,14 @@ watch(
         class="overflow-hidden rounded-lg border bg-white p-3"
       >
         <div class="mb-2 flex flex-wrap items-center gap-2">
-          <template v-if="getChartSignal(chart)">
-            <span
-              class="rounded px-2.5 py-0.5 text-[13px] font-extrabold tracking-wide border shadow-sm"
-              :class="predBadgeClass(chart)"
-            >
-              {{ predBadgeText(chart) }}
-            </span>
-            <span
-              class="rounded border px-1.5 py-0.5 text-[11px] font-semibold"
-              :class="barBadgeClass(chart)"
-            >
-              {{ barBadgeText(chart) }}
-            </span>
-          </template>
-          <span class="text-xs font-semibold text-foreground">
-            {{ chartBlockTitle(chart, historyDays) }}
+          <span class="text-sm font-semibold text-foreground">
+            {{ chartStockName(chart) }}
+          </span>
+          <span
+            class="rounded px-2 py-0.5 text-xs font-bold"
+            :class="riseFallClass(chart)"
+          >
+            {{ chartRiseFallLabel(chart) }}
           </span>
         </div>
         <div

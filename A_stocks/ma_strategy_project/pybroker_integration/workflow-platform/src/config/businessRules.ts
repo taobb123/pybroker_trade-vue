@@ -79,7 +79,12 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
       'workspace.cloud_save': false,
       'team.seats': false,
     },
-    features: ['基础工作流', '每天 10 次运行', '本地运行历史'],
+    features: [
+      '每日好球预览（限 1 条）',
+      '观察池 5 只',
+      '基础工作流',
+      '每天 10 次运行',
+    ],
     cta: '使用 Free',
   },
   pro: {
@@ -97,8 +102,14 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
       'workspace.cloud_save': true,
       'team.seats': false,
     },
-    features: ['每天 100 次运行', '高级策略', '报告导出', '云端保存'],
-    cta: '升级 Pro',
+    features: [
+      '完整好球雷达',
+      '观察池 40 只',
+      '每天 100 次运行',
+      '高级策略',
+      '报告导出',
+    ],
+    cta: '解锁完整好球与观察纪律',
   },
   team: {
     id: 'team',
@@ -115,7 +126,7 @@ export const PLAN_RULES: Record<PlanTier, PlanRule> = {
       'workspace.cloud_save': true,
       'team.seats': true,
     },
-    features: ['不限运行次数', '高级策略', '席位协作', '优先支持'],
+    features: ['完整好球与观察池', '不限运行次数', '席位协作', '优先支持'],
     cta: '联系客服',
   },
 }
@@ -150,12 +161,12 @@ export const ONBOARDING_PERSONAS: {
   { id: 'explorer', label: '先随便看看', hint: '先熟悉平台再定方向' },
 ]
 
-/** 引导完成后的落地页；`/` 等总览不算用户意图，仍去推荐策略 */
+/** 引导完成后的落地页；默认机会雷达（价值 MVP） */
 export function resolveOnboardingLanding(redirect?: unknown): string {
-  const recommended = `/workflows?step=${ONBOARDING_RECOMMENDED_STEP_ID}`
-  if (typeof redirect !== 'string' || !redirect.startsWith('/')) return recommended
-  if (redirect.startsWith('/onboarding')) return recommended
-  if (redirect === '/' || redirect === '') return recommended
+  const radar = '/'
+  if (typeof redirect !== 'string' || !redirect.startsWith('/')) return radar
+  if (redirect.startsWith('/onboarding')) return radar
+  if (redirect === '/' || redirect === '') return radar
   return redirect
 }
 

@@ -260,28 +260,55 @@ def _plain_sentiment(sent: Optional[FactorScore]) -> str:
 
 
 def build_plain_diagnosis(result: TemperatureResult) -> PlainDiagnosis:
-    """生成非专业人士可读的诊断摘要。"""
+    """生成非专业人士可读的诊断摘要。
+
+    仓位文案以 result.position_pct（含回测校准映射）为准，避免出现
+    「建议重仓」却写「宜轻仓」的对立表述。
+    """
     score = result.total_score
     pos = result.position_pct
+    calibrated = bool(result.extra.get("calibration_loaded"))
 
+    # 情绪强弱仍看温度分；仓位建议看校准后的 position
     if score >= 80:
-        headline = f"市场偏强，可考虑接近满仓运作（建议约 {pos:.0f}%）。"
         mood = "进攻"
+        sentiment = "偏强"
     elif score >= 60:
-        headline = f"市场中性偏强，适合积极但留有余地（建议约 {pos:.0f}%）。"
         mood = "偏进攻"
+        sentiment = "中性偏强"
     elif score >= 40:
-        headline = f"市场震荡分化，宜中性仓位、精选个股（建议约 {pos:.0f}%）。"
         mood = "平衡"
+        sentiment = "震荡分化"
     elif score >= 20:
-        headline = f"市场偏弱，宜轻仓观望、减少新开仓（建议约 {pos:.0f}%）。"
         mood = "防守"
+        sentiment = "偏弱"
     else:
-        headline = f"市场较弱，建议空仓或仅极小仓位观察（建议约 {pos:.0f}%）。"
         mood = "极度防守"
+        sentiment = "较弱"
+
+    if pos >= 85:
+        pos_tone = "接近满仓运作"
+    elif pos >= 55:
+        pos_tone = "相对积极仓位"
+    elif pos >= 30:
+        pos_tone = "中性仓位、精选个股"
+    elif pos >= 10:
+        pos_tone = "轻仓试探"
+    else:
+        pos_tone = "空仓或极小仓位观察"
+
+    if calibrated and score < 45 and pos >= 55:
+        # 典型矛盾：情绪弱但回测校准给高仓 → 解释清楚
+        headline = (
+            f"市场情绪{sentiment}（温度分 {score:.0f}），"
+            f"但按过往同类情绪区间的未来收益回测，建议{pos_tone}"
+            f"（约 {pos:.0f}%）：弱市中保留参与空间，不等于追涨。"
+        )
+    else:
+        headline = f"市场{sentiment}，建议{pos_tone}（约 {pos:.0f}%）。"
 
     if result.risk_penalty > 0:
-        headline += f" 另有多项风险信号，已下调评分。"
+        headline += " 另有多项风险信号，已下调评分。"
 
     factor_plain: Dict[str, str] = {}
     snapshot: List[str] = []

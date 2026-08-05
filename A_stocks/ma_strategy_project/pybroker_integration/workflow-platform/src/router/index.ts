@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from '@/layouts/AppShell.vue'
+import RadarPage from '@/pages/RadarPage.vue'
+import WatchlistPage from '@/pages/WatchlistPage.vue'
 import DashboardPage from '@/pages/DashboardPage.vue'
 import WorkflowsPage from '@/pages/WorkflowsPage.vue'
 import RunsPage from '@/pages/RunsPage.vue'
@@ -34,8 +36,15 @@ export const router = createRouter({
       path: '/',
       component: AppShell,
       children: [
-        { path: '', name: 'dashboard', component: DashboardPage, meta: { title: '总览' } },
-        { path: 'usage', name: 'usage', component: UsagePage, meta: { title: '用量' } },
+        { path: '', name: 'radar', component: RadarPage, meta: { title: '机会雷达' } },
+        { path: 'watchlist', name: 'watchlist', component: WatchlistPage, meta: { title: '观察池' } },
+        { path: 'overview', name: 'dashboard', component: DashboardPage, meta: { title: '运行总览' } },
+        {
+          path: 'usage',
+          name: 'usage',
+          component: UsagePage,
+          meta: { title: '用量', requiresAuth: true, requiresAdmin: true },
+        },
         { path: 'workflows', name: 'workflows', component: WorkflowsPage, meta: { title: '工作流' } },
         { path: 'runs', name: 'runs', component: RunsPage, meta: { title: '运行记录' } },
         { path: 'reports', name: 'reports', component: ReportsPage, meta: { title: '报告' } },

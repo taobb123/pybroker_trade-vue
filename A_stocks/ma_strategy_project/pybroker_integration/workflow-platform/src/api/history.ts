@@ -1,5 +1,4 @@
 import type { RunResult, WorkspaceOutput } from '@/api/types'
-import { parseReportFromLog } from '@/api/parse'
 
 export type RunRecord = {
   id: string
@@ -84,6 +83,18 @@ function seedDemoHistory(): RunRecord[] {
 
   const records: RunRecord[] = [
     {
+      id: 'demo-roc20',
+      stepId: 'roc_20',
+      stepTitle: '20日 ROC 排序',
+      startedAt: new Date(now - 3 * 60_000).toISOString(),
+      finishedAt: new Date(now - 2 * 60_000).toISOString(),
+      exitCode: 0,
+      status: 'success',
+      log: rocLog,
+      durationMs: 1800,
+      outputs: [{ path: 'factor_investing_ranking_latest.csv', label: 'ROC20 表' }],
+    },
+    {
       id: 'demo-compute',
       stepId: 'compute_today',
       stepTitle: '做 T 止盈止损',
@@ -112,7 +123,6 @@ function seedDemoHistory(): RunRecord[] {
     },
   ]
 
-  parseReportFromLog(rocLog)
   saveRunHistory(records)
   return records
 }

@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { useRoute, RouterLink, RouterView } from 'vue-router'
 import {
+  Crosshair,
+  Bookmark,
   LayoutDashboard,
   Workflow,
   History,
@@ -36,14 +38,18 @@ const mainScroll = ref<HTMLElement | null>(null)
 
 const nav = computed(() => {
   const base = [
-    { to: '/', label: '总览', icon: LayoutDashboard },
-    { to: '/usage', label: '用量', icon: Activity },
+    { to: '/', label: '机会雷达', icon: Crosshair },
+    { to: '/watchlist', label: '观察池', icon: Bookmark },
+    { to: '/overview', label: '运行总览', icon: LayoutDashboard },
     { to: '/workflows', label: '工作流', icon: Workflow },
     { to: '/runs', label: '运行记录', icon: History },
     { to: '/reports', label: '报告', icon: FileBarChart2 },
   ]
   if (auth.user?.role === 'admin') {
-    base.push({ to: '/admin', label: '管理', icon: Shield })
+    base.push(
+      { to: '/usage', label: '用量', icon: Activity },
+      { to: '/admin', label: '管理', icon: Shield },
+    )
   }
   return base
 })
@@ -89,7 +95,11 @@ const contentMax = computed(() => {
                 <SidebarMenuButton
                   as-child
                   :tooltip="item.label"
-                  :is-active="route.path === item.to"
+                  :is-active="
+                    item.to === '/'
+                      ? route.path === '/'
+                      : route.path === item.to || route.path.startsWith(`${item.to}/`)
+                  "
                 >
                   <RouterLink :to="item.to">
                     <component :is="item.icon" />
@@ -114,7 +124,9 @@ const contentMax = computed(() => {
         <Separator orientation="vertical" class="mr-2 h-4" />
         <div class="min-w-0">
           <h1 class="truncate text-sm font-semibold">{{ pageTitle }}</h1>
-          <p class="truncate text-xs text-muted-foreground">对接 workflow_server · 旧台并存</p>
+          <p class="truncate text-xs text-muted-foreground">
+            {{ route.name === 'radar' ? '只打好球 · 规则评分 · 非投资建议' : '对接 workflow_server · 旧台并存' }}
+          </p>
         </div>
       </header>
       <div

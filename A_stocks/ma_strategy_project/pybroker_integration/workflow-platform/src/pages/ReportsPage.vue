@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -46,8 +47,8 @@ import {
 import { isPathOutput, type WorkspaceOutput } from '@/api/types'
 import { useWorkflowStore } from '@/stores/workflow'
 import { useQuotaStore } from '@/stores/quota'
-import { useRouter } from 'vue-router'
 
+const route = useRoute()
 const store = useWorkflowStore()
 const quota = useQuotaStore()
 const router = useRouter()
@@ -259,6 +260,30 @@ watch(
     const prefer = (stepId && list.find((r) => r.stepId === stepId)) || list[0]
     if (prefer) store.selectRun(prefer.id)
   },
+  { immediate: true },
+)
+
+/** 价值 MVP S3：从雷达/观察池深链 ?step= / ?run= */
+function applyReportDeepLink() {
+  const runId = String(route.query.run ?? '').trim()
+  const stepId = String(route.query.step ?? '').trim()
+  if (runId) {
+    const byId = store.runs.find((r) => r.id === runId)
+    if (byId) {
+      store.selectRun(byId.id)
+      return
+    }
+  }
+  if (!stepId) return
+  const prefer =
+    reportRuns.value.find((r) => r.stepId === stepId) ||
+    store.runs.find((r) => r.stepId === stepId)
+  if (prefer) store.selectRun(prefer.id)
+}
+
+watch(
+  () => [route.query.step, route.query.run, reportRuns.value.length] as const,
+  () => applyReportDeepLink(),
   { immediate: true },
 )
 

@@ -53,12 +53,15 @@ npx shadcn-vue@latest add <component> -y
 
 | 页面 | 状态 |
 |---|---|
+| 机会雷达 `/` | 选球卡：中性多头净值 Top2×前2股；卡内嵌预测K线+右侧做T买一买二；无中性产物则回退 |
+| 观察池 `/watchlist` | localStorage · 理想买入区 · 档位容量门控 · 报告深链 |
+| 运行总览 `/overview` | KPI + 最近结果（原 Dashboard） |
 | 登录 `/login` | 服务端 JWT · 邮箱注册/登录；演示账号预填（内测） |
 | 用户中心 `/account` | 头像缩写 / 昵称 / 邮箱 / 手机 / 会员等级 / 邀请码 |
 | 会员套餐 `/billing/plans` | Free / Pro(¥99) / Team；内测开通；Team 微信二维码；付费不退 |
 | 订单 `/billing/orders` | 服务端订单列表 |
-| 用量 `/usage` | events 转化漏斗 + 本机 run Top（Mock 访问已下线） |
-| 总览 Dashboard | KPI + 最近结果 BarList / 预览表（工作流结果向，与用量分离） |
+| 用量 `/usage` | **仅管理员**：events 转化漏斗 + 本机 run Top |
+| 总览 Dashboard | 迁至 `/overview`；首页改为机会雷达 |
 | 工作流 Workflows | 按 YAML 动态输入（粘贴/形态ID/模式/池/编辑）+ 查看产物链接 |
 | 运行记录 Runs | 历史表 + 筛选 + 日志 Sheet + 跳转报告 |
 | 报告 Reports | 工作区表（CSV）+ 文档（Markdown）+ 文本（TXT）+ 图形（PNG）+ 预测 K 线（JSON/ECharts）+ 次要日志 |
