@@ -195,7 +195,9 @@ railway domain
 同步脚本会 `git pull`、安装 `requirements.txt` + **`requirements-server.txt`（含 `lib-pybroker` / sklearn / numba）**、重启服务，并在首次迁移旧 SQLite。  
 安装后冒烟：`python -c "import pybroker,sklearn,numba"` 必须成功，否则部署失败。
 
-东财等脚本如需 Token：GitHub Secret `TUSHARE_TOKEN`，或写入 systemd 环境变量后 restart。
+东财等脚本如需 Token：GitHub Secret `TUSHARE_TOKEN`，或写入 systemd 环境变量后 restart。  
+妙想推自选：GitHub Secret `MX_APIKEY`，或 systemd `Environment=MX_APIKEY=...` / `config/mx_apikey.txt`。  
+同步脚本会从已有 unit/drop-in **保留** `MVP_JWT_SECRET` / `TUSHARE_TOKEN` / `MX_APIKEY`，避免每次 deploy 冲掉。
 
 冒烟：不应再出现 `脚本不存在: /root/workflow-api/fetch_...`。
 
@@ -257,6 +259,9 @@ ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\workflow_ecs_deploy -N '""'
 | `ECS_SSH_KEY` | 是 | 上面私钥全文 |
 | `ECS_REPO_DIR` | 否 | 默认 `/root/pybroker_trade-vue` |
 | `ECS_APP_DIR` | 否 | 默认 `/root/workflow-api` |
+| `TUSHARE_TOKEN` | 否 | 写入 systemd；未设则保留服务器已有值 |
+| `MVP_JWT_SECRET` | 否 | 同上 |
+| `MX_APIKEY` | 否 | 妙想 Skills Key；未设则保留服务器已有值 |
 
 工作流文件：`.github/workflows/deploy-workflow-api.yml`  
 服务器同步脚本：`.../pybroker_integration/scripts/sync_workflow_api_on_server.sh`

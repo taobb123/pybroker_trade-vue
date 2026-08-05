@@ -63,17 +63,34 @@ if missing:
 print("strategy deps ok")
 PY
 
-# 保留已有 systemd 环境变量（避免每次 deploy 冲掉 JWT / Token）
-if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
-  if [[ -z "${MVP_JWT_SECRET:-}" ]]; then
-    MVP_JWT_SECRET="$(grep -E '^Environment=MVP_JWT_SECRET=' "/etc/systemd/system/${SERVICE_NAME}.service" | head -1 | sed 's/^Environment=MVP_JWT_SECRET=//' || true)"
+# 从主 unit / drop-in 读取已有 Environment=KEY=...（避免 deploy 冲掉密钥）
+_read_service_env() {
+  local key="$1"
+  local unit="/etc/systemd/system/${SERVICE_NAME}.service"
+  local drop_dir="/etc/systemd/system/${SERVICE_NAME}.service.d"
+  local val=""
+  if [[ -f "$unit" ]]; then
+    val="$(grep -E "^Environment=${key}=" "$unit" | head -1 | sed "s/^Environment=${key}=//" || true)"
   fi
-  if [[ -z "${TUSHARE_TOKEN:-}" ]]; then
-    TUSHARE_TOKEN="$(grep -E '^Environment=TUSHARE_TOKEN=' "/etc/systemd/system/${SERVICE_NAME}.service" | head -1 | sed 's/^Environment=TUSHARE_TOKEN=//' || true)"
+  if [[ -z "$val" && -d "$drop_dir" ]]; then
+    val="$(grep -rhE "^Environment=${key}=" "$drop_dir" 2>/dev/null | head -1 | sed "s/^Environment=${key}=//" || true)"
   fi
+  printf '%s' "$val"
+}
+
+# 保留已有 systemd 环境变量（避免每次 deploy 冲掉 JWT / Token / 妙想 Key）
+if [[ -z "${MVP_JWT_SECRET:-}" ]]; then
+  MVP_JWT_SECRET="$(_read_service_env MVP_JWT_SECRET)"
+fi
+if [[ -z "${TUSHARE_TOKEN:-}" ]]; then
+  TUSHARE_TOKEN="$(_read_service_env TUSHARE_TOKEN)"
+fi
+if [[ -z "${MX_APIKEY:-}" ]]; then
+  MX_APIKEY="$(_read_service_env MX_APIKEY)"
 fi
 MVP_JWT_SECRET="${MVP_JWT_SECRET:-change-me-to-a-long-random-string}"
 TUSHARE_TOKEN="${TUSHARE_TOKEN:-}"
+MX_APIKEY="${MX_APIKEY:-}"
 
 # systemd：工作目录 = 全量 integration；PYTHONPATH 含上级以便 data.* / pybroker_integration.*
 sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
@@ -86,6 +103,7 @@ WorkingDirectory=$SRC
 Environment=CORS_ORIGINS=https://freealpha.lol,https://www.freealpha.lol
 Environment=MVP_JWT_SECRET=$MVP_JWT_SECRET
 Environment=TUSHARE_TOKEN=$TUSHARE_TOKEN
+Environment=MX_APIKEY=$MX_APIKEY
 Environment=PYTHONPATH=$PARENT_DIR
 Environment=PYTHONUTF8=1
 ExecStart=$PYTHON_BIN -m uvicorn workflow_server:app --host 127.0.0.1 --port 8765
