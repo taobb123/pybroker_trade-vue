@@ -1,0 +1,2 @@
+# 由 fetch_vp_six_combo 自动生成 · combo_id=2 底部放量上涨
+# 供 fetch_pattern_entry 作为默认观察池；可手工增删。

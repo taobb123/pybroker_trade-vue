@@ -1,0 +1,8 @@
+# 由 fetch_vp_six_combo 自动生成 · combo_id=3 上涨缩量整理
+# 供 fetch_pattern_entry 作为默认观察池；可手工增删。
+
+000028
+000411
+000503
+000705
+000950

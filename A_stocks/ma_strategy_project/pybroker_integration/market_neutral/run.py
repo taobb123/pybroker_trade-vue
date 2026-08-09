@@ -102,7 +102,17 @@ def parse_args(argv=None) -> argparse.Namespace:
         action="store_true",
         help="轮动仅用 ICIR×温度规则，不用轻量 GBM",
     )
+    p.add_argument(
+        "--combo-ids",
+        default="4,6",
+        help="观察池 combo id，逗号分隔（默认 4,6；对比步骤可用 2,3）",
+    )
     p.add_argument("--output-dir", default="")
+    p.add_argument(
+        "--latest-dir",
+        default="",
+        help="同步 latest 的目录（默认 market_neutral/output/latest）",
+    )
     return p.parse_args(argv)
 
 
@@ -147,8 +157,20 @@ def main(argv=None) -> int:
     variants = tuple(
         _norm_variant(x) for x in str(args.variants).split(",") if x.strip()
     )
+    combo_ids = tuple(
+        int(x.strip())
+        for x in str(args.combo_ids or "4,6").split(",")
+        if str(x).strip()
+    )
+    if not combo_ids:
+        print("combo-ids 为空", flush=True)
+        return 1
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = args.output_dir.strip() or os.path.join(_PKG, "output", run_id)
+    latest_dir = (
+        args.latest_dir.strip()
+        or os.path.join(_PKG, "output", "latest")
+    )
     warm_start = pd_timestamp_minus_days(args.start, 280)
 
     cfg = MNConfig(
@@ -160,10 +182,13 @@ def main(argv=None) -> int:
         upside_min=float(args.upside_min),
         variants=variants,
         output_dir=out_dir,
+        latest_output_dir=latest_dir,
         use_watch_archive=not bool(args.no_archive),
+        combo_ids=combo_ids,
     )
 
     q_pct = int(round(cfg.quantile * 100))
+    pool_tag = "+".join(str(x) for x in combo_ids)
     print("=" * 60, flush=True)
     print(
         f"市场中性 | 个股多空 前{q_pct}%/后{q_pct}% | "
@@ -171,7 +196,7 @@ def main(argv=None) -> int:
         flush=True,
     )
     print(
-        f"区间 {cfg.start_date}~{cfg.end_date}  variants={variants}",
+        f"区间 {cfg.start_date}~{cfg.end_date}  variants={variants}  pool=combo{pool_tag}",
         flush=True,
     )
     print("=" * 60, flush=True)
@@ -338,7 +363,11 @@ def main(argv=None) -> int:
             )
 
     cfg_info = {
-        "pool": "combo4+6(+archive)" if cfg.use_watch_archive else "combo4+6",
+        "pool": (
+            f"combo{pool_tag}(+archive)"
+            if cfg.use_watch_archive
+            else f"combo{pool_tag}"
+        ),
         "hedge": f"个股多空 前{q_pct}%/后{q_pct}%",
         "rebalance": cfg.rebalance,
         "q_rebalance": cfg.q_rebalance,

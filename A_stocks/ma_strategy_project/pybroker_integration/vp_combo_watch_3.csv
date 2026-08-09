@@ -1,0 +1,6 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+000028,国药一致,2026-08-07,3,上涨缩量整理,20.32,-0.3922,22.08,20.43,20.32,31138.08,0.8712,0.8712,False,82.0,True,uptrend,
+000411,英特集团,2026-08-07,3,上涨缩量整理,9.65,0.6257,9.9,9.65,9.65,41075.0,0.837,0.837,False,84.0,True,uptrend,
+000503,国新健康,2026-08-07,3,上涨缩量整理,7.39,-2.2487,7.82,7.56,7.39,203919.07,0.8275,0.8275,False,74.0,True,uptrend,
+000705,浙江震元,2026-08-07,3,上涨缩量整理,6.71,1.6667,6.83,6.74,6.71,63620.19,0.9334,0.9334,False,76.0,True,uptrend,
+000950,重药控股,2026-08-07,3,上涨缩量整理,5.43,1.6854,5.8,5.44,5.43,381505.92,1.1045,1.1045,False,76.0,True,uptrend,

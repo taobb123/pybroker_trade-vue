@@ -44,6 +44,7 @@ export const ADVANCED_STEP_IDS = new Set<string>([
   'market_temperature',
   'fetch_pattern_entry',
   'fetch_vp_six_combo',
+  'vp_combo_23_long_compare',
   'compute_today',
   'factor_Investing_strategy_pro',
   'risk-based_strategy',

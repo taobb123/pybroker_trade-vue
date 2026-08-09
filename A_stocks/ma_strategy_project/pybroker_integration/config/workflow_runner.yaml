@@ -119,6 +119,43 @@ steps:
     label: 观察池M+排名表
   - path: pattern_entry_mminus_rank.csv
     label: 观察池M-排名表
+- id: vp_combo_23_long_compare
+  title: 回测对比 · 底部放量上涨+上涨缩量整理 vs 原4+6（仅多头年化）
+  type: script
+  script: run_vp_combo_23_long_compare.py
+  args:
+  - --start
+  - '2025-06-01'
+  - --rebalance
+  - weekly
+  - --q-rebalance
+  - monthly
+  - --quantile
+  - '0.10'
+  - --variants
+  - A,B,Q,M+,M-
+  highlight: chain
+  tier: advanced
+  frequency: weekly
+  frequency_note: 不改原六组合；从 scan 导出 watch2+3→同策略中性回测→与 latest(4+6) 仅多头年化并排；固定M-截面 mud_minus Top2→自选「23M减」
+  workspace_inputs:
+  - path: vp_six_combo_scan.csv
+    label: 量价六组合表（需先跑六组合）
+  - path: market_neutral/output/latest/metrics.csv
+    label: 原4+6中性指标（建议先跑市场中性）
+  workspace_outputs:
+  - path: vp_combo_23_vs_46_long_annual.md
+    label: 仅多头年化对比摘要
+  - path: vp_combo_23_vs_46_long_annual.csv
+    label: 仅多头年化对比表
+  - path: vp_combo_23_mminus_top.csv
+    label: M- mud_minus Top（推送「23M减」）
+  - path: vp_combo_watch_2.csv
+    label: 底部放量上涨观察表
+  - path: vp_combo_watch_3.csv
+    label: 上涨缩量整理观察表
+  - path: market_neutral/output/combo23_latest/summary.md
+    label: combo2+3 中性回测摘要
 - id: market_neutral
   title: 市场中性 · 形态/PE/Q/MUD 个股多空
   type: script

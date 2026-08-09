@@ -136,29 +136,36 @@ def seed_from_current_watch(
     combo_ids: Sequence[int] = (4, 6),
     root: Optional[str] = None,
 ) -> List[str]:
-    """若归档为空，用当前 vp_combo_watch_{id}.csv 播种一版。"""
+    """
+    对「尚无任何归档」的 combo，用当前 vp_combo_watch_{id}.csv 播种一版。
+    已有其它 combo 归档时，仍可为缺失的 combo 单独播种（避免 4+6 有档却跳过 2+3）。
+    """
     notes: List[str] = []
+    archived: set = set()
     ip = index_path(root)
     if os.path.isfile(ip):
         try:
             idx = pd.read_csv(ip, encoding="utf-8-sig")
-            if not idx.empty:
-                notes.append(f"归档已有 {len(idx)} 条索引，跳过播种")
-                return notes
+            if not idx.empty and "combo_id" in idx.columns:
+                archived = {int(x) for x in idx["combo_id"].dropna().tolist()}
         except Exception:
             pass
     for cid in combo_ids:
-        path = os.path.join(integration_root, f"vp_combo_watch_{int(cid)}.csv")
+        cid_i = int(cid)
+        if cid_i in archived:
+            notes.append(f"watch[{cid_i}] 已有归档，跳过播种")
+            continue
+        path = os.path.join(integration_root, f"vp_combo_watch_{cid_i}.csv")
         if not os.path.isfile(path):
-            notes.append(f"无当前 watch[{cid}]，跳过")
+            notes.append(f"无当前 watch[{cid_i}]，跳过")
             continue
         try:
             df = pd.read_csv(path, encoding="utf-8-sig")
         except Exception as exc:
-            notes.append(f"读取 watch[{cid}] 失败: {exc}")
+            notes.append(f"读取 watch[{cid_i}] 失败: {exc}")
             continue
-        out = save_watch_snapshot(df, int(cid), root=root)
-        notes.append(f"播种 watch[{cid}] → {out}")
+        out = save_watch_snapshot(df, cid_i, root=root)
+        notes.append(f"播种 watch[{cid_i}] → {out}")
     return notes
 
 
