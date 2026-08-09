@@ -17,6 +17,7 @@
 （MX_APIKEY 或 config/mx_apikey.txt；--skip-mx-push 可关）。
 同时对 combo4/6 全观察池计算估值 upside，排名前 N（默认 2）推东财自选「估值因子」；
 以及 Q / M+ / M- 排名 Top2 分别推「Q」「M加」「M减」。
+对「量能 / M加 / M减」推送票计算半凯利仓位（上限 20%）→ pattern_entry_kelly_positions.csv。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -60,12 +61,17 @@ from fetch_vp_six_combo import (  # noqa: E402
     watch_csv_path,
 )
 from mx_self_select import add_symbols_to_group  # noqa: E402
+from kelly_position import (  # noqa: E402
+    build_kelly_rows_for_symbols,
+    write_kelly_position_csv,
+)
 
 DEFAULT_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_scan.csv")
 DEFAULT_VALUE_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_valuation_rank.csv")
 DEFAULT_Q_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_q_rank.csv")
 DEFAULT_MPLUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_rank.csv")
 DEFAULT_MMINUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mminus_rank.csv")
+DEFAULT_KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_kelly_positions.csv")
 
 PATTERN_ENTRY_CONFIG = {
     "history_calendar_days": 220,
@@ -1647,6 +1653,73 @@ def run_qm_rank_and_push(
     return notes
 
 
+def _top_symbols_from_rank_csv(path: str, top_n: int) -> List[str]:
+    p = os.path.abspath(path)
+    if not os.path.isfile(p):
+        return []
+    try:
+        df = pd.read_csv(p, encoding="utf-8-sig")
+    except Exception:
+        return []
+    if df is None or df.empty or "symbol" not in df.columns:
+        return []
+    n = max(1, int(top_n))
+    out: List[str] = []
+    seen = set()
+    for raw in df["symbol"].head(n).tolist():
+        s = _norm_symbol(raw)
+        if len(s) == 6 and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
+
+
+def build_pattern_kelly_rows(
+    results: List[PatternResult],
+    *,
+    name_map: Dict[str, str],
+    mx_group: str = MX_PUSH_GROUP_DEFAULT,
+    skip_mx_push: bool = False,
+    mplus_csv: str = DEFAULT_MPLUS_OUT_CSV,
+    mminus_csv: str = DEFAULT_MMINUS_OUT_CSV,
+    qm_top_n: int = QM_TOP_N_DEFAULT,
+    skip_qm: bool = False,
+) -> Tuple[List[dict], List[str]]:
+    """
+    仅对「量能 / M加 / M减」推送池挂凯利（口径 A · 半凯利 · 上限 20%）。
+    不包含估值因子、Q。
+    """
+    notes: List[str] = []
+    rows: List[dict] = []
+
+    # 量能：与推送一致，仅待选后通过
+    if not skip_mx_push:
+        _dai, tong, _ = collect_mx_push_symbols(results)
+        r1, _st, n1 = build_kelly_rows_for_symbols(
+            mx_group or MX_PUSH_GROUP_DEFAULT,
+            tong,
+            name_map=name_map,
+        )
+        rows.extend(r1)
+        notes.extend(n1)
+    else:
+        notes.append("量能推送已跳过，不计算其凯利仓位")
+
+    if not skip_qm:
+        for group, path in (
+            (MX_MPLUS_GROUP_DEFAULT, mplus_csv),
+            (MX_MMINUS_GROUP_DEFAULT, mminus_csv),
+        ):
+            syms = _top_symbols_from_rank_csv(path, qm_top_n)
+            r, _st, n = build_kelly_rows_for_symbols(group, syms, name_map=name_map)
+            rows.extend(r)
+            notes.extend(n)
+    else:
+        notes.append("Q/M 排名已跳过，不计算 M加/M减 凯利仓位")
+
+    return rows, notes
+
+
 def _combo_name_default(combo_id: int) -> str:
     return "下跌放量" if int(combo_id) == 6 else "上涨放量突破"
 
@@ -1924,6 +1997,21 @@ def main() -> None:
     else:
         qm_notes = ["已跳过 Q/M 排名（--skip-qm-rank）"]
 
+    kelly_notes: List[str] = []
+    kelly_rows, kn = build_pattern_kelly_rows(
+        results,
+        name_map=name_map,
+        mx_group=str(args.mx_group or MX_PUSH_GROUP_DEFAULT),
+        skip_mx_push=bool(args.skip_mx_push),
+        mplus_csv=DEFAULT_MPLUS_OUT_CSV,
+        mminus_csv=DEFAULT_MMINUS_OUT_CSV,
+        qm_top_n=int(args.qm_top_n),
+        skip_qm=bool(args.skip_qm_rank),
+    )
+    kelly_notes.extend(kn)
+    kelly_path = write_kelly_position_csv(kelly_rows, DEFAULT_KELLY_OUT_CSV)
+    kelly_notes.append(f"凯利仓位表 → {kelly_path}")
+
     print("=" * 72)
     print(
         f"形态建仓 | combo={combo_ids} | 截止 {args.end_date} | "
@@ -1946,6 +2034,10 @@ def main() -> None:
     if qm_notes:
         print("【Q / M加 / M减】")
         for pn in qm_notes:
+            print(f"  {pn}")
+    if kelly_notes:
+        print("【凯利仓位·量能/M加/M减】")
+        for pn in kelly_notes:
             print(f"  {pn}")
 
     by_state: Dict[str, List[PatternResult]] = {}

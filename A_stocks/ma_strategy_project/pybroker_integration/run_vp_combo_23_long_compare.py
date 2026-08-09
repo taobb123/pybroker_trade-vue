@@ -9,6 +9,7 @@
   3) 用同一套市场中性参数跑 combo2+3（输出到独立 latest，不覆盖 4+6）
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
   5) 固定 M-：combo23 最新 factor_snapshot 按 mud_minus Top2 → 东财自选「23M减」
+  6) 半凯利仓位（口径A · 上限20%）写入 CSV/日志（仅「23M减」推送票）
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
 """
@@ -38,6 +39,10 @@ from fetch_vp_six_combo import (  # noqa: E402
 from market_neutral.data.pool_archive import save_watch_snapshot  # noqa: E402
 from market_neutral.run import main as market_neutral_main  # noqa: E402
 from mx_self_select import add_symbols_to_group  # noqa: E402
+from kelly_position import (  # noqa: E402
+    build_kelly_rows_for_symbols,
+    write_kelly_position_csv,
+)
 
 DEFAULT_SCAN = DEFAULT_OUT_CSV
 BASELINE_METRICS = os.path.join(
@@ -49,6 +54,7 @@ COMBO23_LATEST = os.path.join(
 COMPARE_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_vs_46_long_annual.csv")
 COMPARE_MD = os.path.join(_SCRIPT_DIR, "vp_combo_23_vs_46_long_annual.md")
 MMINUS_TOP_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_mminus_top.csv")
+KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_kelly_positions.csv")
 MX_MMINUS_GROUP = "23M减"
 MX_TOP_N_DEFAULT = 2
 NEW_IDS = (2, 3)
@@ -222,7 +228,7 @@ def push_mminus_top_to_mx(
     group_name: str = MX_MMINUS_GROUP,
     out_rank_csv: str = MMINUS_TOP_CSV,
     skip_push: bool = False,
-) -> List[str]:
+) -> Tuple[List[str], List[str], pd.DataFrame]:
     notes: List[str] = []
     top, pn = pick_mminus_top_from_snapshot(snapshot_csv, top_n=top_n)
     notes.extend(pn)
@@ -238,15 +244,18 @@ def push_mminus_top_to_mx(
         ).to_csv(out, index=False, encoding="utf-8-sig")
     notes.append(f"M- Top 表 → {out}")
 
+    syms: List[str] = []
+    if top is not None and not top.empty:
+        syms = [_norm_symbol(x) for x in top["symbol"].tolist()]
+        syms = [s for s in syms if len(s) == 6]
+
     if skip_push:
         notes.append(f"已跳过推送「{group_name}」")
-        return notes
-    if top is None or top.empty:
+        return syms, notes, top if top is not None else pd.DataFrame()
+    if not syms:
         notes.append(f"无 Top 股票，跳过推送「{group_name}」")
-        return notes
+        return syms, notes, top if top is not None else pd.DataFrame()
 
-    syms = [_norm_symbol(x) for x in top["symbol"].tolist()]
-    syms = [s for s in syms if len(s) == 6]
     brief = []
     for _, r in top.iterrows():
         name = str(r.get("stock_name") or "")
@@ -261,7 +270,7 @@ def push_mminus_top_to_mx(
     )
     _ok, push_notes = add_symbols_to_group(syms, group_name=group_name)
     notes.extend(push_notes)
-    return notes
+    return syms, notes, top
 
 
 def write_compare_report(
@@ -479,14 +488,34 @@ def main(argv=None) -> int:
     ]
     snap_path = next((p for p in snap_candidates if os.path.isfile(p)), snap_candidates[-1])
     print("【东财自选·23M减】", flush=True)
-    for note in push_mminus_top_to_mx(
+    push_syms, push_notes, top_df = push_mminus_top_to_mx(
         snap_path,
         top_n=int(args.mx_top_n),
         group_name=str(args.mx_group or MX_MMINUS_GROUP),
         out_rank_csv=MMINUS_TOP_CSV,
         skip_push=bool(args.skip_mx_push),
-    ):
+    )
+    for note in push_notes:
         print(f"  {note}", flush=True)
+
+    name_map: dict = {}
+    if top_df is not None and not top_df.empty and "symbol" in top_df.columns:
+        for _, r in top_df.iterrows():
+            s = _norm_symbol(r.get("symbol"))
+            if len(s) == 6:
+                name_map[s] = str(r.get("stock_name") or "")
+
+    print("【凯利仓位·23M减】", flush=True)
+    kelly_rows, _st, kelly_notes = build_kelly_rows_for_symbols(
+        str(args.mx_group or MX_MMINUS_GROUP),
+        push_syms,
+        name_map=name_map,
+        source_dir_override=COMBO23_LATEST,
+    )
+    for note in kelly_notes:
+        print(f"  {note}", flush=True)
+    kelly_path = write_kelly_position_csv(kelly_rows, KELLY_OUT_CSV)
+    print(f"  凯利仓位表 → {kelly_path}", flush=True)
 
     print("=" * 64, flush=True)
     return 0
