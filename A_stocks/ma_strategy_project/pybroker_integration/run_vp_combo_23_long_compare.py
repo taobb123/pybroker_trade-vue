@@ -8,8 +8,8 @@
   2) 归档当日 2+3 快照
   3) 用同一套市场中性参数跑 combo2+3（输出到独立 latest，不覆盖 4+6）
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
-  5) 固定 M-：combo23 最新 factor_snapshot 按 mud_minus Top2 → 东财自选「23M减」
-  6) 半凯利仓位（口径A · 上限20%）写入 CSV/日志（仅「23M减」推送票）
+  5) 定向推送（2+3 优势 Q/B，双池仍推 M-）：Q、估值因子、23M减 各 Top2
+  6) 半凯利仓位跟随推送名单写入 CSV/日志
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
 """
@@ -19,7 +19,7 @@ import argparse
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -55,7 +55,11 @@ COMPARE_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_vs_46_long_annual.csv")
 COMPARE_MD = os.path.join(_SCRIPT_DIR, "vp_combo_23_vs_46_long_annual.md")
 MMINUS_TOP_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_mminus_top.csv")
 KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_kelly_positions.csv")
+VALUE_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_valuation_rank.csv")
+Q_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_rank.csv")
 MX_MMINUS_GROUP = "23M减"
+MX_VALUE_GROUP = "估值因子"
+MX_Q_GROUP = "Q"
 MX_TOP_N_DEFAULT = 2
 NEW_IDS = (2, 3)
 BASE_IDS = (4, 6)
@@ -79,6 +83,133 @@ def _combo_label(ids: Tuple[int, ...]) -> str:
         name = COMBO_META.get(int(i), {}).get("combo_name", str(i))
         parts.append(f"{i}:{name}")
     return " + ".join(parts)
+
+
+def collect_combo23_pool_symbols() -> Tuple[List[str], Dict[str, str], List[str]]:
+    """合并 watch_2/watch_3 代码与名称。"""
+    notes: List[str] = []
+    syms: List[str] = []
+    names: Dict[str, str] = {}
+    seen = set()
+    for cid in NEW_IDS:
+        path = watch_csv_path(cid, out_dir=_SCRIPT_DIR)
+        if not os.path.isfile(path):
+            notes.append(f"无 watch[{cid}]：{path}")
+            continue
+        try:
+            df = pd.read_csv(path, encoding="utf-8-sig")
+        except Exception as exc:
+            notes.append(f"读取 watch[{cid}] 失败: {exc}")
+            continue
+        if df is None or df.empty or "symbol" not in df.columns:
+            notes.append(f"watch[{cid}] 为空")
+            continue
+        n_add = 0
+        for _, r in df.iterrows():
+            s = _norm_symbol(r.get("symbol"))
+            if len(s) != 6 or s in seen:
+                continue
+            seen.add(s)
+            syms.append(s)
+            nm = str(r.get("stock_name") or "")
+            if nm:
+                names[s] = nm
+            n_add += 1
+        notes.append(f"watch[{cid}] 纳入 {n_add} 只")
+    notes.append(f"2+3 观察池合计 {len(syms)} 只")
+    return syms, names, notes
+
+
+def push_combo23_value_and_q(
+    pool_syms: Sequence[str],
+    *,
+    name_map: Dict[str, str],
+    end_date: str,
+    top_n: int = MX_TOP_N_DEFAULT,
+    skip_push: bool = False,
+    skip_fina: bool = False,
+) -> Tuple[List[dict], List[str], Dict[str, List[str]]]:
+    """
+    2+3 池：估值因子(B) + Q 排名 TopN 推送。
+    返回 (推送记录[{group,syms}], 日志, {group: syms})。
+    """
+    from fetch_pattern_entry import (  # noqa: WPS433
+        push_rank_top_to_mx_group,
+        push_value_top_to_mx_group,
+        rank_observation_pool_by_valuation,
+        _write_rank_csv,
+    )
+    from market_neutral.factors.daily_pool_rank import rank_observation_pool_qm
+
+    notes: List[str] = []
+    pushed: Dict[str, List[str]] = {MX_VALUE_GROUP: [], MX_Q_GROUP: []}
+    records: List[dict] = []
+
+    ranked_v, vn = rank_observation_pool_by_valuation(
+        list(pool_syms), end_date=end_date, name_map=name_map
+    )
+    notes.extend(vn)
+    v_path = _write_rank_csv(
+        VALUE_RANK_CSV,
+        ranked_v if ranked_v is not None else pd.DataFrame(),
+        ["rank", "asof", "symbol", "stock_name", "upside", "pe_ttm", "pe_ref", "industry"],
+    )
+    notes.append(f"估值排名表 → {v_path}")
+    v_top: List[str] = []
+    if ranked_v is not None and not ranked_v.empty and "symbol" in ranked_v.columns:
+        for raw in ranked_v["symbol"].head(max(1, int(top_n))).tolist():
+            s = _norm_symbol(raw)
+            if len(s) == 6 and s not in v_top:
+                v_top.append(s)
+    if skip_push:
+        notes.append(f"已跳过「{MX_VALUE_GROUP}」推送")
+        pushed[MX_VALUE_GROUP] = v_top
+    else:
+        syms, pn = push_value_top_to_mx_group(
+            ranked_v if ranked_v is not None else pd.DataFrame(),
+            top_n=top_n,
+            group_name=MX_VALUE_GROUP,
+        )
+        notes.extend(pn)
+        pushed[MX_VALUE_GROUP] = list(syms) if syms else v_top
+        records.append({"group": MX_VALUE_GROUP, "symbols": list(pushed[MX_VALUE_GROUP])})
+
+    ranked_map, qn = rank_observation_pool_qm(
+        list(pool_syms),
+        end_date=end_date,
+        name_map=name_map,
+        skip_fina=skip_fina,
+    )
+    notes.extend(qn)
+    q_df = ranked_map.get("Q") if isinstance(ranked_map, dict) else None
+    q_path = _write_rank_csv(
+        Q_RANK_CSV,
+        q_df if q_df is not None else pd.DataFrame(),
+        ["rank", "asof", "symbol", "stock_name", "company_q", "roe", "ocf_to_or", "upside"],
+    )
+    notes.append(f"Q 排名表 → {q_path}")
+    q_top: List[str] = []
+    if q_df is not None and not q_df.empty and "symbol" in q_df.columns:
+        for raw in q_df["symbol"].head(max(1, int(top_n))).tolist():
+            s = _norm_symbol(raw)
+            if len(s) == 6 and s not in q_top:
+                q_top.append(s)
+    if skip_push:
+        notes.append(f"已跳过「{MX_Q_GROUP}」推送")
+        pushed[MX_Q_GROUP] = q_top
+    else:
+        syms, pn = push_rank_top_to_mx_group(
+            q_df if q_df is not None else pd.DataFrame(),
+            top_n=top_n,
+            group_name=MX_Q_GROUP,
+            score_col="company_q",
+            label="Q",
+        )
+        notes.extend(pn)
+        pushed[MX_Q_GROUP] = list(syms) if syms else q_top
+        records.append({"group": MX_Q_GROUP, "symbols": list(pushed[MX_Q_GROUP])})
+
+    return records, notes, pushed
 
 
 def export_watch_23(*, scan_csv: str) -> List[str]:
@@ -348,7 +479,8 @@ def write_compare_report(
             "- 原步骤「量价六组合」仍只导出/归档 4+6；本步骤单独导出 2+3。",
             "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
             "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
-            f"- 固定因子 M-：最新截面 `mud_minus` Top2 推东财自选「{MX_MMINUS_GROUP}」。",
+            f"- 定向推送：Q / 估值因子 / 「{MX_MMINUS_GROUP}」各 Top2（2+3 优势 Q/B，双池仍推 M-）。",
+            "- 半凯利仓位跟随上述推送名单（CSV/日志）。",
             "",
         ]
     )
@@ -487,6 +619,25 @@ def main(argv=None) -> int:
         os.path.join(COMBO23_LATEST, "factor_snapshot.csv"),
     ]
     snap_path = next((p for p in snap_candidates if os.path.isfile(p)), snap_candidates[-1])
+
+    pool_syms, pool_names, pool_notes = collect_combo23_pool_symbols()
+    print("【2+3 观察池】", flush=True)
+    for note in pool_notes:
+        print(f"  {note}", flush=True)
+
+    end_date = (str(args.end).strip() or datetime.now().strftime("%Y-%m-%d"))[:10]
+    print("【东财自选·Q / 估值因子】", flush=True)
+    _recs, vq_notes, pushed_map = push_combo23_value_and_q(
+        pool_syms,
+        name_map=pool_names,
+        end_date=end_date,
+        top_n=int(args.mx_top_n),
+        skip_push=bool(args.skip_mx_push),
+        skip_fina=bool(args.skip_fina),
+    )
+    for note in vq_notes:
+        print(f"  {note}", flush=True)
+
     print("【东财自选·23M减】", flush=True)
     push_syms, push_notes, top_df = push_mminus_top_to_mx(
         snap_path,
@@ -498,21 +649,31 @@ def main(argv=None) -> int:
     for note in push_notes:
         print(f"  {note}", flush=True)
 
-    name_map: dict = {}
+    name_map: Dict[str, str] = dict(pool_names)
     if top_df is not None and not top_df.empty and "symbol" in top_df.columns:
         for _, r in top_df.iterrows():
             s = _norm_symbol(r.get("symbol"))
             if len(s) == 6:
-                name_map[s] = str(r.get("stock_name") or "")
+                name_map[s] = str(r.get("stock_name") or "") or name_map.get(s, "")
 
-    print("【凯利仓位·23M减】", flush=True)
-    kelly_rows, _st, kelly_notes = build_kelly_rows_for_symbols(
-        str(args.mx_group or MX_MMINUS_GROUP),
-        push_syms,
-        name_map=name_map,
-        source_dir_override=COMBO23_LATEST,
-    )
-    for note in kelly_notes:
+    # 凯利跟随推送名单：Q / 估值因子 / 23M减（均用 combo23 净值）
+    print("【凯利仓位·Q / 估值因子 / 23M减】", flush=True)
+    kelly_rows: List[dict] = []
+    kelly_all_notes: List[str] = []
+    for group, syms in (
+        (MX_Q_GROUP, pushed_map.get(MX_Q_GROUP, [])),
+        (MX_VALUE_GROUP, pushed_map.get(MX_VALUE_GROUP, [])),
+        (str(args.mx_group or MX_MMINUS_GROUP), push_syms),
+    ):
+        rows, _st, kn = build_kelly_rows_for_symbols(
+            group,
+            syms,
+            name_map=name_map,
+            source_dir_override=COMBO23_LATEST,
+        )
+        kelly_rows.extend(rows)
+        kelly_all_notes.extend(kn)
+    for note in kelly_all_notes:
         print(f"  {note}", flush=True)
     kelly_path = write_kelly_position_csv(kelly_rows, KELLY_OUT_CSV)
     print(f"  凯利仓位表 → {kelly_path}", flush=True)

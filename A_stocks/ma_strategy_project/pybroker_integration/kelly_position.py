@@ -29,11 +29,14 @@ KELLY_CAP = 0.20
 MIN_MONTHS = 3
 
 # 分组 → (仅多头变体, 默认 metrics 目录)
+# 量能≈A、估值因子≈B；4+6 侧用 latest，2+3 侧用 combo23_latest
 GROUP_VARIANT_MAP = {
     "量能": ("A_L", DEFAULT_MN_LATEST),
     "M加": ("M+_L", DEFAULT_MN_LATEST),
     "M减": ("M-_L", DEFAULT_MN_LATEST),
     "23M减": ("M-_L", DEFAULT_COMBO23_LATEST),
+    "Q": ("Q_L", DEFAULT_COMBO23_LATEST),
+    "估值因子": ("B_L", DEFAULT_COMBO23_LATEST),
 }
 
 

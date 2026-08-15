@@ -90,7 +90,7 @@ steps:
   args: []
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；待选后通过→「量能」；估值Top2→「估值因子」；Q/M+/M-各Top2；凯利半凯利+20%上限写CSV（仅量能/M加/M减）；作废码剔除观察池
+  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；只推量能/M加/M减（不推Q/估值）；半凯利跟随推送名单；作废码剔除观察池
   symbols_paste: true
   symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
   symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
@@ -139,7 +139,7 @@ steps:
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 不改原六组合；从 scan 导出 watch2+3→同策略中性回测→与 latest(4+6) 仅多头年化并排；固定M-截面 mud_minus Top2→自选「23M减」；半凯利+20%上限→CSV/日志
+  frequency_note: 不改原六组合；2+3回测对比；定向推送Q/估值因子/23M减各Top2；半凯利跟随推送名单
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）
@@ -152,8 +152,12 @@ steps:
     label: 仅多头年化对比表
   - path: vp_combo_23_mminus_top.csv
     label: M- mud_minus Top（推送「23M减」）
+  - path: vp_combo_23_q_rank.csv
+    label: 2+3 池 Q 排名（推送「Q」）
+  - path: vp_combo_23_valuation_rank.csv
+    label: 2+3 池估值排名（推送「估值因子」）
   - path: vp_combo_23_kelly_positions.csv
-    label: 凯利仓位（23M减）
+    label: 凯利仓位·Q/估值因子/23M减
   - path: vp_combo_watch_2.csv
     label: 底部放量上涨观察表
   - path: vp_combo_watch_3.csv

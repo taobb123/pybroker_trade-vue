@@ -15,8 +15,8 @@
 
 跑完后：仅「待选后通过」(entry) 自动推东财自选「量能」
 （MX_APIKEY 或 config/mx_apikey.txt；--skip-mx-push 可关）。
-同时对 combo4/6 全观察池计算估值 upside，排名前 N（默认 2）推东财自选「估值因子」；
-以及 Q / M+ / M- 排名 Top2 分别推「Q」「M加」「M减」。
+定向优化（4+6 优势 A/M+，双池仍推 M-）：另推「M加」「M减」Top2；
+「Q」「估值因子」改由 vp_combo_23_long_compare 推送（本步默认不推）。
 对「量能 / M加 / M减」推送票计算半凯利仓位（上限 20%）→ pattern_entry_kelly_positions.csv。
 
 用法（在 ma_strategy_project 目录下）：
@@ -1593,8 +1593,12 @@ def run_qm_rank_and_push(
     q_group: str = MX_Q_GROUP_DEFAULT,
     mplus_group: str = MX_MPLUS_GROUP_DEFAULT,
     mminus_group: str = MX_MMINUS_GROUP_DEFAULT,
+    push_labels: Optional[Sequence[str]] = None,
 ) -> List[str]:
-    """观察池 Q/M+/M- 排名写 CSV，并 TopN 推东财自选「Q」「M加」「M减」。"""
+    """
+    观察池 Q/M+/M- 排名写 CSV；按 push_labels 推东财自选。
+    push_labels 默认全推；形态建仓定向可传 ("M+", "M-") 不推 Q。
+    """
     notes: List[str] = []
     try:
         from market_neutral.factors.daily_pool_rank import rank_observation_pool_qm
@@ -1608,6 +1612,10 @@ def run_qm_rank_and_push(
         skip_fina=skip_fina,
     )
     notes.extend(rn)
+
+    allow = None
+    if push_labels is not None:
+        allow = {str(x).strip().upper().replace("＋", "+").replace("－", "-") for x in push_labels}
 
     specs = [
         (
@@ -1639,8 +1647,13 @@ def run_qm_rank_and_push(
         out = _write_rank_csv(path, df if df is not None else pd.DataFrame(), empty_cols)
         n_rows = 0 if df is None or df.empty else len(df)
         notes.append(f"{label} 排名表({n_rows}) → {out}")
-        if skip_push:
-            notes.append(f"已跳过「{group}」推送")
+        label_key = label.upper()
+        do_push = (allow is None) or (label_key in allow)
+        if skip_push or not do_push:
+            if not do_push:
+                notes.append(f"定向：不推送「{group}」（{label}）")
+            else:
+                notes.append(f"已跳过「{group}」推送")
             continue
         _syms, pn = push_rank_top_to_mx_group(
             df if df is not None else pd.DataFrame(),
@@ -1687,7 +1700,7 @@ def build_pattern_kelly_rows(
 ) -> Tuple[List[dict], List[str]]:
     """
     仅对「量能 / M加 / M减」推送池挂凯利（口径 A · 半凯利 · 上限 20%）。
-    不包含估值因子、Q。
+    形态建仓定向：不推 Q/估值因子，故凯利也不含这两项。
     """
     notes: List[str] = []
     rows: List[dict] = []
@@ -1849,7 +1862,12 @@ def main() -> None:
     parser.add_argument(
         "--skip-value-push",
         action="store_true",
-        help="计算估值排名但不推送「估值因子」",
+        help="计算估值排名但不推送「估值因子」（默认本就不推；保留兼容）",
+    )
+    parser.add_argument(
+        "--push-value",
+        action="store_true",
+        help="例外：仍推送「估值因子」（默认关闭，定向由 2+3 对比步骤推）",
     )
     parser.add_argument(
         "--skip-qm-rank",
@@ -1955,7 +1973,7 @@ def main() -> None:
         if ranked is not None and not ranked.empty:
             ranked.to_csv(value_path, index=False, encoding="utf-8-sig")
             value_notes.append(f"估值排名表 → {value_path}")
-            if not bool(args.skip_value_push):
+            if not bool(args.skip_value_push) and bool(getattr(args, "push_value", False)):
                 _syms, pn = push_value_top_to_mx_group(
                     ranked,
                     top_n=int(args.value_top_n),
@@ -1963,7 +1981,9 @@ def main() -> None:
                 )
                 value_notes.extend(pn)
             else:
-                value_notes.append("已跳过「估值因子」推送（--skip-value-push）")
+                value_notes.append(
+                    "定向优化：形态建仓不推「估值因子」（改由 2+3 回测对比推送）"
+                )
         else:
             # 仍写空表，便于工作流「查看」
             pd.DataFrame(
@@ -1993,6 +2013,8 @@ def main() -> None:
             top_n=int(args.qm_top_n),
             skip_push=bool(args.skip_qm_push),
             skip_fina=bool(args.skip_qm_fina),
+            # 定向：4+6 优势在 A/M+，双池仍推 M-；Q 改由 2+3 对比步骤推
+            push_labels=("M+", "M-"),
         )
     else:
         qm_notes = ["已跳过 Q/M 排名（--skip-qm-rank）"]
@@ -2032,7 +2054,7 @@ def main() -> None:
         for pn in value_notes:
             print(f"  {pn}")
     if qm_notes:
-        print("【Q / M加 / M减】")
+        print("【M加 / M减】（定向不推 Q）")
         for pn in qm_notes:
             print(f"  {pn}")
     if kelly_notes:
