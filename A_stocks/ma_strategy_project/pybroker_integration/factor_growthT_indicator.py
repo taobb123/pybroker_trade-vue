@@ -316,7 +316,9 @@ if PROJECT_ROOT not in sys.path:
 from pybroker_integration.custom_data_source import create_custom_data_source
 from pybroker_integration.steady_quality_financial import build_steady_quality_scores
 from pybroker_integration.mx_self_select import (
-    fetch_self_select_groups,
+    DEFAULT_MX_GROUPS_DIR,
+    group_txt_path,
+    load_group_symbols_txt,
     replace_group_symbols,
 )
 
@@ -535,22 +537,21 @@ def run_mx_group_growth_rank(
     *,
     skip_push: bool = False,
     ranking_file: Optional[str] = None,
+    groups_dir: Optional[str] = None,
 ) -> int:
     """
-    拉取东财自选现况（含手改）→ 各组独立成长排序 → 原组写回。
-    两组不合并宇宙、不混合推送。
+    读取项目内分组 txt → 各组独立成长排序 → 推东财同名分组。
+    不回写桌面文件，也不覆盖分组 txt。
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ranking_file = ranking_file or os.path.join(script_dir, "factor_growth_ranking.csv")
+    groups_dir = os.path.abspath(groups_dir or DEFAULT_MX_GROUPS_DIR)
     wanted = [str(g).strip() for g in group_names if str(g).strip()]
     print("=" * 80)
-    print("成长因子排序 · 东财自选分组（不混合）")
+    print("成长因子排序 · 项目分组文件（不混合、不回写桌面）")
     print("分组: " + "、".join(f"「{g}」" for g in wanted))
+    print(f"名单目录: {groups_dir}")
     print("=" * 80)
-
-    groups, fetch_notes = fetch_self_select_groups(wanted=wanted)
-    for line in fetch_notes:
-        print(f"  {line}")
     if not wanted:
         print("✗ 未指定分组")
         return 2
@@ -558,29 +559,27 @@ def run_mx_group_growth_rank(
     all_rows: List[dict] = []
     any_ok = False
     for g in wanted:
-        current = list(groups.get(g) or [])
-        if not current:
-            for k, v in groups.items():
-                if k == g or g in k or k in g:
-                    current = list(v)
-                    break
+        path = group_txt_path(g, groups_dir)
+        current, notes = load_group_symbols_txt(path)
         print("-" * 72)
-        print(f"【{g}】拉取 {len(current)} 只: {', '.join(current) if current else '（空）'}")
+        for line in notes:
+            print(f"  {line}")
+        print(f"【{g}】{len(current)} 只: {', '.join(current) if current else '（空）'}")
         if not current:
-            print(f"  跳过「{g}」：自选为空，不推送、不改该组")
+            print(f"  跳过「{g}」：无有效代码，不推送")
             continue
         ranked, details, scores = _rank_symbols_keep_all(current)
         names = get_stock_names(ranked)
         industries = get_stock_industries(ranked)
         all_rows.extend(_ranking_rows(g, ranked, details, names, industries))
-        print(f"  组内成长排序（高→低）:")
+        print("  组内成长排序（高→低）:")
         for i, sym in enumerate(ranked, 1):
             sc = scores.get(sym)
             sc_s = f"{sc:.4f}" if sc is not None and sc == sc else "无财务分"
             print(f"    {i}. {names.get(sym, sym)} {sym}  {sc_s}")
         any_ok = True
         if skip_push:
-            print(f"  已跳过写回「{g}」")
+            print(f"  已跳过写回东财「{g}」")
             continue
         ok, push_notes = replace_group_symbols(
             ranked, group_name=g, current_symbols=current
@@ -588,7 +587,8 @@ def run_mx_group_growth_rank(
         for line in push_notes:
             print(f"  {line}")
         if not ok:
-            print(f"  ⚠ 「{g}」写回未完全成功")
+            print(f"  ⚠ 「{g}」写回东财未完全成功")
+        print(f"  未改写分组文件: {path}")
 
     if all_rows:
         try:
@@ -603,12 +603,17 @@ def run_mx_group_growth_rank(
 
 
 def main():
-    """默认：股票池 + 四层评分 + 回测。指定 --from-mx-groups 则只对东财自选分组排序并写回。"""
+    """默认：股票池 + 四层评分 + 回测。指定 --from-mx-groups 则读项目分组 txt，排序后推东财。"""
     parser = argparse.ArgumentParser(description="稳健高质量成长因子")
     parser.add_argument(
         "--from-mx-groups",
         default="",
-        help="逗号分隔东财自选分组名（如 M加,Q）；指定后拉取该组现况分组成长排序并原组写回，不做回测",
+        help="逗号分隔分组名（如 M加,Q）；读取 config/mx_groups/{名}.txt，组内成长排序后推东财同名分组",
+    )
+    parser.add_argument(
+        "--mx-groups-dir",
+        default="",
+        help="分组 txt 目录（默认 config/mx_groups）",
     )
     parser.add_argument(
         "--skip-mx-push",
@@ -620,7 +625,11 @@ def main():
     if groups_arg:
         names = [x.strip() for x in groups_arg.replace("，", ",").split(",") if x.strip()]
         raise SystemExit(
-            run_mx_group_growth_rank(names, skip_push=bool(args.skip_mx_push))
+            run_mx_group_growth_rank(
+                names,
+                skip_push=bool(args.skip_mx_push),
+                groups_dir=str(args.mx_groups_dir or "").strip() or None,
+            )
         )
 
     print("=" * 80)

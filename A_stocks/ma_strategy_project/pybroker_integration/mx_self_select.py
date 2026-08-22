@@ -22,6 +22,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_APIKEY_FILE = os.path.join(_SCRIPT_DIR, "config", "mx_apikey.txt")
+DEFAULT_MX_GROUPS_DIR = os.path.join(_SCRIPT_DIR, "config", "mx_groups")
 MANAGE_URL = "https://mkapi2.dfcfs.com/finskillshub/api/claw/self-select/manage"
 GET_URL = "https://mkapi2.dfcfs.com/finskillshub/api/claw/self-select/get"
 
@@ -135,6 +136,58 @@ def _add_code(groups: Dict[str, List[str]], group: str, code: Any) -> None:
 
 def _extract_codes_from_text(text: str) -> List[str]:
     return _uniq_codes(_CODE_RE.findall(str(text or "")))
+
+
+def load_group_symbols_txt(path: str) -> Tuple[List[str], List[str]]:
+    """
+    读取分组 txt（东财导出或一行一码）。返回 (代码列表, 说明)。
+    不写回该文件。
+    """
+    notes: List[str] = []
+    p = os.path.abspath(path)
+    if not os.path.isfile(p):
+        notes.append(f"分组文件不存在: {p}")
+        return [], notes
+    raw = None
+    used = None
+    for enc in ("utf-8-sig", "utf-8", "gb18030", "gbk"):
+        try:
+            with open(p, encoding=enc) as f:
+                raw = f.read()
+            used = enc
+            break
+        except UnicodeDecodeError:
+            continue
+    if raw is None:
+        notes.append(f"分组文件无法解码: {p}")
+        return [], notes
+    codes: List[str] = []
+    seen = set()
+    for line in raw.splitlines():
+        s = str(line or "").strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.startswith("初始") or s.startswith("代码"):
+            continue
+        picked = ""
+        parts = s.split()
+        if len(parts) >= 2 and parts[0].isdigit() and len(parts[0]) <= 4:
+            cand = "".join(ch for ch in parts[1] if ch.isdigit())
+            if len(cand) == 6:
+                picked = cand
+        if not picked:
+            found = _CODE_RE.findall(s)
+            picked = found[0] if found else ""
+        if picked and picked not in seen:
+            seen.add(picked)
+            codes.append(picked)
+    notes.append(f"读取 {os.path.basename(p)} ({used}) {len(codes)} 只")
+    return codes, notes
+
+
+def group_txt_path(group_name: str, groups_dir: str = "") -> str:
+    d = os.path.abspath(groups_dir or DEFAULT_MX_GROUPS_DIR)
+    return os.path.join(d, f"{str(group_name).strip()}.txt")
 
 
 def _group_name_from_mapping(obj: dict) -> str:
