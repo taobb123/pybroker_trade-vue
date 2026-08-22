@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_APIKEY_FILE = os.path.join(_SCRIPT_DIR, "config", "mx_apikey.txt")
@@ -26,6 +27,29 @@ GET_URL = "https://mkapi2.dfcfs.com/finskillshub/api/claw/self-select/get"
 
 # 单次自然语言里放太多代码易失败，按批切分
 DEFAULT_CHUNK_SIZE = 20
+_CODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
+_GROUP_NAME_KEYS = (
+    "groupName",
+    "group_name",
+    "group",
+    "name",
+    "title",
+    "分组",
+    "分组名",
+    "groupTitle",
+)
+_STOCK_LIST_KEYS = (
+    "stocks",
+    "stockList",
+    "stock_list",
+    "list",
+    "items",
+    "codes",
+    "symbols",
+    "members",
+    "children",
+    "data",
+)
 
 
 def load_mx_apikey(*, apikey_file: str = DEFAULT_APIKEY_FILE) -> str:
@@ -76,6 +100,265 @@ def manage_self_select(query: str, *, apikey: str) -> dict:
 
 def get_self_select(*, apikey: str) -> dict:
     return _post_json(GET_URL, apikey=apikey, body=None)
+
+
+def _norm_symbol(raw: Any) -> str:
+    s = "".join(ch for ch in str(raw or "") if ch.isdigit())
+    return s.zfill(6) if s else ""
+
+
+def _norm_group_name(raw: Any) -> str:
+    return str(raw or "").strip()
+
+
+def _uniq_codes(codes: Iterable[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for raw in codes:
+        s = _norm_symbol(raw)
+        if len(s) != 6 or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def _add_code(groups: Dict[str, List[str]], group: str, code: Any) -> None:
+    g = _norm_group_name(group)
+    s = _norm_symbol(code)
+    if not g or len(s) != 6:
+        return
+    bucket = groups.setdefault(g, [])
+    if s not in bucket:
+        bucket.append(s)
+
+
+def _extract_codes_from_text(text: str) -> List[str]:
+    return _uniq_codes(_CODE_RE.findall(str(text or "")))
+
+
+def _group_name_from_mapping(obj: dict) -> str:
+    for k in _GROUP_NAME_KEYS:
+        if k in obj and isinstance(obj[k], str) and obj[k].strip():
+            val = obj[k].strip()
+            if k == "group" and val.isdigit():
+                continue
+            return val
+    return ""
+
+
+def parse_self_select_groups(payload: Any) -> Dict[str, List[str]]:
+    """从 get/manage 返回里尽量解析 {分组名: [6位代码, ...]}。"""
+    groups: Dict[str, List[str]] = {}
+
+    def walk(obj: Any, current: Optional[str] = None) -> None:
+        if obj is None:
+            return
+        if isinstance(obj, dict):
+            name = _group_name_from_mapping(obj) or current
+            code_val = obj.get("code") or obj.get("symbol") or obj.get("ts_code") or obj.get("secuCode")
+            if name and code_val:
+                _add_code(groups, name, code_val)
+            for key in _STOCK_LIST_KEYS:
+                if key in obj:
+                    walk(obj[key], name)
+            for k, v in obj.items():
+                if k in _STOCK_LIST_KEYS or k in _GROUP_NAME_KEYS:
+                    continue
+                if k in ("code", "symbol", "ts_code", "secuCode", "status", "message", "success"):
+                    continue
+                if isinstance(v, (dict, list)):
+                    walk(v, name)
+            return
+        if isinstance(obj, list):
+            for item in obj:
+                walk(item, current)
+            return
+        if isinstance(obj, str):
+            if current:
+                for code in _extract_codes_from_text(obj):
+                    _add_code(groups, current, code)
+            else:
+                _parse_groups_from_text(obj, groups)
+            return
+
+    walk(payload)
+    if not groups:
+        try:
+            _parse_groups_from_text(json.dumps(payload, ensure_ascii=False), groups)
+        except Exception:
+            pass
+    return groups
+
+
+def _parse_groups_from_text(text: str, groups: Dict[str, List[str]]) -> None:
+    raw = str(text or "").strip()
+    if not raw:
+        return
+    headers = list(re.finditer(r"[「【\[]([^」】\]]{1,20})[」】\]]", raw))
+    if not headers:
+        named = list(re.finditer(r"([\w\u4e00-\u9fff]{1,12})(?:分组|自选)", raw))
+        if not named:
+            return
+        for i, m in enumerate(named):
+            end = named[i + 1].start() if i + 1 < len(named) else len(raw)
+            for code in _extract_codes_from_text(raw[m.end() : end]):
+                _add_code(groups, m.group(1), code)
+        return
+    for i, m in enumerate(headers):
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(raw)
+        name = m.group(1).strip()
+        for code in _extract_codes_from_text(raw[m.end() : end]):
+            _add_code(groups, name, code)
+
+
+def _manage_ok(resp: dict) -> bool:
+    status = resp.get("status", resp.get("code", -1))
+    if status in (0, "0"):
+        return True
+    if str(resp.get("message", "")).upper() == "OK":
+        return True
+    if resp.get("success") in (True, "true", "True"):
+        return True
+    return False
+
+
+def _brief_msg(resp: dict) -> str:
+    msg = resp.get("message") or resp.get("data") or ""
+    if isinstance(msg, dict):
+        msg = json.dumps(msg, ensure_ascii=False)[:200]
+    return str(msg)[:240]
+
+
+def fetch_self_select_groups(
+    *,
+    apikey: str = "",
+    wanted: Optional[Sequence[str]] = None,
+) -> Tuple[Dict[str, List[str]], List[str]]:
+    """拉取全部自选分组；wanted 非空时对缺的组再用自然语言查询补一次。"""
+    notes: List[str] = []
+    key = (apikey or load_mx_apikey()).strip()
+    if not key:
+        notes.append("未配置 MX_APIKEY / config/mx_apikey.txt，无法拉取自选")
+        return {}, notes
+    resp = get_self_select(apikey=key)
+    groups = parse_self_select_groups(resp)
+    if not groups:
+        notes.append(f"自选 get 未解析到分组 status={resp.get('status', resp.get('code', ''))} {_brief_msg(resp)}")
+    else:
+        notes.append(
+            "已拉取自选分组: "
+            + "；".join(f"「{g}」{len(v)}只" for g, v in groups.items())
+        )
+    for name in wanted or ():
+        g = _norm_group_name(name)
+        if not g or groups.get(g):
+            continue
+        q = f"查询名为「{g}」的自选股分组中的股票"
+        extra = manage_self_select(q, apikey=key)
+        parsed = parse_self_select_groups(extra)
+        hit = parsed.get(g) or []
+        if not hit:
+            for k, v in parsed.items():
+                if k == g or g in k or k in g:
+                    hit = v
+                    break
+        if hit:
+            groups[g] = hit
+            notes.append(f"「{g}」已用查询补全 {len(hit)} 只")
+        else:
+            notes.append(f"「{g}」查询无代码 {_brief_msg(extra)}")
+    return groups, notes
+
+
+def list_group_symbols(
+    group_name: str,
+    *,
+    groups: Optional[Dict[str, List[str]]] = None,
+    apikey: str = "",
+) -> List[str]:
+    g = _norm_group_name(group_name)
+    if groups is None:
+        groups, _ = fetch_self_select_groups(apikey=apikey, wanted=[g])
+    if g in groups:
+        return list(groups[g])
+    for k, v in (groups or {}).items():
+        if k == g or g in k or k in g:
+            return list(v)
+    return []
+
+
+def remove_symbols_from_group(
+    symbols: Iterable[str],
+    *,
+    group_name: str,
+    apikey: str = "",
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> Tuple[bool, List[str]]:
+    """从指定自选分组删除代码。"""
+    notes: List[str] = []
+    key = (apikey or load_mx_apikey()).strip()
+    if not key:
+        notes.append("跳过删除自选：未配置 MX_APIKEY / config/mx_apikey.txt")
+        return False, notes
+    syms = _uniq_codes(symbols)
+    if not syms:
+        notes.append(f"删除自选「{group_name}」：无代码")
+        return True, notes
+    g = _norm_group_name(group_name) or "量能"
+    ok_all = True
+    for batch in _chunked(syms, chunk_size):
+        joined = "、".join(batch)
+        query = f"从名为「{g}」的自选股分组中删除{joined}"
+        resp = manage_self_select(query, apikey=key)
+        if _manage_ok(resp):
+            notes.append(f"已从「{g}」删除 {len(batch)} 只 | {_brief_msg(resp)}")
+        else:
+            ok_all = False
+            notes.append(f"删除失败 status={resp.get('status', resp.get('code'))} | {_brief_msg(resp)}")
+    return ok_all, notes
+
+
+def replace_group_symbols(
+    symbols: Iterable[str],
+    *,
+    group_name: str,
+    current_symbols: Optional[Sequence[str]] = None,
+    apikey: str = "",
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> Tuple[bool, List[str]]:
+    """
+    按新顺序写回分组：先删现有成员，再按 ranked 顺序加入。
+    加入失败时尝试把 current_symbols 加回去，避免把手改名单清空。
+    """
+    notes: List[str] = []
+    ranked = _uniq_codes(symbols)
+    current = _uniq_codes(current_symbols or [])
+    g = _norm_group_name(group_name)
+    if not g:
+        notes.append("写回自选失败：分组名为空")
+        return False, notes
+    if not ranked:
+        notes.append(f"「{g}」重排名单为空，不改自选")
+        return True, notes
+    to_delete = current or ranked
+    ok_del, del_notes = remove_symbols_from_group(
+        to_delete, group_name=g, apikey=apikey, chunk_size=chunk_size
+    )
+    notes.extend(del_notes)
+    ok_add, add_notes = add_symbols_to_group(
+        ranked, group_name=g, apikey=apikey, chunk_size=chunk_size
+    )
+    notes.extend(add_notes)
+    if ok_add:
+        return True, notes
+    if current:
+        notes.append(f"「{g}」按新顺序写入失败，尝试恢复原名单")
+        _ok_r, restore_notes = add_symbols_to_group(
+            current, group_name=g, apikey=apikey, chunk_size=chunk_size
+        )
+        notes.extend(restore_notes)
+    return False, notes
 
 
 def _chunked(items: Sequence[str], size: int) -> List[List[str]]:

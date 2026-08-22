@@ -298,13 +298,12 @@ steps:
   title: 按成长因子排序（资产安全、现金流质量）
   type: script
   script: factor_growthT_indicator.py
-  args: []
+  args:
+  - --from-mx-groups
+  - M加,Q
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_a_low_ma5 → fetch_vp_six_combo
-  workspace_inputs:
-  - path: stocks_pool.txt
-    label: 股票池列表
+  frequency_note: 拉取东财「M加」「Q」现况（含手改）→ 各组独立成长排序 → 原组写回；不混合
   workspace_outputs:
   - path: factor_growth_ranking.csv
     label: 成长综合得分表

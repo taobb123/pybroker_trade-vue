@@ -298,13 +298,14 @@ b > 0 说明提升。
 
 """
 
+import argparse
 import os
 import sys
 import numpy as np
 import pandas as pd
 import pybroker as pyb
 from pybroker import Strategy, StrategyConfig, ExecContext
-from typing import Dict, List
+from typing import Dict, List, Optional, Sequence, Tuple
 from datetime import datetime, timedelta
 
 # 添加项目根目录到路径
@@ -314,6 +315,10 @@ if PROJECT_ROOT not in sys.path:
 
 from pybroker_integration.custom_data_source import create_custom_data_source
 from pybroker_integration.steady_quality_financial import build_steady_quality_scores
+from pybroker_integration.mx_self_select import (
+    fetch_self_select_groups,
+    replace_group_symbols,
+)
 
 # 启用数据源缓存
 pyb.enable_data_source_cache('factor_growth_cache')
@@ -453,8 +458,171 @@ def get_stock_industries(symbols: List[str]) -> Dict[str, str]:
     return result
 
 
+def _rank_symbols_keep_all(
+    symbols: Sequence[str],
+) -> Tuple[List[str], Dict[str, Dict], Dict[str, float]]:
+    """组内打分排序；财务不足的票排在末尾，避免把手改名单丢掉。"""
+    uniq: List[str] = []
+    seen = set()
+    for raw in symbols:
+        s = "".join(ch for ch in str(raw) if ch.isdigit()).zfill(6)
+        if len(s) != 6 or s in seen:
+            continue
+        seen.add(s)
+        uniq.append(s)
+    if not uniq:
+        return [], {}, {}
+    df_scores, _top, details = build_steady_quality_scores(uniq, min_valid_indicators=5)
+    factor_scores = (
+        df_scores.set_index("symbol")["total_score"].to_dict() if not df_scores.empty else {}
+    )
+    ranked: List[str] = []
+    have = set()
+    if not df_scores.empty:
+        for _, r in df_scores.sort_values("total_score", ascending=False).iterrows():
+            sym = str(r["symbol"])
+            ranked.append(sym)
+            have.add(sym)
+    ranked.extend([s for s in uniq if s not in have])
+    return ranked, details or {}, factor_scores
+
+
+def _ranking_rows(
+    group_name: str,
+    ranked: Sequence[str],
+    details: Dict[str, Dict],
+    names: Dict[str, str],
+    industries: Dict[str, str],
+) -> List[dict]:
+    rows = []
+    for i, symbol in enumerate(ranked, 1):
+        d = details.get(symbol, {})
+        rows.append(
+            {
+                "分组": group_name,
+                "排名": i,
+                "股票代码": symbol,
+                "股票名称": names.get(symbol, symbol),
+                "行业": industries.get(symbol, ""),
+                "总分": d.get("total_score"),
+                "资产安全得分": d.get("layer1_score"),
+                "现金流质量得分": d.get("layer2_score"),
+                "盈利质量得分": d.get("layer3_score"),
+                "运营效率得分": d.get("layer4_score"),
+            }
+        )
+    return rows
+
+
+def _save_ranking_csv(rows: List[dict], ranking_file: str) -> None:
+    ranking_df = pd.DataFrame(rows)
+    if not ranking_df.empty:
+        ranking_df = ranking_df.round(4)
+    tmp_file = ranking_file + ".tmp"
+    ranking_df.to_csv(tmp_file, index=False, encoding="utf-8-sig")
+    try:
+        os.replace(tmp_file, ranking_file)
+        print(f"✓ 排名已保存: {ranking_file}")
+    except OSError:
+        print(f"✓ 排名已写入: {tmp_file}")
+        print(
+            f"  若 {os.path.basename(ranking_file)} 被其他程序打开，请关闭后手动将 .tmp 重命名为该文件。"
+        )
+
+
+def run_mx_group_growth_rank(
+    group_names: Sequence[str],
+    *,
+    skip_push: bool = False,
+    ranking_file: Optional[str] = None,
+) -> int:
+    """
+    拉取东财自选现况（含手改）→ 各组独立成长排序 → 原组写回。
+    两组不合并宇宙、不混合推送。
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    ranking_file = ranking_file or os.path.join(script_dir, "factor_growth_ranking.csv")
+    wanted = [str(g).strip() for g in group_names if str(g).strip()]
+    print("=" * 80)
+    print("成长因子排序 · 东财自选分组（不混合）")
+    print("分组: " + "、".join(f"「{g}」" for g in wanted))
+    print("=" * 80)
+
+    groups, fetch_notes = fetch_self_select_groups(wanted=wanted)
+    for line in fetch_notes:
+        print(f"  {line}")
+    if not wanted:
+        print("✗ 未指定分组")
+        return 2
+
+    all_rows: List[dict] = []
+    any_ok = False
+    for g in wanted:
+        current = list(groups.get(g) or [])
+        if not current:
+            for k, v in groups.items():
+                if k == g or g in k or k in g:
+                    current = list(v)
+                    break
+        print("-" * 72)
+        print(f"【{g}】拉取 {len(current)} 只: {', '.join(current) if current else '（空）'}")
+        if not current:
+            print(f"  跳过「{g}」：自选为空，不推送、不改该组")
+            continue
+        ranked, details, scores = _rank_symbols_keep_all(current)
+        names = get_stock_names(ranked)
+        industries = get_stock_industries(ranked)
+        all_rows.extend(_ranking_rows(g, ranked, details, names, industries))
+        print(f"  组内成长排序（高→低）:")
+        for i, sym in enumerate(ranked, 1):
+            sc = scores.get(sym)
+            sc_s = f"{sc:.4f}" if sc is not None and sc == sc else "无财务分"
+            print(f"    {i}. {names.get(sym, sym)} {sym}  {sc_s}")
+        any_ok = True
+        if skip_push:
+            print(f"  已跳过写回「{g}」")
+            continue
+        ok, push_notes = replace_group_symbols(
+            ranked, group_name=g, current_symbols=current
+        )
+        for line in push_notes:
+            print(f"  {line}")
+        if not ok:
+            print(f"  ⚠ 「{g}」写回未完全成功")
+
+    if all_rows:
+        try:
+            _save_ranking_csv(all_rows, ranking_file)
+        except Exception as save_err:
+            print(f"⚠ 保存排名失败: {save_err}")
+    else:
+        _save_ranking_csv([], ranking_file)
+        print("成长表为空（两组均无代码）")
+
+    return 0 if any_ok else 2
+
+
 def main():
-    """主函数：加载股票池 -> 财务数据计算四层稳健高质量评分与前 10% -> 回测（仅行情）。"""
+    """默认：股票池 + 四层评分 + 回测。指定 --from-mx-groups 则只对东财自选分组排序并写回。"""
+    parser = argparse.ArgumentParser(description="稳健高质量成长因子")
+    parser.add_argument(
+        "--from-mx-groups",
+        default="",
+        help="逗号分隔东财自选分组名（如 M加,Q）；指定后拉取该组现况分组成长排序并原组写回，不做回测",
+    )
+    parser.add_argument(
+        "--skip-mx-push",
+        action="store_true",
+        help="只排序写 CSV，不写回东财自选",
+    )
+    args, _unknown = parser.parse_known_args()
+    groups_arg = str(args.from_mx_groups or "").strip()
+    if groups_arg:
+        names = [x.strip() for x in groups_arg.replace("，", ",").split(",") if x.strip()]
+        raise SystemExit(
+            run_mx_group_growth_rank(names, skip_push=bool(args.skip_mx_push))
+        )
+
     print("=" * 80)
     print("稳健型高质量复利策略 - 资产安全/现金流质量/盈利质量/运营效率 四层评分")
     print("=" * 80)
