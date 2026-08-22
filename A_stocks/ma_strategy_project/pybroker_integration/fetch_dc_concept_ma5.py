@@ -15,9 +15,10 @@
 
 漏斗选股（量化分层）：
 1) 资金宇宙：预筛排序 TopN；
-2) 低位硬筛：箱体/距低点/启动量价等，过/不过；
+2) 低位硬筛：箱体/距低点/启动量价等，过/不过（「命中」只认这一层）；
 3) 排序：仅在低位通过者中按资金分（再综合分）排序写池，默认取 Top3；
-无低位通过则按资金分 TopN 兜底（默认 Top2；--pool-top-n 0 关闭轮空）。
+无低位命中则轮空：不向下游传递股票名单（清空 stocks_pool.txt；成分表写空表）。
+可选 --pool-top-n N（N>0）恢复按资金分 TopN 兜底。
 综合分 = 低位(0–50) + 资金(0–50)，仅作展示与辅助排序，不作双门槛否决。
 
 用法（在 ma_strategy_project 目录下）：
@@ -64,7 +65,7 @@ from fetch_a_low_ma5 import (  # noqa: E402
 
 DEFAULT_OUT_CSV = os.path.join(_SCRIPT_DIR, "dc_concept_ma5_scan.csv")
 DEFAULT_MEMBERS_CSV = os.path.join(_SCRIPT_DIR, "dc_concept_ma5_members.csv")
-DEFAULT_POOL_TOP_N = 2
+DEFAULT_POOL_TOP_N = 0
 DEFAULT_HIT_TOP_N = 3
 DC_IDX_TYPE = "概念板块"
 REQUEST_SLEEP_SEC = 0.13
@@ -1197,7 +1198,7 @@ def concepts_for_member_fetch(
     pool_top_n: int,
     hit_top_n: int = DEFAULT_HIT_TOP_N,
 ) -> List[ConceptLaunchSnapshot]:
-    """有低位硬筛命中取资金分 Top hit_top_n；否则按资金分 Top pool_top_n 兜底；<=0 则轮空。"""
+    """有低位硬筛命中取资金分 Top hit_top_n；否则仅当 pool_top_n>0 时按资金分兜底，默认轮空。"""
     if hits:
         n = int(hit_top_n)
         if n <= 0:
@@ -1212,7 +1213,7 @@ def concepts_for_member_fetch(
 def main() -> None:
     cfg = CONCEPT_LAUNCH_CONFIG
     parser = argparse.ArgumentParser(
-        description="东财概念扫描：资金宇宙→低位硬筛→资金分排序（漏斗）；无低位通过则 TopN 兜底"
+        description="东财概念扫描：资金宇宙→低位硬筛→资金分排序；命中只认低位硬筛，无命中则轮空不传股票名单"
     )
     parser.add_argument("--codes", default="", help="逗号分隔概念代码；为空则扫全市场（可预筛）")
     parser.add_argument(
@@ -1309,12 +1310,12 @@ def main() -> None:
         "--pool-top-n",
         type=int,
         default=DEFAULT_POOL_TOP_N,
-        help="无低位硬筛通过时，取资金分前 N 个概念拉成分股，默认 2；传 0 关闭兜底轮空",
+        help="无低位硬筛命中时：0=轮空不传股票名单（默认）；N>0 则按资金分 TopN 兜底",
     )
     parser.add_argument(
         "--pool-merge",
         action="store_true",
-        help="股票池与原有池合并去重（默认覆盖旧池，仅保留本次命中/兜底概念成分；轮空时写空池）",
+        help="股票池与原有池合并去重（默认覆盖旧池，仅保留本次命中概念成分；轮空时写空池）",
     )
     parser.add_argument("--out-csv", default=DEFAULT_OUT_CSV)
     parser.add_argument("--out-members-csv", default=DEFAULT_MEMBERS_CSV)
@@ -1526,9 +1527,16 @@ def main() -> None:
             print("提示: 未拉取到成分股（dc_member 为空），跳过 CSV/股票池写入。", file=sys.stderr)
     elif need_members and not member_snaps:
         print(
-            "轮空: 无低位硬筛通过且未启用/无可用 TopN 兜底，不写入成分股。",
+            "轮空: 无低位硬筛命中，不向下游传递股票名单。",
             file=sys.stderr,
         )
+        if bool(args.with_members):
+            mem_path = os.path.abspath(args.out_members_csv)
+            empty_mem = pd.DataFrame(
+                columns=["trade_date", "concept_name", "concept_code", "con_code", "con_name"]
+            )
+            empty_mem.to_csv(mem_path, index=False, encoding="utf-8-sig")
+            print(f"成分股已清空(轮空): {mem_path}（0 行）")
         if write_pool and not bool(args.pool_merge):
             pool_path = os.path.abspath(str(args.write_stocks_pool))
             total, _ = write_stocks_pool_txt(pool_path, [], merge=False)

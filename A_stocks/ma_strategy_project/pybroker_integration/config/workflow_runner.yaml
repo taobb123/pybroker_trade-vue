@@ -285,7 +285,7 @@ steps:
   - --with-members
   highlight: core
   frequency: daily
-  frequency_note: 漏斗=资金预筛Top40→低位硬筛→资金分排序取Top3；无低位则Top2兜底
+  frequency_note: 漏斗=资金预筛Top40→低位硬筛→资金分排序取Top3；命中只认低位硬筛，无命中则轮空不传股票名单
   workspace_inputs:
   - path: stocks_pool.txt
     label: 股票池列表

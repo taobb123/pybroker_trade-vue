@@ -1515,6 +1515,7 @@ def push_rank_top_to_mx_group(
     group_name: str,
     score_col: str,
     label: str = "",
+    exclude_symbols: Optional[Sequence[str]] = None,
 ) -> Tuple[List[str], List[str]]:
     """推送任意排名表前 top_n 至东财自选分组。返回 (代码列表, 说明)。"""
     notes: List[str] = []
@@ -1523,7 +1524,16 @@ def push_rank_top_to_mx_group(
     if ranked is None or ranked.empty or "symbol" not in ranked.columns:
         notes.append(f"{tag} Top{n}：无排名结果，跳过推送「{group_name}」")
         return [], notes
-    top = ranked.head(n)
+    ban = {_norm_symbol(x) for x in (exclude_symbols or []) if _norm_symbol(x)}
+    work = ranked.copy()
+    work["_sym"] = work["symbol"].map(_norm_symbol)
+    if ban:
+        before = len(work)
+        work = work[~work["_sym"].isin(ban)].copy()
+        dropped = before - len(work)
+        if dropped:
+            notes.append(f"{tag}：已排除作废/屏蔽 {dropped} 只后再取 Top{n}")
+    top = work.head(n)
     syms = [_norm_symbol(x) for x in top["symbol"].tolist()]
     syms = [s for s in syms if len(s) == 6]
     brief = []
@@ -1594,10 +1604,12 @@ def run_qm_rank_and_push(
     mplus_group: str = MX_MPLUS_GROUP_DEFAULT,
     mminus_group: str = MX_MMINUS_GROUP_DEFAULT,
     push_labels: Optional[Sequence[str]] = None,
+    exclude_symbols: Optional[Sequence[str]] = None,
 ) -> List[str]:
     """
     观察池 Q/M+/M- 排名写 CSV；按 push_labels 推东财自选。
     push_labels 默认全推；形态建仓定向可传 ("M+", "M-") 不推 Q。
+    exclude_symbols：作废等代码，排名与推送均排除。
     """
     notes: List[str] = []
     try:
@@ -1605,8 +1617,13 @@ def run_qm_rank_and_push(
     except Exception as exc:
         return [f"Q/M 排名模块导入失败: {exc}"]
 
+    ban = {_norm_symbol(x) for x in (exclude_symbols or []) if _norm_symbol(x)}
+    filtered_pool = [s for s in pool_syms if _norm_symbol(s) not in ban]
+    if ban:
+        notes.append(f"Q/M 排名池已排除作废/屏蔽 {len(ban)} 只，剩余 {len(filtered_pool)}")
+
     ranked_map, rn = rank_observation_pool_qm(
-        pool_syms,
+        filtered_pool,
         end_date=end_date,
         name_map=name_map,
         skip_fina=skip_fina,
@@ -1661,6 +1678,7 @@ def run_qm_rank_and_push(
             group_name=group,
             score_col=score_col,
             label=label,
+            exclude_symbols=list(ban),
         )
         notes.extend(pn)
     return notes
@@ -1957,7 +1975,23 @@ def main() -> None:
     for r in results:
         if r.stock_name:
             name_map[_norm_symbol(r.symbol)] = str(r.stock_name)
-    pool_syms = [_norm_symbol(a.symbol) for a in anchors]
+
+    # 排名/推送池：排除本轮判定作废(invalid)的代码（量能推送本身只含 entry，不受影响）
+    invalid_syms = {
+        _norm_symbol(r.symbol) for r in results if str(r.state) == "invalid"
+    }
+    pool_syms = []
+    seen_pool = set()
+    for a in anchors:
+        s = _norm_symbol(a.symbol)
+        if len(s) != 6 or s in seen_pool or s in invalid_syms:
+            continue
+        seen_pool.add(s)
+        pool_syms.append(s)
+    if invalid_syms:
+        print(
+            f"【筛选】本轮作废 {len(invalid_syms)} 只，已排除出估值/Q/M+/M- 排名与推送池"
+        )
 
     if not bool(args.skip_value_rank):
         ranked, vn = rank_observation_pool_by_valuation(
@@ -2015,6 +2049,7 @@ def main() -> None:
             skip_fina=bool(args.skip_qm_fina),
             # 定向：4+6 优势在 A/M+，双池仍推 M-；Q 改由 2+3 对比步骤推
             push_labels=("M+", "M-"),
+            exclude_symbols=list(invalid_syms),
         )
     else:
         qm_notes = ["已跳过 Q/M 排名（--skip-qm-rank）"]
