@@ -3,3 +3,4 @@ config/mx_apikey.txt
 *.pem
 .env
 .env.*
+.cache/

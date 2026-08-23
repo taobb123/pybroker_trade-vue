@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Bookmark, Crosshair, RefreshCw } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import BuffettQuoteCard from '@/components/radar/BuffettQuoteCard.vue'
+import MarketRadarPanel from '@/components/radar/MarketRadarPanel.vue'
 import OpportunityCard from '@/components/radar/OpportunityCard.vue'
 import PitchSelectCard from '@/components/radar/PitchSelectCard.vue'
 import { DISCLAIMER, GOOD_PITCH_THRESHOLD } from '@/config/opportunityRules'
@@ -37,6 +38,8 @@ const watchlist = useWatchlistStore()
 const workflow = useWorkflowStore()
 
 const loading = ref(true)
+const radarTick = ref(0)
+const radarBooted = ref(false)
 const pitchBundle = ref<PitchSelectBundle | null>(null)
 const fallbackBundle = ref<OpportunityBundle | null>(null)
 const tLevels = ref<Map<string, TLevels>>(new Map())
@@ -110,6 +113,8 @@ async function refresh() {
       klineFile.exists && klineFile.content
         ? parsePredictionKlineJson(klineFile.content)
         : null
+    if (radarBooted.value) radarTick.value += 1
+    radarBooted.value = true
   } finally {
     loading.value = false
   }
@@ -148,7 +153,7 @@ onMounted(() => {
           </h2>
           <p class="mt-1 max-w-xl text-sm text-muted-foreground">
             市场中性多头净值 Top2 因子 × 各取前 2 股；选球卡内嵌预测 K 线，右侧为做 T 买一/买二等档位。
-            综合分 ≥ {{ GOOD_PITCH_THRESHOLD }} 标为好球。
+            综合分 ≥ {{ GOOD_PITCH_THRESHOLD }} 标为好球。下方盘中雷达盯成长因子 M加前 3 + Q 前 3。
           </p>
           <p v-if="sourceHint" class="mt-1 text-[11px] text-muted-foreground">
             数据源：{{ sourceHint }}
@@ -251,6 +256,8 @@ onMounted(() => {
         </ul>
       </div>
     </section>
+
+    <MarketRadarPanel :tick="radarTick" />
 
     <!-- 选球卡（主路径） -->
     <section v-if="usePitchMode" class="space-y-3">

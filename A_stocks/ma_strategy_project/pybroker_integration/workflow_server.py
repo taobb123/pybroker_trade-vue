@@ -52,6 +52,7 @@ from onboarding_api import router as onboarding_router
 from events_api import router as events_router
 from admin_api import router as admin_router, seed_admin_user
 from db import init_db
+from market_radar_api import router as market_radar_router
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "workflow_runner.yaml"
@@ -441,6 +442,7 @@ app.include_router(membership_router)
 app.include_router(onboarding_router)
 app.include_router(events_router)
 app.include_router(admin_router)
+app.include_router(market_radar_router)
 
 
 @app.on_event("startup")
