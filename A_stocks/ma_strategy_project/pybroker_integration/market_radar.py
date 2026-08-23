@@ -438,6 +438,19 @@ def _match_code_rows(df: pd.DataFrame, ts_code: str, *, exact: bool) -> pd.DataF
     return df[codes.str.startswith(base)]
 
 
+def _latest_row(hit: pd.DataFrame) -> pd.Series:
+    """多日/多根 K 时取最新一条。日线按日期升序后 iloc[0] 会拿到窗口第一天。"""
+    work = hit
+    for col in ("trade_date", "date", "trade_time", "time"):
+        if col in work.columns:
+            try:
+                work = work.sort_values(col, kind="mergesort")
+            except Exception:
+                pass
+            break
+    return work.iloc[-1]
+
+
 def _quote_from_rt_df(
     df: Optional[pd.DataFrame],
     ts_code: str,
@@ -458,7 +471,7 @@ def _quote_from_rt_df(
     hit = _match_code_rows(df, ts_code, exact=exact)
     if hit.empty:
         return None
-    row = hit.iloc[0]
+    row = _latest_row(hit)
     pct = _pct_from_row(row, sanity_abs=sanity_abs)
     return {
         "ts_code": ts_code,
@@ -526,22 +539,30 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
     if not ts_codes:
         return {}
     joined = ",".join(ts_codes)
-    rt_df = None
-    try:
-        rt_df = ts_mod.realtime_quote(ts_code=joined, src="sina")
-    except Exception:
-        rt_df = None
-    if rt_df is None or (hasattr(rt_df, "empty") and rt_df.empty):
-        try:
-            rt_df = pro.rt_k(ts_code=joined)
-        except Exception:
-            rt_df = None
-
     found: dict[str, dict[str, Any]] = {}
-    for code in ts_codes:
-        q = _quote_from_rt_df(rt_df, code, sanity_abs=STOCK_PCT_SANITY)
-        if q:
-            found[code] = q
+
+    def _absorb(rt_df: Any) -> None:
+        if rt_df is None or (hasattr(rt_df, "empty") and rt_df.empty):
+            return
+        for code in ts_codes:
+            if code in found:
+                continue
+            q = _quote_from_rt_df(rt_df, code, sanity_abs=STOCK_PCT_SANITY)
+            if q and q.get("pct") is not None:
+                found[code] = q
+
+    # 香港 ECS 访问新浪经常失败/超时，东财 dc 与 Tushare rt_k 更稳。
+    for loader in (
+        lambda: ts_mod.realtime_quote(ts_code=joined, src="dc"),
+        lambda: ts_mod.realtime_quote(ts_code=joined, src="sina"),
+        lambda: pro.rt_k(ts_code=joined),
+    ):
+        try:
+            _absorb(loader())
+        except Exception:
+            pass
+        if all(code in found for code in ts_codes):
+            return found
 
     missing = [c for c in ts_codes if c not in found]
     if missing:
@@ -552,13 +573,17 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
             daily = None
         if daily is not None and not daily.empty:
             daily = _lower_df(daily)
-            daily = daily.sort_values("trade_date") if daily is not None and "trade_date" in daily.columns else daily
+            if daily is not None and "trade_date" in daily.columns:
+                daily = daily.sort_values("trade_date")
             for code in missing:
-                sub = daily[daily["ts_code"].astype(str) == code] if "ts_code" in daily.columns else daily
+                if daily is None or "ts_code" not in daily.columns:
+                    sub = daily
+                else:
+                    sub = daily[daily["ts_code"].astype(str) == code]
                 if sub is None or sub.empty:
                     continue
                 q = _quote_from_rt_df(sub, code, sanity_abs=STOCK_PCT_SANITY)
-                if q:
+                if q and q.get("pct") is not None:
                     q["quote_kind"] = "daily"
                     found[code] = q
     return found
