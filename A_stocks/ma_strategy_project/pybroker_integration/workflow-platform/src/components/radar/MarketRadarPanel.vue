@@ -102,7 +102,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">成长因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          工作流「按成长因子排序」M加前 3 + Q 前 3 → 申万板块 → 沪深300。准实时约 1 分钟，非投资建议。
+          工作流「按成长因子排序」M加前 3 + Q 前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -126,10 +126,13 @@ defineExpose({ refresh: load })
       </div>
     </div>
 
-    <p v-if="payload?.asOf || payload?.universe?.label" class="text-[11px] text-muted-foreground">
+    <p v-if="payload?.asOf || payload?.universe?.label || payload?.source" class="text-[11px] text-muted-foreground">
       <template v-if="payload?.asOf">数据时间 {{ payload.asOf }}</template>
       <template v-if="payload?.universe?.label">
         <template v-if="payload?.asOf"> · </template>{{ payload.universe.label }}
+      </template>
+      <template v-if="payload?.source">
+        <template v-if="payload?.asOf || payload?.universe?.label"> · </template>源 {{ payload.source }}
       </template>
     </p>
 
@@ -141,10 +144,17 @@ defineExpose({ refresh: load })
     </p>
 
     <p
+      v-if="payload?.ok && payload?.sectorStale !== 'daily'"
+      class="rounded-md border border-emerald-200/70 bg-emerald-50/50 px-2.5 py-1.5 text-[11px] leading-relaxed text-emerald-950/80 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-100/80"
+    >
+      板块与指数盘中行情已改用东方财富实时；行业仍按申万二级分类。个股优先东财/新浪参考现价。
+    </p>
+
+    <p
       v-if="payload?.sectorStale === 'daily'"
       class="rounded-md border border-amber-200/70 bg-amber-50/60 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-950/80 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100/80"
     >
-      申万实时行情不可用，板块已回退日频（非盘中）。个股仍尽量用参考现价。
+      东方财富实时暂未取到，板块暂回退申万日频收盘（非盘中）。个股仍尽量用参考现价。
     </p>
 
     <div

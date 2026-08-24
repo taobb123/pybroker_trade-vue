@@ -520,7 +520,9 @@ def _em_ulist_rows(secids: list[str]) -> list[dict[str, Any]]:
     query = urllib.parse.urlencode(
         {
             "fltt": "2",
+            "invt": "2",
             "np": "1",
+            "ut": "fa5fd1943c7b386f172d6893dbfba10b",
             "fields": "f2,f3,f4,f5,f6,f12,f13,f14,f18",
             "secids": ",".join(uniq),
         }
@@ -582,18 +584,38 @@ def _em_index_secid(ts_code: str) -> str:
     return f"1.{code}" if mkt == "SH" else f"0.{code}"
 
 
-def _fetch_em_index_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
-    rows = _em_ulist_rows([_em_index_secid(c) for c in ts_codes])
-    by_code = {str(r.get("f12") or "").strip(): r for r in rows}
+def _em_stock_secid(ts_code: str) -> str:
+    code, mkt = ts_code.split(".")[0], ts_code.split(".")[-1].upper()
+    return f"1.{code.zfill(6)}" if mkt == "SH" else f"0.{code.zfill(6)}"
+
+
+def _fetch_em_quotes_by_secid(
+    ts_codes: list[str],
+    secid_of,
+    *,
+    sanity_abs: float,
+) -> dict[str, dict[str, Any]]:
+    if not ts_codes:
+        return {}
+    rows = _em_ulist_rows([secid_of(c) for c in ts_codes])
+    by_code = {str(r.get("f12") or "").strip().zfill(6): r for r in rows}
     found: dict[str, dict[str, Any]] = {}
     for ts_code in ts_codes:
-        row = by_code.get(ts_code.split(".")[0])
+        row = by_code.get(ts_code.split(".")[0].zfill(6))
         if not row:
             continue
-        q = _em_quote_from_row(row, ts_code, sanity_abs=INDEX_PCT_SANITY)
+        q = _em_quote_from_row(row, ts_code, sanity_abs=sanity_abs)
         if q:
             found[ts_code] = q
     return found
+
+
+def _fetch_em_index_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
+    return _fetch_em_quotes_by_secid(ts_codes, _em_index_secid, sanity_abs=INDEX_PCT_SANITY)
+
+
+def _fetch_em_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
+    return _fetch_em_quotes_by_secid(ts_codes, _em_stock_secid, sanity_abs=STOCK_PCT_SANITY)
 
 
 def _sw_digits(ts_code: str) -> str:
@@ -650,6 +672,8 @@ def _save_em_board_cache(items: dict[str, str]) -> None:
 
 def _em_suggest_secid(name: str) -> Optional[str]:
     variants = [name]
+    if name:
+        variants = [f"{name}申万", f"申万{name}", name]
     stripped = name
     for suf in ("Ⅱ", "III", "II", "2", "Ⅲ"):
         if stripped.endswith(suf):
@@ -684,6 +708,8 @@ def _em_suggest_secid(name: str) -> Optional[str]:
             if classify and classify not in {"BK", "INDEX"}:
                 continue
             score = 2 if _norm_board_name(nm) == want else 1
+            if "申万" in nm:
+                score += 2
             if best is None or score > best[0]:
                 best = (score, qid)
         if best:
@@ -813,6 +839,15 @@ def fetch_index_quotes(ts_mod: Any, pro: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _realtime_quote_stale(q: dict[str, Any]) -> bool:
+    """盘中若行情日期早于今日，视为过期快照（香港机 Tushare/新浪常见）。"""
+    tt = str(q.get("trade_time") or "")
+    digits = "".join(ch for ch in tt if ch.isdigit())
+    if len(digits) < 8:
+        return False
+    return digits[:8] < _ymd()
+
+
 def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, dict[str, Any]]:
     if not ts_codes:
         return {}
@@ -826,10 +861,13 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
             if code in found:
                 continue
             q = _quote_from_rt_df(rt_df, code, sanity_abs=STOCK_PCT_SANITY)
-            if q and q.get("pct") is not None:
+            if q and q.get("pct") is not None and not _realtime_quote_stale(q):
                 found[code] = q
 
-    # 香港 ECS 访问新浪经常失败/超时，东财 dc 与 Tushare rt_k 更稳。
+    found.update(_fetch_em_stock_quotes(ts_codes))
+    if all(code in found for code in ts_codes):
+        return found
+
     for loader in (
         lambda: ts_mod.realtime_quote(ts_code=joined, src="dc"),
         lambda: ts_mod.realtime_quote(ts_code=joined, src="sina"),
@@ -944,7 +982,7 @@ def fetch_sector_quotes(
                     daily_q["amount_change"] = ratio
         if code not in found and daily_q:
             found[code] = daily_q
-        elif code in found and daily_q:
+        elif code in found and daily_q and found[code].get("quote_kind") != "realtime":
             rt_pct = found[code].get("pct")
             daily_pct = daily_q.get("pct")
             if daily_pct is not None and (
