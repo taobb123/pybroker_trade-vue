@@ -509,8 +509,18 @@ def _em_http_json(url: str, timeout: float = 8.0) -> Optional[dict[str, Any]]:
             raw = resp.read().decode("utf-8", "replace")
         data = json.loads(raw)
         return data if isinstance(data, dict) else None
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
-        return None
+    except Exception:
+        try:
+            req2 = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0", "Referer": "https://finance.eastmoney.com/"},
+            )
+            with urllib.request.urlopen(req2, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", "replace")
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
 
 
 def _em_ulist_rows(secids: list[str]) -> list[dict[str, Any]]:
@@ -525,7 +535,8 @@ def _em_ulist_rows(secids: list[str]) -> list[dict[str, Any]]:
             "ut": "fa5fd1943c7b386f172d6893dbfba10b",
             "fields": "f2,f3,f4,f5,f6,f12,f13,f14,f18",
             "secids": ",".join(uniq),
-        }
+        },
+        safe=",",
     )
     for _attempt in range(2):
         for host in _EM_ULIST_URLS:
@@ -554,8 +565,14 @@ def _em_quote_from_row(
     sanity_abs: Optional[float],
 ) -> Optional[dict[str, Any]]:
     close = _finite(row.get("f2"))
+    if close is None:
+        close = _finite(row.get("f43"))
     pre = _finite(row.get("f18"))
+    if pre is None:
+        pre = _finite(row.get("f60"))
     named = _finite(row.get("f3"))
+    if named is None:
+        named = _finite(row.get("f170"))
     pct = None
     if close is not None and pre is not None and abs(pre) > 1e-6:
         pct = (close / pre - 1.0) * 100.0
@@ -565,14 +582,15 @@ def _em_quote_from_row(
         return None
     if sanity_abs is not None and abs(float(pct)) > sanity_abs:
         return None
+    name = str(row.get("f14") or row.get("f58") or "").strip()
     return {
         "ts_code": ts_code,
-        "name": str(row.get("f14") or "").strip(),
+        "name": name,
         "pct": round(float(pct), 4),
         "close": close,
         "pre_close": pre,
-        "amount": _finite(row.get("f6")),
-        "vol": _finite(row.get("f5")),
+        "amount": _finite(row.get("f6") or row.get("f48")),
+        "vol": _finite(row.get("f5") or row.get("f47")),
         "trade_time": "",
         "quote_kind": "realtime",
         "source": "eastmoney",
@@ -615,7 +633,36 @@ def _fetch_em_index_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
 
 
 def _fetch_em_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
-    return _fetch_em_quotes_by_secid(ts_codes, _em_stock_secid, sanity_abs=STOCK_PCT_SANITY)
+    """个股走东财 stock/get（ulist 批量在香港/盘中经常空包）。"""
+    found: dict[str, dict[str, Any]] = {}
+    hosts = (
+        "https://82.push2.eastmoney.com/api/qt/stock/get",
+        "https://push2.eastmoney.com/api/qt/stock/get",
+    )
+    for ts_code in ts_codes:
+        secid = _em_stock_secid(ts_code)
+        query = urllib.parse.urlencode(
+            {
+                "fltt": "2",
+                "invt": "2",
+                "secid": secid,
+                "fields": "f43,f47,f48,f57,f58,f60,f169,f170",
+            },
+            safe=",",
+        )
+        row = None
+        for host in hosts:
+            data = _em_http_json(f"{host}?{query}", timeout=6.0)
+            cand = (data or {}).get("data") if isinstance(data, dict) else None
+            if isinstance(cand, dict) and (cand.get("f57") or cand.get("f43") is not None):
+                row = cand
+                break
+        if not row:
+            continue
+        q = _em_quote_from_row(row, ts_code, sanity_abs=STOCK_PCT_SANITY)
+        if q:
+            found[ts_code] = q
+    return found
 
 
 def _sw_digits(ts_code: str) -> str:
@@ -848,6 +895,64 @@ def _realtime_quote_stale(q: dict[str, Any]) -> bool:
     return digits[:8] < _ymd()
 
 
+def _tencent_symbol(ts_code: str) -> str:
+    code = ts_code.split(".")[0].zfill(6)
+    mkt = ts_code.split(".")[-1].upper()
+    if mkt == "SH":
+        return f"sh{code}"
+    if mkt == "BJ":
+        return f"bj{code}"
+    return f"sz{code}"
+
+
+def _fetch_tencent_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
+    """腾讯行情，香港机访问东财 push2 被限流时的个股兜底。"""
+    if not ts_codes:
+        return {}
+    joined = ",".join(_tencent_symbol(c) for c in ts_codes)
+    url = f"https://qt.gtimg.cn/q={joined}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        raw = urllib.request.urlopen(req, timeout=6).read()
+        text = raw.decode("gb18030", "replace")
+    except Exception:
+        return {}
+    by_code = {c.split(".")[0].zfill(6): c for c in ts_codes}
+    found: dict[str, dict[str, Any]] = {}
+    for line in text.splitlines():
+        if "=\"" not in line:
+            continue
+        payload = line.split("=\"", 1)[-1].rstrip("\";")
+        parts = payload.split("~")
+        if len(parts) < 33:
+            continue
+        ts_code = by_code.get(str(parts[2]).zfill(6))
+        if not ts_code:
+            continue
+        close = _finite(parts[3])
+        pre = _finite(parts[4])
+        pct = _finite(parts[32])
+        if pct is None and close is not None and pre is not None and abs(pre) > 1e-6:
+            pct = (close / pre - 1.0) * 100.0
+        if pct is None or abs(float(pct)) > STOCK_PCT_SANITY:
+            continue
+        q = {
+            "ts_code": ts_code,
+            "name": str(parts[1] or "").strip(),
+            "pct": round(float(pct), 4),
+            "close": close,
+            "pre_close": pre,
+            "amount": _finite(parts[37]) if len(parts) > 37 else None,
+            "vol": _finite(parts[6]),
+            "trade_time": str(parts[30] if len(parts) > 30 else ""),
+            "quote_kind": "realtime",
+            "source": "tencent",
+        }
+        if not _realtime_quote_stale(q):
+            found[ts_code] = q
+    return found
+
+
 def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, dict[str, Any]]:
     if not ts_codes:
         return {}
@@ -865,6 +970,9 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
                 found[code] = q
 
     found.update(_fetch_em_stock_quotes(ts_codes))
+    missing = [c for c in ts_codes if c not in found]
+    if missing:
+        found.update(_fetch_tencent_stock_quotes(missing))
     if all(code in found for code in ts_codes):
         return found
 
@@ -1125,6 +1233,8 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
         q.get("source") == "eastmoney" for q in sector_quotes.values()
     ):
         sources.append("eastmoney")
+    if any((stock_quotes.get(c) or {}).get("source") == "tencent" for c in ts_codes):
+        sources.append("tencent")
     if sector_stale:
         sources.append("sw_daily")
     if any(i.get("quote_kind") == "realtime" for i in indexes):
