@@ -303,7 +303,7 @@ steps:
   - M加,Q
   highlight: chain
   frequency: daily
-  frequency_note: 读项目 config/mx_groups 的 M加.txt、Q.txt → 各组独立成长排序 → 推东财同名分组；不回写桌面文件
+  frequency_note: 桌面名单先跑 sync_mx_groups.py（或「同步桌面自选分组.bat」）写入 config/mx_groups，再成长排序并推东财同名分组；不回写桌面
   workspace_inputs:
   - path: config/mx_groups/M加.txt
     label: 自选分组 M加
