@@ -147,14 +147,14 @@ defineExpose({ refresh: load })
       v-if="payload?.ok && payload?.sectorStale !== 'daily'"
       class="rounded-md border border-emerald-200/70 bg-emerald-50/50 px-2.5 py-1.5 text-[11px] leading-relaxed text-emerald-950/80 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-100/80"
     >
-      板块与指数盘中优先腾讯/东财现价；行业名称固定申万二级，不用东财概念板。个股同样走东财或腾讯参考现价。
+      板块盘中涨跌由申万二级成分股现价等权合成（名称仍固定申万，不跟东财概念板）。指数和个股走腾讯或东财现价。
     </p>
 
     <p
       v-if="payload?.sectorStale === 'daily'"
       class="rounded-md border border-amber-200/70 bg-amber-50/60 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-950/80 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100/80"
     >
-      东方财富实时暂未取到，板块暂回退申万日频收盘（非盘中）。个股仍尽量用参考现价。
+      申万成分实时合成暂未取到，板块暂回退申万日频收盘（非盘中）。个股仍尽量用参考现价。
     </p>
 
     <div

@@ -27,6 +27,9 @@ SECTOR_PCT_SANITY = 20.0
 STOCK_PCT_SANITY = 22.0
 INDEX_LAMP_BAND = 0.3
 MAX_SYMBOLS = 40
+SW_MEMBER_MAX = 80
+SW_SYNTH_MIN = 3
+TENCENT_BATCH = 50
 
 INDEX_SPECS = (
     {"ts_code": "000001.SH", "label": "上证"},
@@ -38,6 +41,7 @@ HS300_CODE = "000300.SH"
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _MA_PROJECT_ROOT = _SCRIPT_DIR.parent
 _CACHE_PATH = _SCRIPT_DIR / ".cache" / "market_radar_sw_map.json"
+_MEMBER_CACHE_PATH = _SCRIPT_DIR / ".cache" / "market_radar_sw_members.json"
 _EM_ULIST_URLS = (
     "https://82.push2.eastmoney.com/api/qt/ulist.np/get",
     "https://push2.eastmoney.com/api/qt/ulist.np/get",
@@ -429,6 +433,166 @@ def _sector_display(sw: dict[str, str]) -> tuple[str, str, str]:
     if sw.get("l3_code") and sw.get("l3_name"):
         return sw["l3_code"], sw["l3_name"], "L3"
     return "", "", ""
+
+
+def _load_member_cache() -> dict[str, Any]:
+    try:
+        if not _MEMBER_CACHE_PATH.is_file():
+            return {"date": "", "items": {}}
+        data = json.loads(_MEMBER_CACHE_PATH.read_text(encoding="utf-8"))
+        items = data.get("items") if isinstance(data, dict) else None
+        if not isinstance(items, dict):
+            return {"date": "", "items": {}}
+        return {"date": str(data.get("date") or ""), "items": items}
+    except Exception:
+        return {"date": "", "items": {}}
+
+
+def _save_member_cache(payload: dict[str, Any]) -> None:
+    try:
+        _MEMBER_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _MEMBER_CACHE_PATH.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _member_ts_code(raw: Any) -> str:
+    s = str(raw or "").strip().upper()
+    if not s or s in {"NAN", "NONE"}:
+        return ""
+    if s.endswith(".SI"):
+        return ""
+    if "." in s:
+        return s
+    digits = "".join(ch for ch in s if ch.isdigit())
+    return to_ts_code(digits) if digits else ""
+
+
+def _members_from_df(df: Any) -> list[str]:
+    work = _lower_df(df) if df is not None else None
+    if work is None or work.empty:
+        return []
+    if "is_new" in work.columns:
+        fresh = work[work["is_new"].astype(str).str.upper() == "Y"]
+        if not fresh.empty:
+            work = fresh
+    if "out_date" in work.columns:
+        out = work["out_date"]
+        current = work[out.isna() | (out.astype(str).str.strip().str.upper().isin({"", "NONE", "NAN", "NAT", "NULL"}))]
+        if not current.empty:
+            work = current
+    col = next((c for c in ("ts_code", "con_code", "symbol") if c in work.columns), None)
+    if not col:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for val in work[col].tolist():
+        code = _member_ts_code(val)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append(code)
+        if len(out) >= SW_MEMBER_MAX:
+            break
+    return out
+
+
+def _fetch_sw_members_one(pro: Any, sector_code: str) -> list[str]:
+    today = _ymd()
+    code = str(sector_code or "").strip()
+    if not code:
+        return []
+    attempts: list[Any] = [
+        lambda: pro.index_member_all(l2_code=code, start_date="19900101", end_date=today, is_new="Y"),
+        lambda: pro.index_member_all(l2_code=code, start_date="19900101", end_date=today),
+        lambda: pro.index_member(index_code=code, is_new="Y"),
+        lambda: pro.index_member(index_code=code),
+    ]
+    digits = "".join(ch for ch in code.split(".")[0] if ch.isdigit())
+    alt = f"{digits}.SI" if digits else ""
+    if alt and alt != code:
+        attempts.insert(
+            2,
+            lambda a=alt: pro.index_member_all(l2_code=a, start_date="19900101", end_date=today, is_new="Y"),
+        )
+    for loader in attempts:
+        try:
+            df = loader()
+        except Exception:
+            df = None
+        members = _members_from_df(df)
+        if members:
+            return members
+    return []
+
+
+def resolve_sw_members(pro: Any, sector_codes: list[str]) -> dict[str, list[str]]:
+    """申万二级 -> 成分股 ts_code，按日缓存。只作分类，不当行情主键。"""
+    cache = _load_member_cache()
+    today = _ymd()
+    stored: dict[str, list[str]] = {}
+    raw = cache.get("items") if cache.get("date") == today else {}
+    if isinstance(raw, dict):
+        for key, val in raw.items():
+            if isinstance(val, list):
+                stored[str(key)] = [str(x) for x in val if x]
+    out: dict[str, list[str]] = {}
+    dirty = cache.get("date") != today
+    for i, code in enumerate(sector_codes):
+        hit = stored.get(code) or []
+        if hit:
+            out[code] = hit
+            continue
+        got = _fetch_sw_members_one(pro, code)
+        if got:
+            stored[code] = got
+            out[code] = got
+            dirty = True
+        if i + 1 < len(sector_codes):
+            time.sleep(0.12)
+    if dirty:
+        _save_member_cache({"date": today, "items": stored})
+    return out
+
+
+def _synth_sector_quote(
+    sector_code: str,
+    name: str,
+    members: list[str],
+    quotes: dict[str, dict[str, Any]],
+) -> Optional[dict[str, Any]]:
+    """成分股现价等权平均，作为申万二级盘中涨跌代理。"""
+    pcts: list[float] = []
+    for mem in members:
+        q = quotes.get(mem) or {}
+        if q.get("quote_kind") != "realtime":
+            continue
+        pct = q.get("pct")
+        if pct is None:
+            continue
+        try:
+            val = float(pct)
+        except (TypeError, ValueError):
+            continue
+        if abs(val) > STOCK_PCT_SANITY:
+            continue
+        pcts.append(val)
+    if len(pcts) < SW_SYNTH_MIN:
+        return None
+    return {
+        "ts_code": sector_code,
+        "name": name or sector_code,
+        "pct": round(sum(pcts) / len(pcts), 4),
+        "close": None,
+        "pre_close": None,
+        "amount": None,
+        "vol": None,
+        "trade_time": "",
+        "quote_kind": "realtime",
+        "source": "tencent_sw_synth",
+        "synth_count": len(pcts),
+        "synth_universe": len(members),
+    }
 
 
 def _lower_df(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
@@ -836,7 +1000,13 @@ def _fetch_tencent_quotes(
     """腾讯行情，香港机访问东财 push2 被限流时的指数/个股兜底。"""
     if not ts_codes:
         return {}
-    joined = ",".join(_tencent_symbol(c) for c in ts_codes)
+    uniq = list(dict.fromkeys(ts_codes))
+    if len(uniq) > TENCENT_BATCH:
+        found: dict[str, dict[str, Any]] = {}
+        for i in range(0, len(uniq), TENCENT_BATCH):
+            found.update(_fetch_tencent_quotes(uniq[i : i + TENCENT_BATCH], sanity_abs=sanity_abs))
+        return found
+    joined = ",".join(_tencent_symbol(c) for c in uniq)
     url = f"https://qt.gtimg.cn/q={joined}"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
@@ -844,7 +1014,7 @@ def _fetch_tencent_quotes(
         text = raw.decode("gb18030", "replace")
     except Exception:
         return {}
-    by_code = {c.split(".")[0].zfill(6): c for c in ts_codes}
+    by_code = {c.split(".")[0].zfill(6): c for c in uniq}
     found: dict[str, dict[str, Any]] = {}
     for line in text.splitlines():
         if "=\"" not in line:
@@ -958,6 +1128,8 @@ def fetch_sector_quotes(
     names: Optional[dict[str, str]] = None,
     *,
     allow_daily: bool = True,
+    member_map: Optional[dict[str, list[str]]] = None,
+    extra_quotes: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, dict[str, Any]]:
     if not sector_codes:
         return {}
@@ -979,6 +1151,25 @@ def fetch_sector_quotes(
             found[code] = q
 
     missing = [c for c in sector_codes if c not in found]
+    if missing:
+        member_map = member_map if member_map is not None else resolve_sw_members(pro, missing)
+        need: list[str] = []
+        for code in missing:
+            need.extend(member_map.get(code) or [])
+        quotes = dict(extra_quotes or {})
+        still = [c for c in dict.fromkeys(need) if c not in quotes]
+        if still:
+            quotes.update(_fetch_tencent_stock_quotes(still))
+        for code in missing:
+            q = _synth_sector_quote(
+                code,
+                (names or {}).get(code) or "",
+                member_map.get(code) or [],
+                quotes,
+            )
+            if q:
+                found[code] = q
+        missing = [c for c in sector_codes if c not in found]
     if missing:
         found.update(_fetch_em_sw_quotes(missing, names or {}))
         missing = [c for c in sector_codes if c not in found]
@@ -1081,7 +1272,18 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
             sector_codes.append(sc)
 
     sector_names = {sc: sn for sc, sn, _lv in sector_of.values() if sc and sn}
-    sector_quotes = fetch_sector_quotes(pro, sector_codes, sector_names) if sector_codes else {}
+    member_map = resolve_sw_members(pro, sector_codes) if sector_codes else {}
+    sector_quotes = (
+        fetch_sector_quotes(
+            pro,
+            sector_codes,
+            sector_names,
+            member_map=member_map,
+            extra_quotes=stock_quotes,
+        )
+        if sector_codes
+        else {}
+    )
     sector_stale = None
     if sector_quotes and not any(q.get("quote_kind") == "realtime" for q in sector_quotes.values()):
         sector_stale = "daily"
@@ -1154,6 +1356,7 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
                 "rs_index": rs_index,
                 "quote_kind": q.get("quote_kind") or "missing",
                 "stock_count": sector_count.get(code, 0),
+                "synth_count": q.get("synth_count"),
                 "lamp": index_lamp(pct),
             }
         )
@@ -1175,9 +1378,11 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     ) or any((stock_quotes.get(c) or {}).get("source") == "eastmoney" for c in ts_codes):
         sources.append("eastmoney")
     if any(i.get("source") == "tencent" for i in indexes) or any(
-        (stock_quotes.get(c) or {}).get("source") == "tencent" for c in ts_codes
-    ):
+        q.get("source") in {"tencent", "tencent_sw_synth"} for q in sector_quotes.values()
+    ) or any((stock_quotes.get(c) or {}).get("source") == "tencent" for c in ts_codes):
         sources.append("tencent")
+    if any(q.get("source") == "tencent_sw_synth" for q in sector_quotes.values()):
+        sources.append("sw_synth")
     if sector_stale or any(i.get("quote_kind") == "daily" for i in indexes):
         sources.append("daily")
 
