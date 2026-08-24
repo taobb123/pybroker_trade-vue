@@ -36,6 +36,7 @@ class RadarBody(BaseModel):
 
     symbols: list[str] = Field(default_factory=list, max_length=MAX_SYMBOLS)
     use_watchlist: bool = False
+    refresh: bool = False
 
 
 def _placeholder_stocks(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -120,9 +121,10 @@ def _put_cache(key: str, payload: dict[str, Any]) -> None:
 def market_radar(body: RadarBody | None = None) -> dict[str, Any]:
     body = body or RadarBody()
     key = _cache_key(body)
-    cached = _get_cached(key)
-    if cached is not None:
-        return cached
+    if not body.refresh:
+        cached = _get_cached(key)
+        if cached is not None:
+            return cached
     try:
         symbols = body.symbols if body.use_watchlist else []
         payload = build_market_radar(symbols)

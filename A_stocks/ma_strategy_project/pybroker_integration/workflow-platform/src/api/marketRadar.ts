@@ -112,11 +112,11 @@ function mapAlert(row: Raw): RadarAlert {
   }
 }
 
-export async function fetchMarketRadar(): Promise<MarketRadarPayload> {
+export async function fetchMarketRadar(opts?: { refresh?: boolean }): Promise<MarketRadarPayload> {
   const res = await fetch(apiUrl('/api/market-radar'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ refresh: Boolean(opts?.refresh) }),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')

@@ -38,14 +38,15 @@ HS300_CODE = "000300.SH"
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _MA_PROJECT_ROOT = _SCRIPT_DIR.parent
 _CACHE_PATH = _SCRIPT_DIR / ".cache" / "market_radar_sw_map.json"
-_EM_BOARD_CACHE = _SCRIPT_DIR / ".cache" / "market_radar_em_board.json"
 _EM_ULIST_URLS = (
     "https://82.push2.eastmoney.com/api/qt/ulist.np/get",
     "https://push2.eastmoney.com/api/qt/ulist.np/get",
     "https://88.push2.eastmoney.com/api/qt/ulist.np/get",
 )
-_EM_SUGGEST_URL = "https://searchadapter.eastmoney.com/api/suggest/get"
-_EM_SUGGEST_TOKEN = "FAKESECRET_i4j5k6l7m8n9o0p1q2r3"
+_EM_STOCK_GET_URLS = (
+    "https://82.push2.eastmoney.com/api/qt/stock/get",
+    "https://push2.eastmoney.com/api/qt/stock/get",
+)
 _EM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://quote.eastmoney.com/",
@@ -628,41 +629,57 @@ def _fetch_em_quotes_by_secid(
     return found
 
 
+def _em_fetch_secid_quote(
+    secid: str,
+    ts_code: str,
+    *,
+    sanity_abs: float,
+) -> Optional[dict[str, Any]]:
+    """东财 stock/get 单只现价（香港机 ulist 批量经常空包）。"""
+    if not secid:
+        return None
+    query = urllib.parse.urlencode(
+        {
+            "fltt": "2",
+            "invt": "2",
+            "secid": secid,
+            "fields": "f43,f47,f48,f57,f58,f60,f169,f170",
+        },
+        safe=",",
+    )
+    for host in _EM_STOCK_GET_URLS:
+        data = _em_http_json(f"{host}?{query}", timeout=6.0)
+        cand = (data or {}).get("data") if isinstance(data, dict) else None
+        if isinstance(cand, dict) and (cand.get("f57") or cand.get("f43") is not None):
+            return _em_quote_from_row(cand, ts_code, sanity_abs=sanity_abs)
+    return None
+
+
+def _fetch_em_quotes_spot(
+    ts_codes: list[str],
+    secid_of,
+    *,
+    sanity_abs: float,
+) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
+    for ts_code in ts_codes:
+        q = _em_fetch_secid_quote(secid_of(ts_code), ts_code, sanity_abs=sanity_abs)
+        if q:
+            found[ts_code] = q
+    return found
+
+
 def _fetch_em_index_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
-    return _fetch_em_quotes_by_secid(ts_codes, _em_index_secid, sanity_abs=INDEX_PCT_SANITY)
+    found = _fetch_em_quotes_spot(ts_codes, _em_index_secid, sanity_abs=INDEX_PCT_SANITY)
+    missing = [c for c in ts_codes if c not in found]
+    if missing:
+        found.update(_fetch_em_quotes_by_secid(missing, _em_index_secid, sanity_abs=INDEX_PCT_SANITY))
+    return found
 
 
 def _fetch_em_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
     """个股走东财 stock/get（ulist 批量在香港/盘中经常空包）。"""
-    found: dict[str, dict[str, Any]] = {}
-    hosts = (
-        "https://82.push2.eastmoney.com/api/qt/stock/get",
-        "https://push2.eastmoney.com/api/qt/stock/get",
-    )
-    for ts_code in ts_codes:
-        secid = _em_stock_secid(ts_code)
-        query = urllib.parse.urlencode(
-            {
-                "fltt": "2",
-                "invt": "2",
-                "secid": secid,
-                "fields": "f43,f47,f48,f57,f58,f60,f169,f170",
-            },
-            safe=",",
-        )
-        row = None
-        for host in hosts:
-            data = _em_http_json(f"{host}?{query}", timeout=6.0)
-            cand = (data or {}).get("data") if isinstance(data, dict) else None
-            if isinstance(cand, dict) and (cand.get("f57") or cand.get("f43") is not None):
-                row = cand
-                break
-        if not row:
-            continue
-        q = _em_quote_from_row(row, ts_code, sanity_abs=STOCK_PCT_SANITY)
-        if q:
-            found[ts_code] = q
-    return found
+    return _fetch_em_quotes_spot(ts_codes, _em_stock_secid, sanity_abs=STOCK_PCT_SANITY)
 
 
 def _sw_digits(ts_code: str) -> str:
@@ -670,111 +687,19 @@ def _sw_digits(ts_code: str) -> str:
 
 
 def _em_secids_for_sw(ts_code: str) -> list[str]:
+    """只绑申万代码本身，禁止 BK 后四位猜测（会撞上东财概念板）。"""
     digits = _sw_digits(ts_code)
     if len(digits) != 6:
         return []
-    out = [f"90.{digits}"]
-    if digits.startswith("80"):
-        out.append(f"90.BK{digits[2:]}")
-    return out
-
-
-def _norm_board_name(name: str) -> str:
-    t = str(name or "").strip()
-    for a, b in (
-        ("Ⅱ", "II"),
-        ("iii", "II"),
-        ("Ⅲ", "III"),
-        ("（申万）", ""),
-        ("(申万)", ""),
-        ("申万", ""),
-        (" ", ""),
-        ("　", ""),
-    ):
-        t = t.replace(a, b)
-    return t.upper()
-
-
-def _load_em_board_cache() -> dict[str, str]:
-    try:
-        if not _EM_BOARD_CACHE.is_file():
-            return {}
-        data = json.loads(_EM_BOARD_CACHE.read_text(encoding="utf-8"))
-        items = data.get("items") if isinstance(data, dict) else None
-        return dict(items) if isinstance(items, dict) else {}
-    except Exception:
-        return {}
-
-
-def _save_em_board_cache(items: dict[str, str]) -> None:
-    try:
-        _EM_BOARD_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        _EM_BOARD_CACHE.write_text(
-            json.dumps({"date": _ymd(), "items": items}, ensure_ascii=False),
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-
-
-def _em_suggest_secid(name: str) -> Optional[str]:
-    variants = [name]
-    if name:
-        variants = [f"{name}申万", f"申万{name}", name]
-    stripped = name
-    for suf in ("Ⅱ", "III", "II", "2", "Ⅲ"):
-        if stripped.endswith(suf):
-            stripped = stripped[: -len(suf)]
-            variants.append(stripped)
-    want = _norm_board_name(name)
-    for qname in dict.fromkeys(v.strip() for v in variants if v.strip()):
-        query = urllib.parse.urlencode(
-            {
-                "input": qname,
-                "type": "14",
-                "token": _EM_SUGGEST_TOKEN,
-                "count": "8",
-            }
-        )
-        data = _em_http_json(f"{_EM_SUGGEST_URL}?{query}")
-        table = None
-        if isinstance(data, dict):
-            table = data.get("QuotationCodeTable") or data.get("QuotationCodeTable")
-        rows = (table or {}).get("Data") if isinstance(table, dict) else None
-        if not isinstance(rows, list):
-            continue
-        best = None
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            qid = str(row.get("QuoteID") or row.get("QuoteID") or "").strip()
-            nm = str(row.get("Name") or "").strip()
-            classify = str(row.get("Classify") or "").upper()
-            if not qid.startswith("90."):
-                continue
-            if classify and classify not in {"BK", "INDEX"}:
-                continue
-            score = 2 if _norm_board_name(nm) == want else 1
-            if "申万" in nm:
-                score += 2
-            if best is None or score > best[0]:
-                best = (score, qid)
-        if best:
-            return best[1]
-    return None
+    return [f"90.{digits}"]
 
 
 def _index_em_sw_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by: dict[str, dict[str, Any]] = {}
     for row in rows:
         code = str(row.get("f12") or "").strip().upper()
-        if not code:
-            continue
-        by[code] = row
-        if code.startswith("BK") and len(code) >= 6:
-            tail = code[2:]
-            by[f"80{tail}"] = row
-            by[f"85{tail}"] = row
+        if code:
+            by[code] = row
     return by
 
 
@@ -783,48 +708,42 @@ def _fetch_em_sw_quotes(
     names: Optional[dict[str, str]] = None,
 ) -> dict[str, dict[str, Any]]:
     names = names or {}
-    board_cache = _load_em_board_cache()
-    secids: list[str] = []
-    for code in sector_codes:
-        secids.extend(_em_secids_for_sw(code))
-        cached = board_cache.get(_norm_board_name(names.get(code) or code))
-        if cached:
-            secids.append(cached)
-    rows = _em_ulist_rows(secids)
-    by = _index_em_sw_rows(rows)
     found: dict[str, dict[str, Any]] = {}
-    cache_dirty = False
     for code in sector_codes:
-        digits = _sw_digits(code).upper()
-        row = by.get(digits)
-        if row is None and len(digits) == 6:
-            row = by.get(f"BK{digits[2:]}")
-        if row is None:
-            name = names.get(code) or ""
-            key = _norm_board_name(name or code)
-            secid = board_cache.get(key)
-            if not secid and name:
-                secid = _em_suggest_secid(name)
-                if secid:
-                    board_cache[key] = secid
-                    cache_dirty = True
-            if secid:
-                extra = _em_ulist_rows([secid])
-                if extra:
-                    row = extra[0]
-        if not row:
+        q = None
+        for secid in _em_secids_for_sw(code):
+            q = _em_fetch_secid_quote(secid, code, sanity_abs=SECTOR_PCT_SANITY)
+            if q:
+                break
+        if q is None:
+            rows = _em_ulist_rows(_em_secids_for_sw(code))
+            by = _index_em_sw_rows(rows)
+            digits = _sw_digits(code).upper()
+            row = by.get(digits)
+            if row:
+                q = _em_quote_from_row(row, code, sanity_abs=SECTOR_PCT_SANITY)
+        if not q:
             continue
-        q = _em_quote_from_row(row, code, sanity_abs=SECTOR_PCT_SANITY)
-        if q:
-            found[code] = q
-    if cache_dirty:
-        _save_em_board_cache(board_cache)
+        sw_name = str(names.get(code) or "").strip()
+        if sw_name:
+            q["name"] = sw_name
+        found[code] = q
     return found
 
 
-def fetch_index_quotes(ts_mod: Any, pro: Any) -> list[dict[str, Any]]:
+def fetch_index_quotes(
+    ts_mod: Any,
+    pro: Any,
+    *,
+    allow_daily: bool = True,
+) -> list[dict[str, Any]]:
     codes = [s["ts_code"] for s in INDEX_SPECS]
     found: dict[str, dict[str, Any]] = {}
+
+    found.update(_fetch_tencent_quotes(codes, sanity_abs=INDEX_PCT_SANITY))
+    missing = [c for c in codes if c not in found]
+    if missing:
+        found.update(_fetch_em_index_quotes(missing))
 
     def _absorb(rt_df: Any) -> None:
         if rt_df is None or (hasattr(rt_df, "empty") and rt_df.empty):
@@ -833,27 +752,29 @@ def fetch_index_quotes(ts_mod: Any, pro: Any) -> list[dict[str, Any]]:
             if spec["ts_code"] in found:
                 continue
             q = _quote_from_rt_df(rt_df, spec["ts_code"], exact=True, sanity_abs=INDEX_PCT_SANITY)
-            if q and q.get("pct") is not None:
+            if q and q.get("pct") is not None and not _realtime_quote_stale(q):
+                if not str(q.get("trade_time") or "").strip() and not allow_daily:
+                    continue
                 found[spec["ts_code"]] = q
 
-    for loader in (
-        lambda: pro.rt_idx_k(ts_code=",".join(codes)),
-        lambda: ts_mod.realtime_quote(ts_code=",".join(codes), src="dc"),
-        lambda: ts_mod.realtime_quote(ts_code=",".join(codes), src="sina"),
-    ):
-        try:
-            _absorb(loader())
-        except Exception:
-            pass
-        if all(c in found for c in codes):
-            break
-    if any(c not in found for c in codes):
-        found.update(_fetch_em_index_quotes([c for c in codes if c not in found]))
+    missing = [c for c in codes if c not in found]
+    if missing:
+        for loader in (
+            lambda: pro.rt_idx_k(ts_code=",".join(missing)),
+            lambda: ts_mod.realtime_quote(ts_code=",".join(missing), src="dc"),
+            lambda: ts_mod.realtime_quote(ts_code=",".join(missing), src="sina"),
+        ):
+            try:
+                _absorb(loader())
+            except Exception:
+                pass
+            if all(c in found for c in codes):
+                break
 
     out: list[dict[str, Any]] = []
     for spec in INDEX_SPECS:
         q = found.get(spec["ts_code"])
-        if q is None:
+        if q is None and allow_daily:
             try:
                 start = (_cn_now() - timedelta(days=10)).strftime("%Y%m%d")
                 daily = pro.index_daily(ts_code=spec["ts_code"], start_date=start, end_date=_ymd())
@@ -871,6 +792,7 @@ def fetch_index_quotes(ts_mod: Any, pro: Any) -> list[dict[str, Any]]:
                         "vol": _finite(_cell(row, "vol")),
                         "trade_time": str(_cell(row, "trade_date") or "").strip(),
                         "quote_kind": "daily",
+                        "source": "tushare",
                     }
             except Exception:
                 q = None
@@ -881,6 +803,7 @@ def fetch_index_quotes(ts_mod: Any, pro: Any) -> list[dict[str, Any]]:
             "close": q["close"] if q else None,
             "lamp": index_lamp(q["pct"] if q else None),
             "quote_kind": q["quote_kind"] if q else "missing",
+            "source": (q.get("source") if q else None),
         }
         out.append(item)
     return out
@@ -905,8 +828,12 @@ def _tencent_symbol(ts_code: str) -> str:
     return f"sz{code}"
 
 
-def _fetch_tencent_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
-    """腾讯行情，香港机访问东财 push2 被限流时的个股兜底。"""
+def _fetch_tencent_quotes(
+    ts_codes: list[str],
+    *,
+    sanity_abs: float,
+) -> dict[str, dict[str, Any]]:
+    """腾讯行情，香港机访问东财 push2 被限流时的指数/个股兜底。"""
     if not ts_codes:
         return {}
     joined = ",".join(_tencent_symbol(c) for c in ts_codes)
@@ -934,7 +861,7 @@ def _fetch_tencent_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]
         pct = _finite(parts[32])
         if pct is None and close is not None and pre is not None and abs(pre) > 1e-6:
             pct = (close / pre - 1.0) * 100.0
-        if pct is None or abs(float(pct)) > STOCK_PCT_SANITY:
+        if pct is None or abs(float(pct)) > sanity_abs:
             continue
         q = {
             "ts_code": ts_code,
@@ -953,7 +880,17 @@ def _fetch_tencent_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]
     return found
 
 
-def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, dict[str, Any]]:
+def _fetch_tencent_stock_quotes(ts_codes: list[str]) -> dict[str, dict[str, Any]]:
+    return _fetch_tencent_quotes(ts_codes, sanity_abs=STOCK_PCT_SANITY)
+
+
+def fetch_stock_quotes(
+    ts_mod: Any,
+    pro: Any,
+    ts_codes: list[str],
+    *,
+    allow_daily: bool = True,
+) -> dict[str, dict[str, Any]]:
     if not ts_codes:
         return {}
     joined = ",".join(ts_codes)
@@ -967,6 +904,8 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
                 continue
             q = _quote_from_rt_df(rt_df, code, sanity_abs=STOCK_PCT_SANITY)
             if q and q.get("pct") is not None and not _realtime_quote_stale(q):
+                if not str(q.get("trade_time") or "").strip() and not allow_daily:
+                    continue
                 found[code] = q
 
     found.update(_fetch_em_stock_quotes(ts_codes))
@@ -989,7 +928,7 @@ def fetch_stock_quotes(ts_mod: Any, pro: Any, ts_codes: list[str]) -> dict[str, 
             return found
 
     missing = [c for c in ts_codes if c not in found]
-    if missing:
+    if missing and allow_daily:
         start = (_cn_now() - timedelta(days=10)).strftime("%Y%m%d")
         try:
             daily = pro.daily(ts_code=",".join(missing), start_date=start, end_date=_ymd())
@@ -1017,6 +956,8 @@ def fetch_sector_quotes(
     pro: Any,
     sector_codes: list[str],
     names: Optional[dict[str, str]] = None,
+    *,
+    allow_daily: bool = True,
 ) -> dict[str, dict[str, Any]]:
     if not sector_codes:
         return {}
@@ -1034,7 +975,7 @@ def fetch_sector_quotes(
     found: dict[str, dict[str, Any]] = {}
     for code in sector_codes:
         q = _quote_from_rt_df(rt_df, code, exact=True, sanity_abs=SECTOR_PCT_SANITY)
-        if q and q.get("pct") is not None and abs(float(q["pct"])) <= SECTOR_PCT_SANITY:
+        if q and q.get("pct") is not None and abs(float(q["pct"])) <= SECTOR_PCT_SANITY and not _realtime_quote_stale(q):
             found[code] = q
 
     missing = [c for c in sector_codes if c not in found]
@@ -1088,9 +1029,9 @@ def fetch_sector_quotes(
                     found[code]["amount_change"] = ratio
                 elif daily_q is not None:
                     daily_q["amount_change"] = ratio
-        if code not in found and daily_q:
+        if code not in found and daily_q and allow_daily:
             found[code] = daily_q
-        elif code in found and daily_q and found[code].get("quote_kind") != "realtime":
+        elif code in found and daily_q and found[code].get("quote_kind") != "realtime" and allow_daily:
             rt_pct = found[code].get("pct")
             daily_pct = daily_q.get("pct")
             if daily_pct is not None and (
@@ -1122,13 +1063,13 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
 
     ts_mod, pro = get_tushare_bundle()
     session = session_state(pro, now)
-    indexes = fetch_index_quotes(ts_mod, pro)
+    indexes = fetch_index_quotes(ts_mod, pro, allow_daily=(session != "open"))
     hs300_pct = next((i["pct"] for i in indexes if i["ts_code"] == HS300_CODE), None)
 
     pairs = [(s, to_ts_code(s)) for s in uniq if to_ts_code(s)]
     ts_codes = [c for _, c in pairs]
     sw_map = resolve_sw_map(pro, ts_codes) if ts_codes else {}
-    stock_quotes = fetch_stock_quotes(ts_mod, pro, ts_codes) if ts_codes else {}
+    stock_quotes = fetch_stock_quotes(ts_mod, pro, ts_codes, allow_daily=(session != "open")) if ts_codes else {}
 
     sector_of: dict[str, tuple[str, str, str]] = {}
     sector_codes: list[str] = []
@@ -1197,9 +1138,9 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     sectors_out: list[dict[str, Any]] = []
     for code in sector_codes:
         q = sector_quotes.get(code) or {}
-        name = str(q.get("name") or "").strip()
+        name = next((sn for sc, sn, _ in sector_of.values() if sc == code and sn), "")
         if not name:
-            name = next((sn for sc, sn, _ in sector_of.values() if sc == code and sn), code)
+            name = str(q.get("name") or "").strip() or code
         pct = q.get("pct")
         rs_index = None if pct is None or hs300_pct is None else round(pct - hs300_pct, 4)
         amount_change = q.get("amount_change")
@@ -1229,16 +1170,16 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
             )
 
     sources = [GROWTH_UNIVERSE_LABEL, "tushare"]
-    if any(i.get("quote_kind") == "realtime" for i in indexes) or any(
+    if any(i.get("source") == "eastmoney" for i in indexes) or any(
         q.get("source") == "eastmoney" for q in sector_quotes.values()
-    ):
+    ) or any((stock_quotes.get(c) or {}).get("source") == "eastmoney" for c in ts_codes):
         sources.append("eastmoney")
-    if any((stock_quotes.get(c) or {}).get("source") == "tencent" for c in ts_codes):
+    if any(i.get("source") == "tencent" for i in indexes) or any(
+        (stock_quotes.get(c) or {}).get("source") == "tencent" for c in ts_codes
+    ):
         sources.append("tencent")
-    if sector_stale:
-        sources.append("sw_daily")
-    if any(i.get("quote_kind") == "realtime" for i in indexes):
-        sources.append("rt_idx/realtime_quote")
+    if sector_stale or any(i.get("quote_kind") == "daily" for i in indexes):
+        sources.append("daily")
 
     return {
         "ok": True,

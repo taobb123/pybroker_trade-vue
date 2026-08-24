@@ -43,11 +43,11 @@ function tickClock() {
   clock.value = now.toLocaleTimeString('zh-CN', { hour12: false })
 }
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   error.value = ''
   try {
-    const next = await fetchMarketRadar()
+    const next = await fetchMarketRadar({ refresh: force })
     payload.value = next
     if (!next.ok) {
       error.value = next.error || '市场雷达暂不可用'
@@ -86,7 +86,7 @@ onUnmounted(() => {
 watch(
   () => props.tick,
   (n, prev) => {
-    if (n && n !== prev) void load()
+    if (n && n !== prev) void load(true)
   },
 )
 
@@ -119,7 +119,7 @@ defineExpose({ refresh: load })
           {{ sessionClosed ? '非交易时段' : '盘中' }}
         </Badge>
         <Badge v-if="payload?.cached" variant="outline" class="text-muted-foreground">缓存</Badge>
-        <Button size="sm" variant="outline" :disabled="loading" @click="load">
+        <Button size="sm" variant="outline" :disabled="loading" @click="load(true)">
           <RefreshCw class="size-3.5" :class="loading && 'animate-spin'" />
           刷新
         </Button>
@@ -147,7 +147,7 @@ defineExpose({ refresh: load })
       v-if="payload?.ok && payload?.sectorStale !== 'daily'"
       class="rounded-md border border-emerald-200/70 bg-emerald-50/50 px-2.5 py-1.5 text-[11px] leading-relaxed text-emerald-950/80 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-100/80"
     >
-      板块与指数盘中行情已改用东方财富实时；行业仍按申万二级分类。个股优先东财/新浪参考现价。
+      板块与指数盘中优先腾讯/东财现价；行业名称固定申万二级，不用东财概念板。个股同样走东财或腾讯参考现价。
     </p>
 
     <p
