@@ -1,2 +1,3 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-立新能源,红柱,跌,2026-08-04,2026-08-05,2026-07-31|2026-08-03|2026-08-04,红红红,红绿红,2,1,后续不同概率偏高,down,red,diff_bias,001258
+登海种业,绿柱,跌,2026-08-21,2026-08-24,2026-08-19|2026-08-20|2026-08-21,红红绿,红绿红,1,2,后续相同概率偏高,down,green,same_bias,002041
+开开实业,绿柱,跌,2026-08-21,2026-08-24,2026-08-19|2026-08-20|2026-08-21,绿绿,红绿绿,1,2,后续相同概率偏高,down,green,same_bias,600272
