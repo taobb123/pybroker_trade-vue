@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Activity, RefreshCw } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { fetchMarketRadar } from '@/api/marketRadar'
 import { LAMP_LABEL, POLL_MS } from '@/config/marketRadarRules'
 import {
@@ -13,9 +14,13 @@ import {
   pctClass,
   type MarketRadarPayload,
   type RadarLamp,
+  type RadarStock,
 } from '@/domain/marketRadar'
 
 const GROWTH_STEP_ID = 'growth_factor'
+/** 与后端 GROWTH_GROUPS 顺序一致；默认展开第一组 */
+const GROWTH_GROUPS = ['M加', 'Q', 'M减', '量能', '估值因子', '23M减'] as const
+const HIGHLIGHT_MS = 2500
 
 const props = defineProps<{
   /** 父页刷新时递增，触发重新拉数 */
@@ -28,8 +33,12 @@ const loading = ref(false)
 const payload = ref<MarketRadarPayload | null>(null)
 const error = ref('')
 const clock = ref('')
+const activeGroup = ref<string>(GROWTH_GROUPS[0])
+const watchlistEl = ref<HTMLElement | null>(null)
+const highlightKey = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
 
 const emptyUniverse = computed(() => (payload.value?.universe?.count ?? 0) === 0)
 const sessionClosed = computed(() => payload.value?.session === 'closed')
@@ -37,6 +46,98 @@ const sectorMaxAbs = computed(() => {
   const vals = (payload.value?.sectors ?? []).map((s) => Math.abs(s.pct ?? 0))
   return Math.max(3, ...vals, 0)
 })
+
+const stocksByGroup = computed(() => {
+  const map = new Map<string, RadarStock[]>()
+  for (const g of GROWTH_GROUPS) map.set(g, [])
+  for (const st of payload.value?.stocks ?? []) {
+    const g = st.group || ''
+    if (!map.has(g)) map.set(g, [])
+    map.get(g)!.push(st)
+  }
+  return map
+})
+
+const groupTabs = computed(() =>
+  GROWTH_GROUPS.map((g) => ({
+    name: g,
+    count: stocksByGroup.value.get(g)?.length ?? 0,
+  })),
+)
+
+const activeGroupStocks = computed(
+  () => stocksByGroup.value.get(activeGroup.value) ?? [],
+)
+
+/** 全池去重后按强度取前三；随 payload 刷新重算 */
+const strongestTop3 = computed(() => {
+  const best = new Map<string, RadarStock>()
+  for (const st of payload.value?.stocks ?? []) {
+    if (st.strength == null) continue
+    const prev = best.get(st.symbol)
+    if (!prev || (prev.strength ?? -Infinity) < st.strength) {
+      best.set(st.symbol, st)
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))
+    .slice(0, 3)
+})
+
+const strongestSummary = computed(() => {
+  const list = strongestTop3.value
+  if (!list.length) return ''
+  return list
+    .map((st) => `${st.name || st.symbol} ${st.symbol}(${st.strength})`)
+    .join(' › ')
+})
+
+function stockRowKey(st: Pick<RadarStock, 'group' | 'symbol'>) {
+  return `${st.group ?? ''}::${st.symbol}`
+}
+
+function groupOrder(group: string | null) {
+  const i = GROWTH_GROUPS.indexOf(group as (typeof GROWTH_GROUPS)[number])
+  return i >= 0 ? i : GROWTH_GROUPS.length
+}
+
+/** 该板块自选中强度最高的一只（并列时取更靠前的分组） */
+function findStrongestInSector(sectorCode: string): RadarStock | null {
+  const matches = (payload.value?.stocks ?? []).filter(
+    (st) => st.sectorCode === sectorCode,
+  )
+  if (!matches.length) return null
+  return matches.reduce((best, st) => {
+    const bs = best.strength ?? -Infinity
+    const ss = st.strength ?? -Infinity
+    if (ss !== bs) return ss > bs ? st : best
+    return groupOrder(st.group) < groupOrder(best.group) ? st : best
+  })
+}
+
+function setHighlight(key: string) {
+  highlightKey.value = key
+  if (highlightTimer) clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => {
+    highlightKey.value = ''
+    highlightTimer = null
+  }, HIGHLIGHT_MS)
+}
+
+async function jumpToSectorStock(sectorCode: string) {
+  const target = findStrongestInSector(sectorCode)
+  if (!target?.group) return
+  activeGroup.value = target.group
+  const key = stockRowKey(target)
+  setHighlight(key)
+  await nextTick()
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  watchlistEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const row = watchlistEl.value?.querySelector(
+    `[data-radar-stock="${CSS.escape(key)}"]`,
+  ) as HTMLElement | null
+  row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
 
 function tickClock() {
   const now = new Date()
@@ -81,6 +182,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   if (clockTimer) clearInterval(clockTimer)
+  if (highlightTimer) clearTimeout(highlightTimer)
 })
 
 watch(
@@ -102,7 +204,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">成长因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          工作流「按成长因子排序」M加前 3 + Q 前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          工作流「按成长因子排序」六组各前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -191,7 +293,17 @@ defineExpose({ refresh: load })
       <div class="space-y-2">
         <p class="text-xs font-medium text-foreground">成长因子板块</p>
         <ul v-if="payload?.sectors.length" class="space-y-2">
-          <li v-for="sec in payload.sectors" :key="sec.code" class="space-y-1">
+          <li
+            v-for="sec in payload.sectors"
+            :key="sec.code"
+            class="space-y-1 rounded-md px-1.5 py-1 -mx-1.5 cursor-pointer transition-colors hover:bg-background/80"
+            role="button"
+            tabindex="0"
+            :title="`定位该板块强度最高的自选股`"
+            @click="jumpToSectorStock(sec.code)"
+            @keydown.enter.prevent="jumpToSectorStock(sec.code)"
+            @keydown.space.prevent="jumpToSectorStock(sec.code)"
+          >
             <div class="flex items-center justify-between gap-2 text-sm">
               <span class="truncate">
                 {{ sec.name }}
@@ -214,7 +326,7 @@ defineExpose({ refresh: load })
           v-else
           class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground"
         >
-          <p v-if="emptyUniverse">请先运行「按成长因子排序」，生成 M加 / Q 名单。</p>
+          <p v-if="emptyUniverse">请先运行「按成长因子排序」，生成六组名单。</p>
           <p v-else-if="loading">正在映射申万行业…</p>
           <p v-else>暂无板块数据</p>
           <Button
@@ -230,45 +342,82 @@ defineExpose({ refresh: load })
       </div>
     </div>
 
-    <div class="space-y-2">
-      <div class="flex items-center justify-between gap-2">
-        <p class="text-xs font-medium text-foreground">自选股</p>
-        <span class="text-[11px] text-muted-foreground">
-          {{ payload?.stocks.length ?? 0 }} 只 · M加前3 + Q前3
+    <div ref="watchlistEl" class="space-y-2 scroll-mt-4">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <p class="text-xs font-medium text-foreground">自选股</p>
+          <p
+            v-if="strongestSummary"
+            class="min-w-0 truncate text-[11px] text-muted-foreground"
+            :title="`最强前三（强度）· ${strongestSummary}`"
+          >
+            最强前三 · {{ strongestSummary }}
+          </p>
+        </div>
+        <span class="shrink-0 text-[11px] text-muted-foreground">
+          {{ payload?.stocks.length ?? 0 }} 只 · 六组各前3
         </span>
       </div>
-      <ul v-if="payload?.stocks.length" class="space-y-1.5">
-        <li
-          v-for="st in payload.stocks"
-          :key="st.symbol"
-          class="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/80 px-3 py-2"
+      <Tabs v-if="payload?.stocks.length" v-model="activeGroup" class="w-full">
+        <TabsList class="flex h-auto w-full flex-wrap justify-start gap-1">
+          <TabsTrigger
+            v-for="tab in groupTabs"
+            :key="tab.name"
+            :value="tab.name"
+            class="px-2.5 text-xs"
+          >
+            {{ tab.name }}
+            <span class="ml-1 tabular-nums text-muted-foreground">{{ tab.count }}</span>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent
+          v-for="tab in groupTabs"
+          :key="tab.name"
+          :value="tab.name"
+          class="mt-2"
         >
-          <div class="min-w-0">
-            <p class="truncate text-sm font-medium">
-              <Badge v-if="st.group" variant="outline" class="mr-1.5 align-middle">
-                {{ st.group }}{{ st.rank != null ? ` #${st.rank}` : '' }}
-              </Badge>
-              {{ st.name }}
-              <span class="ml-1 font-normal tabular-nums text-muted-foreground">{{ st.symbol }}</span>
-            </p>
-            <p class="text-[11px] text-muted-foreground">
-              {{ st.sectorName || st.industry || '未映射板块' }}
-              <template v-if="st.sectorPct != null"> {{ formatPct(st.sectorPct) }}</template>
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="tabular-nums text-sm font-semibold" :class="pctClass(st.pct)">
-              {{ formatPct(st.pct) }}
-            </span>
-            <span class="tabular-nums text-[11px] text-muted-foreground">
-              强度 {{ st.strength ?? '—' }}
-            </span>
-            <Badge :class="lampBadge(st.lamp)" class="min-w-10 justify-center">
-              {{ LAMP_LABEL[st.lamp] }}
-            </Badge>
-          </div>
-        </li>
-      </ul>
+          <ul v-if="activeGroupStocks.length" class="space-y-1.5">
+            <li
+              v-for="st in activeGroupStocks"
+              :key="`${st.group}-${st.symbol}`"
+              :data-radar-stock="stockRowKey(st)"
+              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/80 px-3 py-2 transition-colors"
+              :class="
+                highlightKey === stockRowKey(st) &&
+                'border-amber-400/80 bg-amber-50/80 ring-2 ring-amber-300/60 dark:bg-amber-950/30 dark:ring-amber-700/50'
+              "
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium">
+                  <Badge v-if="st.group" variant="outline" class="mr-1.5 align-middle">
+                    {{ st.group }}{{ st.rank != null ? ` #${st.rank}` : '' }}
+                  </Badge>
+                  {{ st.name }}
+                  <span class="ml-1 font-normal tabular-nums text-muted-foreground">{{ st.symbol }}</span>
+                </p>
+                <p class="text-[11px] text-muted-foreground">
+                  {{ st.sectorName || st.industry || '未映射板块' }}
+                  <template v-if="st.sectorPct != null"> {{ formatPct(st.sectorPct) }}</template>
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="tabular-nums text-sm font-semibold" :class="pctClass(st.pct)">
+                  {{ formatPct(st.pct) }}
+                </span>
+                <span class="tabular-nums text-[11px] text-muted-foreground">
+                  强度 {{ st.strength ?? '—' }}
+                </span>
+                <Badge :class="lampBadge(st.lamp)" class="min-w-10 justify-center">
+                  {{ LAMP_LABEL[st.lamp] }}
+                </Badge>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground">
+            「{{ tab.name }}」暂无 Top3，请确认桌面已同步并运行成长排序。
+          </p>
+        </TabsContent>
+      </Tabs>
       <div
         v-else
         class="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-background/60 px-6 py-8 text-center"
@@ -278,7 +427,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有成长因子名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          盘中雷达盯工作流「按成长因子排序」的 M加前三与 Q 前三，不使用观察池。
+          盘中雷达盯工作流「按成长因子排序」的六组各前三（Tab 切换），不使用观察池。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

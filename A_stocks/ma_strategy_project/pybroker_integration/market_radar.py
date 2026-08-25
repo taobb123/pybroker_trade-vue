@@ -57,9 +57,9 @@ _EM_HEADERS = {
     "Accept": "application/json,text/plain,*/*",
 }
 GROWTH_RANKING_CSV = _SCRIPT_DIR / "factor_growth_ranking.csv"
-GROWTH_GROUPS = ("M加", "Q")
+GROWTH_GROUPS = ("M加", "Q", "M减", "量能", "估值因子", "23M减")
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加前3 + Q前3"
+GROWTH_UNIVERSE_LABEL = "按成长因子排序 · 六组各前3"
 
 
 class MarketRadarError(RuntimeError):
@@ -230,7 +230,7 @@ def growth_ranking_mtime() -> str:
 
 
 def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """工作流「按成长因子排序」产物：M加前 N + Q 前 N。"""
+    """工作流「按成长因子排序」产物：六组各取前 N（组内去重，组间可重复）。"""
     if not GROWTH_RANKING_CSV.is_file():
         return [], "未找到 factor_growth_ranking.csv，请先运行工作流「按成长因子排序」。"
     try:
@@ -249,7 +249,6 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
         return [], "成长因子排序表缺少「分组」或「股票代码」列。"
 
     picks: list[dict[str, Any]] = []
-    seen: set[str] = set()
     missing_groups: list[str] = []
     for group in GROWTH_GROUPS:
         sub = df[df[group_col].astype(str).str.strip() == group]
@@ -261,13 +260,14 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
             work["_rank"] = pd.to_numeric(work[rank_col], errors="coerce")
             work = work.sort_values("_rank", ascending=True, na_position="last")
         taken = 0
+        seen_in_group: set[str] = set()
         for _, row in work.iterrows():
             if taken >= top_n:
                 break
             sym = six_digit(row.get(code_col))
-            if not sym or sym in seen:
+            if not sym or sym in seen_in_group:
                 continue
-            seen.add(sym)
+            seen_in_group.add(sym)
             rank_val = row.get("_rank") if "_rank" in work.columns else None
             try:
                 rank_n = int(rank_val) if rank_val is not None and rank_val == rank_val else taken + 1
@@ -285,7 +285,7 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
             taken += 1
     hint = None
     if not picks:
-        hint = "成长因子排序表中没有可用的 M加 / Q 标的。"
+        hint = "成长因子排序表中没有可用的六组标的。"
     elif missing_groups:
         hint = f"排序表缺少分组：{'、'.join(missing_groups)}"
     return picks, hint
@@ -1237,13 +1237,18 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     now = _cn_now()
     as_of = now.strftime("%Y-%m-%d %H:%M:%S")
     picks, universe_hint = load_growth_factor_picks()
-    meta = {p["symbol"]: p for p in picks}
     requested = [six_digit(s) for s in (symbols or [])]
     requested = [s for s in requested if s]
-    uniq = requested if requested else [p["symbol"] for p in picks]
+    if requested:
+        emit_picks: list[dict[str, Any]] = [
+            {"symbol": s, "name": "", "group": None, "rank": None, "industry": ""} for s in requested
+        ]
+    else:
+        emit_picks = list(picks)
     seen: set[str] = set()
     ordered: list[str] = []
-    for s in uniq:
+    for p in emit_picks:
+        s = six_digit(p.get("symbol") or "")
         if s and s not in seen:
             seen.add(s)
             ordered.append(s)
@@ -1291,8 +1296,16 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     stocks_out: list[dict[str, Any]] = []
     alerts: list[dict[str, Any]] = []
     sector_count: dict[str, int] = {}
+    sector_syms: dict[str, set[str]] = {}
+    alerted_lag: set[str] = set()
 
-    for sym, ts_code in pairs:
+    for pick in emit_picks:
+        sym = six_digit(pick.get("symbol") or "")
+        if not sym or sym not in seen:
+            continue
+        ts_code = to_ts_code(sym)
+        if not ts_code:
+            continue
         q = stock_quotes.get(ts_code) or {}
         sc, sn, lv = sector_of.get(ts_code, ("", "", ""))
         sq = sector_quotes.get(sc) or {}
@@ -1301,10 +1314,12 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
         rs_index = None if stock_pct is None or hs300_pct is None else round(stock_pct - hs300_pct, 4)
         rs_sector = None if stock_pct is None or sector_pct is None else round(stock_pct - sector_pct, 4)
         lamp = stock_lamp(stock_pct, sector_pct, rs_index, rs_sector)
-        pick = meta.get(sym) or {}
         name = str(pick.get("name") or q.get("name") or "").strip() or ts_code
         if sc:
-            sector_count[sc] = sector_count.get(sc, 0) + 1
+            bucket = sector_syms.setdefault(sc, set())
+            if sym not in bucket:
+                bucket.add(sym)
+                sector_count[sc] = sector_count.get(sc, 0) + 1
         stocks_out.append(
             {
                 "symbol": sym,
@@ -1325,7 +1340,12 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
                 "quote_kind": q.get("quote_kind") or "missing",
             }
         )
-        if rs_sector is not None and rs_sector < LAG_SECTOR:
+        if (
+            rs_sector is not None
+            and rs_sector < LAG_SECTOR
+            and sym not in alerted_lag
+        ):
+            alerted_lag.add(sym)
             alerts.append(
                 {
                     "kind": "lag_sector",

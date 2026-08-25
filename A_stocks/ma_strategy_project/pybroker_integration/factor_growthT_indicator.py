@@ -597,7 +597,7 @@ def run_mx_group_growth_rank(
             print(f"⚠ 保存排名失败: {save_err}")
     else:
         _save_ranking_csv([], ranking_file)
-        print("成长表为空（两组均无代码）")
+        print("成长表为空（各分组均无代码）")
 
     return 0 if any_ok else 2
 
@@ -608,7 +608,7 @@ def main():
     parser.add_argument(
         "--from-mx-groups",
         default="",
-        help="逗号分隔分组名（如 M加,Q）；读取 config/mx_groups/{名}.txt，组内成长排序后推东财同名分组",
+        help="逗号分隔分组名（如 M加,Q,M减,量能,估值因子,23M减）；读取 config/mx_groups/{名}.txt，组内成长排序后推东财同名分组",
     )
     parser.add_argument(
         "--mx-groups-dir",
