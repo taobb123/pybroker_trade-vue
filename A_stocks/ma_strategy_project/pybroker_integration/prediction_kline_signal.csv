@@ -1,3 +1,3 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-登海种业,绿柱,跌,2026-08-21,2026-08-24,2026-08-19|2026-08-20|2026-08-21,红红绿,红绿红,1,2,后续相同概率偏高,down,green,same_bias,002041
-开开实业,绿柱,跌,2026-08-21,2026-08-24,2026-08-19|2026-08-20|2026-08-21,绿绿,红绿绿,1,2,后续相同概率偏高,down,green,same_bias,600272
+*ST皇庭,红柱,跌,2026-08-24,2026-08-25,2026-08-20|2026-08-21|2026-08-24,红红,绿红红,2,1,后续不同概率偏高,down,red,diff_bias,000056
+宝丰能源,绿柱,跌,2026-08-24,2026-08-25,2026-08-20|2026-08-21|2026-08-24,绿红绿,绿绿红,1,2,后续相同概率偏高,down,green,same_bias,600989

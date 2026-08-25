@@ -1,3 +1,15 @@
+import os
+import sys
+from datetime import datetime, timedelta
+
+_TRAIN_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# pybroker evaluate 使用 @njit(cache=True)；须在 import numba 之前指定独立缓存，
+# 避免香港机 site-packages 缓存损坏后抛出 ReferenceError: underlying object has vanished
+os.environ.setdefault(
+    "NUMBA_CACHE_DIR",
+    os.path.join(_TRAIN_SCRIPT_DIR, ".cache", "numba"),
+)
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -5,12 +17,8 @@ from sklearn.metrics import r2_score
 from numba import njit
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from datetime import datetime, timedelta
 
-import os
-import sys
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_TRAIN_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(_TRAIN_SCRIPT_DIR)
 # 本目录：train_model_symbols 等；上级 ma_strategy_project 必须排在最前，
 # 否则会被本目录 config/ 抢占，导致找不到 config.db_config
 if _TRAIN_SCRIPT_DIR not in sys.path:
@@ -28,28 +36,24 @@ from prediction_kline_chart import export_result1_kline_csv, export_walkforward_
 enable_caches('walkforward_strategy')
 
 # 2. 定义自定义指标 (例如: 收盘价减去移动平均线, CMMA)
+# 嵌套 @njit 闭包在 evaluate/pickle 时可能触发 numba ReferenceError，提到模块级
+@njit
+def _vec_cmma(values, lookback):
+    n = len(values)
+    out = np.empty(n)
+    out[:] = np.nan
+    for i in range(lookback, n):
+        ma = 0.0
+        for j in range(i - lookback, i):
+            ma += values[j]
+        ma /= lookback
+        out[i] = values[i] - ma
+    return out
+
+
 def cmma(bar_data, lookback):
     """计算收盘价减去移动平均线 (CMMA)"""
-    
-    @njit  # 使用 Numba JIT 加速计算
-    def vec_cmma(values, lookback):
-        # 初始化结果数组
-        n = len(values)
-        out = np.array([np.nan for _ in range(n)])
-        
-        # 从 lookback 开始计算所有 bar
-        for i in range(lookback, n):
-            # 计算移动平均
-            ma = 0
-            for j in range(i - lookback, i):
-                ma += values[j]
-            ma /= lookback
-            # 用当前值减去移动平均
-            out[i] = values[i] - ma
-        return out
-    
-    # 使用收盘价计算
-    return vec_cmma(bar_data.close, lookback)
+    return _vec_cmma(bar_data.close, lookback)
 
 cmma_20 = indicator('cmma_20', cmma, lookback=20)
 
@@ -185,6 +189,22 @@ def exec_fn(ctx: ExecContext):
         if prediction < 0:
             ctx.sell_all_shares()  # 清空持仓
 
+
+def _run_walkforward(strategy, **kwargs):
+    """walkforward 结束后 evaluate 会编译 pybroker 的 numba 指标；缓存损坏时不影响已生成的预测。"""
+    try:
+        return strategy.walkforward(**kwargs)
+    except ReferenceError as e:
+        if "vanished" not in str(e).lower():
+            raise
+        print(
+            f"警告: walkforward 评估阶段 numba 序列化失败（{e}）。"
+            "预测已在回测中生成，继续导出。",
+            flush=True,
+        )
+        return None
+
+
 # 5. 初始化 Strategy 对象并运行前向分析
 if __name__ == '__main__':
     # ========== 配置参数 ==========
@@ -221,12 +241,15 @@ if __name__ == '__main__':
     
     # 运行前向分析
     # 使用 5 个时间窗口，每个窗口 50/50 的训练/测试数据分割，前瞻期为 1 bar
-    result = strategy.walkforward(
-        warmup=20, # 预热期，确保指标有足够数据
-        windows=5, 
-        train_size=0.5, 
-        lookahead=1, # 预测未来 1 个 bar，防止数据泄露
-        calc_bootstrap=True # 使用引导程序计算更可靠的指标
+    # 做 T 只用 exec_fn 写入的预测，不需要 bootstrap；evaluate 阶段的 numba 缓存
+    # 在香港机上会抛 ReferenceError: underlying object has vanished
+    result = _run_walkforward(
+        strategy,
+        warmup=20,  # 预热期，确保指标有足够数据
+        windows=5,
+        train_size=0.5,
+        lookahead=1,  # 预测未来 1 个 bar，防止数据泄露
+        calc_bootstrap=False,
     )
     
     # # 打印和分析结果
