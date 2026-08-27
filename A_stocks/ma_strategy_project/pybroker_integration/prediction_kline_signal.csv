@@ -1,3 +1,4 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-*ST皇庭,红柱,跌,2026-08-24,2026-08-25,2026-08-20|2026-08-21|2026-08-24,红红,绿红红,2,1,后续不同概率偏高,down,red,diff_bias,000056
-宝丰能源,绿柱,跌,2026-08-24,2026-08-25,2026-08-20|2026-08-21|2026-08-24,绿红绿,绿绿红,1,2,后续相同概率偏高,down,green,same_bias,600989
+济川药业,红柱,涨,2026-08-25,2026-08-26,2026-08-21|2026-08-24|2026-08-25,绿绿红,红绿绿,1,2,后续相同概率偏高,up,red,same_bias,600566
+西部矿业,绿柱,跌,2026-08-25,2026-08-26,2026-08-21|2026-08-24|2026-08-25,红绿绿,绿红绿,1,2,后续相同概率偏高,down,green,same_bias,601168
+长白山,绿柱,涨,2026-08-25,2026-08-26,2026-08-21|2026-08-24|2026-08-25,红绿绿,红红绿,2,1,后续不同概率偏高,up,green,diff_bias,603099

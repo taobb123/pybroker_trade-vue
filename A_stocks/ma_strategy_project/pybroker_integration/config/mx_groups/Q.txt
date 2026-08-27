@@ -1,5 +1,7 @@
 # 自选分组 Q · 从桌面拷贝，工作流只读此文件、不回写桌面
-# source_encoding=gb18030 count=6
+# source_encoding=gb18030 count=8
+002128
+600993
 002170
 601168
 600961
