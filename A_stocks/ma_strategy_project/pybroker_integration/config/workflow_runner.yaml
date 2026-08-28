@@ -136,10 +136,11 @@ steps:
   - '0.10'
   - --variants
   - A,B,Q,M+,M-
+  - --skip-backtest
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 不改原六组合；2+3回测对比；定向推送Q/估值因子/23M减各Top2；半凯利跟随推送名单
+  frequency_note: 暂跳过2+3回测对比以加快链式；仍定向推送Q/估值因子/23M减各Top2；半凯利跟随推送名单
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）

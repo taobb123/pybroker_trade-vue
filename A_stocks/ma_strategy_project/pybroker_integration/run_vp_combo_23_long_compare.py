@@ -7,11 +7,14 @@
   1) 从当日 vp_six_combo_scan.csv 导出 watch_2 / watch_3（不改原步骤默认 watch 4+6）
   2) 归档当日 2+3 快照
   3) 用同一套市场中性参数跑 combo2+3（输出到独立 latest，不覆盖 4+6）
+     —— 可 --skip-backtest 暂时关掉，以加快链式运行
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
+     —— skip-backtest 时跳过
   5) 定向推送（2+3 优势 Q/B，双池仍推 M-）：Q、估值因子、23M减 各 Top2
   6) 半凯利仓位跟随推送名单写入 CSV/日志
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
+skip-backtest 时 23M减 改用 2+3 观察池当日 M- 截面，不依赖本次回测 snapshot。
 """
 from __future__ import annotations
 
@@ -128,10 +131,11 @@ def push_combo23_value_and_q(
     top_n: int = MX_TOP_N_DEFAULT,
     skip_push: bool = False,
     skip_fina: bool = False,
-) -> Tuple[List[dict], List[str], Dict[str, List[str]]]:
+) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
     2+3 池：估值因子(B) + Q 排名 TopN 推送。
-    返回 (推送记录[{group,syms}], 日志, {group: syms})。
+    返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
+    M- 表供 skip-backtest 时推送「23M减」，避免再跑一遍行情。
     """
     from fetch_pattern_entry import (  # noqa: WPS433
         push_rank_top_to_mx_group,
@@ -209,7 +213,10 @@ def push_combo23_value_and_q(
         pushed[MX_Q_GROUP] = list(syms) if syms else q_top
         records.append({"group": MX_Q_GROUP, "symbols": list(pushed[MX_Q_GROUP])})
 
-    return records, notes, pushed
+    mminus_df = ranked_map.get("M-") if isinstance(ranked_map, dict) else None
+    if mminus_df is None:
+        mminus_df = pd.DataFrame()
+    return records, notes, pushed, mminus_df
 
 
 def export_watch_23(*, scan_csv: str) -> List[str]:
@@ -359,10 +366,23 @@ def push_mminus_top_to_mx(
     group_name: str = MX_MMINUS_GROUP,
     out_rank_csv: str = MMINUS_TOP_CSV,
     skip_push: bool = False,
+    ranked_df: Optional[pd.DataFrame] = None,
 ) -> Tuple[List[str], List[str], pd.DataFrame]:
     notes: List[str] = []
-    top, pn = pick_mminus_top_from_snapshot(snapshot_csv, top_n=top_n)
-    notes.extend(pn)
+    if ranked_df is not None:
+        work = ranked_df.copy()
+        if work.empty or "symbol" not in work.columns:
+            top = pd.DataFrame()
+            notes.append("观察池 M- 排名为空")
+        else:
+            n = max(1, int(top_n))
+            top = work.head(n).copy()
+            if "rank" not in top.columns:
+                top.insert(0, "rank", range(1, len(top) + 1))
+            notes.append(f"M- 来自观察池当日截面 · Top{n}（未用回测 snapshot）")
+    else:
+        top, pn = pick_mminus_top_from_snapshot(snapshot_csv, top_n=top_n)
+        notes.extend(pn)
     out = os.path.abspath(out_rank_csv)
     ddir = os.path.dirname(out)
     if ddir:
@@ -502,7 +522,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--scan-csv", default=DEFAULT_SCAN)
     p.add_argument("--baseline-metrics", default=BASELINE_METRICS)
     p.add_argument("--skip-export", action="store_true", help="不从 scan 导出 2+3")
-    p.add_argument("--skip-backtest", action="store_true", help="只出对比表（需已有 combo23 metrics）")
+    p.add_argument(
+        "--skip-backtest",
+        action="store_true",
+        help="跳过 2+3 市场中性回测与年化对比，仍导出观察池并推送东财自选",
+    )
     p.add_argument("--no-rotation", action="store_true")
     p.add_argument("--skip-fina", action="store_true")
     p.add_argument(
@@ -527,7 +551,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 def main(argv=None) -> int:
     args = parse_args(argv)
     print("=" * 64, flush=True)
-    print("回测对比 · combo2+3 vs combo4+6 · 主指标=仅多头年化", flush=True)
+    print("combo2+3 · 东财推送" + ("（已跳过回测）" if args.skip_backtest else " · 回测对比仅多头年化"), flush=True)
     print("=" * 64, flush=True)
 
     if not args.skip_export:
@@ -572,46 +596,69 @@ def main(argv=None) -> int:
             return rc
         metrics_23_path = os.path.join(out_dir, "metrics.csv")
     else:
-        print("[backtest] 已跳过，使用 combo23_latest", flush=True)
+        print("[backtest] 已跳过市场中性回测与年化对比", flush=True)
 
-    metrics_23 = _load_long_only_metrics(metrics_23_path)
-    metrics_46 = _load_long_only_metrics(str(args.baseline_metrics))
-    if not metrics_23:
-        print(f"无 2+3 仅多头指标：{metrics_23_path}", flush=True)
-        return 1
-    if not metrics_46:
-        print(
-            f"警告：无 4+6 基线 {args.baseline_metrics}（请先跑「市场中性」步骤）",
-            flush=True,
-        )
-
-    cfg_note = (
-        f"start={args.start} rebalance={args.rebalance} "
-        f"q={args.q_rebalance} quantile={args.quantile} variants={args.variants}"
-    )
-    csv_path, md_path = write_compare_report(
-        metrics_23=metrics_23,
-        metrics_46=metrics_46,
-        cfg_note=cfg_note,
-        out_csv=COMPARE_CSV,
-        out_md=COMPARE_MD,
-    )
-
-    print("=" * 64, flush=True)
-    print("【仅多头年化对比】", flush=True)
-    try:
-        cdf = pd.read_csv(csv_path, encoding="utf-8-sig")
-        for _, r in cdf.iterrows():
+    if not args.skip_backtest:
+        metrics_23 = _load_long_only_metrics(metrics_23_path)
+        metrics_46 = _load_long_only_metrics(str(args.baseline_metrics))
+        if not metrics_23:
+            print(f"无 2+3 仅多头指标：{metrics_23_path}", flush=True)
+            return 1
+        if not metrics_46:
             print(
-                f"  {r['variant']}: 2+3={_pct(r['pool_23_annual'])}  "
-                f"4+6={_pct(r['pool_46_annual'])}  "
-                f"Δ={_pct(r['delta_23_minus_46'])}",
+                f"警告：无 4+6 基线 {args.baseline_metrics}（请先跑「市场中性」步骤）",
                 flush=True,
             )
-    except Exception as exc:
-        print(f"打印对比失败: {exc}", flush=True)
-    print(f"对比表 → {csv_path}", flush=True)
-    print(f"摘要   → {md_path}", flush=True)
+
+        cfg_note = (
+            f"start={args.start} rebalance={args.rebalance} "
+            f"q={args.q_rebalance} quantile={args.quantile} variants={args.variants}"
+        )
+        csv_path, md_path = write_compare_report(
+            metrics_23=metrics_23,
+            metrics_46=metrics_46,
+            cfg_note=cfg_note,
+            out_csv=COMPARE_CSV,
+            out_md=COMPARE_MD,
+        )
+
+        print("=" * 64, flush=True)
+        print("【仅多头年化对比】", flush=True)
+        try:
+            cdf = pd.read_csv(csv_path, encoding="utf-8-sig")
+            for _, r in cdf.iterrows():
+                print(
+                    f"  {r['variant']}: 2+3={_pct(r['pool_23_annual'])}  "
+                    f"4+6={_pct(r['pool_46_annual'])}  "
+                    f"Δ={_pct(r['delta_23_minus_46'])}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(f"打印对比失败: {exc}", flush=True)
+        print(f"对比表 → {csv_path}", flush=True)
+        print(f"摘要   → {md_path}", flush=True)
+    else:
+        skip_md = (
+            "# 仅多头年化对比（已暂时跳过回测）\n\n"
+            f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
+            "- 仍导出 2+3 观察池，并推送东财自选「Q」「估值因子」「23M减」各 Top2。\n"
+            "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
+        )
+        with open(COMPARE_MD, "w", encoding="utf-8") as f:
+            f.write(skip_md)
+        if not os.path.isfile(COMPARE_CSV):
+            pd.DataFrame(
+                columns=[
+                    "variant",
+                    "pool_23_annual",
+                    "pool_46_annual",
+                    "delta_23_minus_46",
+                    "note",
+                ]
+            ).to_csv(COMPARE_CSV, index=False, encoding="utf-8-sig")
+        print("【仅多头年化对比】已跳过", flush=True)
+        print(f"  说明 → {COMPARE_MD}", flush=True)
 
     # 优先用本次 run 目录的 snapshot；否则 combo23_latest
     snap_candidates = [
@@ -627,7 +674,7 @@ def main(argv=None) -> int:
 
     end_date = (str(args.end).strip() or datetime.now().strftime("%Y-%m-%d"))[:10]
     print("【东财自选·Q / 估值因子】", flush=True)
-    _recs, vq_notes, pushed_map = push_combo23_value_and_q(
+    _recs, vq_notes, pushed_map, mminus_ranked = push_combo23_value_and_q(
         pool_syms,
         name_map=pool_names,
         end_date=end_date,
@@ -645,6 +692,7 @@ def main(argv=None) -> int:
         group_name=str(args.mx_group or MX_MMINUS_GROUP),
         out_rank_csv=MMINUS_TOP_CSV,
         skip_push=bool(args.skip_mx_push),
+        ranked_df=mminus_ranked if args.skip_backtest else None,
     )
     for note in push_notes:
         print(f"  {note}", flush=True)
