@@ -302,15 +302,17 @@ steps:
   script: factor_growthT_indicator.py
   args:
   - --from-mx-groups
-  - M加,Q
+  - M加,Q,量能
   highlight: chain
   frequency: daily
-  frequency_note: 只排并回写东财「M加」「Q」；不再处理 M减/量能/估值因子/23M减。桌面名单先跑 sync_mx_groups.py
+  frequency_note: 只排并回写东财「M加」「Q」「量能」；不再处理 M减/估值因子/23M减。桌面名单先跑 sync_mx_groups.py
   workspace_inputs:
   - path: config/mx_groups/M加.txt
     label: 自选分组 M加
   - path: config/mx_groups/Q.txt
     label: 自选分组 Q
+  - path: config/mx_groups/量能.txt
+    label: 自选分组 量能
   workspace_outputs:
   - path: factor_growth_ranking.csv
     label: 成长综合得分表

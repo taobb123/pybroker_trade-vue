@@ -608,7 +608,7 @@ def main():
     parser.add_argument(
         "--from-mx-groups",
         default="",
-        help="逗号分隔分组名（默认日常只用 M加,Q）；读取 config/mx_groups/{名}.txt，组内成长排序后推东财同名分组",
+        help="逗号分隔分组名（日常 M加,Q,量能）；读取 config/mx_groups/{名}.txt，组内成长排序后推东财同名分组",
     )
     parser.add_argument(
         "--mx-groups-dir",

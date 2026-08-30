@@ -15,7 +15,7 @@ from mx_self_select import (
     load_group_symbols_txt,
 )
 
-DEFAULT_GROUPS = ("M加", "Q")
+DEFAULT_GROUPS = ("M加", "Q", "量能")
 
 
 def _desktop_dir(explicit: str = "") -> str:
@@ -113,7 +113,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument(
         "--groups",
         default=",".join(DEFAULT_GROUPS),
-        help="逗号分隔分组名，默认 M加,Q",
+        help="逗号分隔分组名，默认 M加,Q,量能",
     )
     parser.add_argument(
         "--groups-dir",
