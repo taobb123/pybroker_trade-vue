@@ -153,7 +153,7 @@ onMounted(() => {
           </h2>
           <p class="mt-1 max-w-xl text-sm text-muted-foreground">
             市场中性多头净值 Top2 因子 × 各取前 2 股；选球卡内嵌预测 K 线，右侧为做 T 买一/买二等档位。
-            综合分 ≥ {{ GOOD_PITCH_THRESHOLD }} 标为好球。下方盘中雷达盯成长因子六组各前 3。
+            综合分 ≥ {{ GOOD_PITCH_THRESHOLD }} 标为好球。下方盘中雷达盯成长因子 M加 / Q 各前 3。
           </p>
           <p v-if="sourceHint" class="mt-1 text-[11px] text-muted-foreground">
             数据源：{{ sourceHint }}

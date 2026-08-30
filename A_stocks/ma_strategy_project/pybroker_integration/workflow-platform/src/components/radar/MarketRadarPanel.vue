@@ -19,7 +19,7 @@ import {
 
 const GROWTH_STEP_ID = 'growth_factor'
 /** 与后端 GROWTH_GROUPS 顺序一致；默认展开第一组 */
-const GROWTH_GROUPS = ['M加', 'Q', 'M减', '量能', '估值因子', '23M减'] as const
+const GROWTH_GROUPS = ['M加', 'Q'] as const
 const HIGHLIGHT_MS = 2500
 
 const props = defineProps<{
@@ -204,7 +204,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">成长因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          工作流「按成长因子排序」六组各前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          工作流「按成长因子排序」仅 M加 / Q 各前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -326,7 +326,7 @@ defineExpose({ refresh: load })
           v-else
           class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground"
         >
-          <p v-if="emptyUniverse">请先运行「按成长因子排序」，生成六组名单。</p>
+          <p v-if="emptyUniverse">请先运行「按成长因子排序」，生成 M加 / Q 名单。</p>
           <p v-else-if="loading">正在映射申万行业…</p>
           <p v-else>暂无板块数据</p>
           <Button
@@ -355,7 +355,7 @@ defineExpose({ refresh: load })
           </p>
         </div>
         <span class="shrink-0 text-[11px] text-muted-foreground">
-          {{ payload?.stocks.length ?? 0 }} 只 · 六组各前3
+          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q 各前3
         </span>
       </div>
       <Tabs v-if="payload?.stocks.length" v-model="activeGroup" class="w-full">
@@ -427,7 +427,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有成长因子名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          盘中雷达盯工作流「按成长因子排序」的六组各前三（Tab 切换），不使用观察池。
+          盘中雷达盯工作流「按成长因子排序」的 M加 / Q 各前三（Tab 切换），不使用观察池。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

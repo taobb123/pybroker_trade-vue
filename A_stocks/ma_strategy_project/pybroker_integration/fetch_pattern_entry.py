@@ -13,11 +13,9 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：仅「待选后通过」(entry) 自动推东财自选「量能」
-（MX_APIKEY 或 config/mx_apikey.txt；--skip-mx-push 可关）。
-定向优化（4+6 优势 A/M+，双池仍推 M-）：另推「M加」「M减」Top2；
-「Q」「估值因子」改由 vp_combo_23_long_compare 推送（本步默认不推）。
-对「量能 / M加 / M减」推送票计算半凯利仓位（上限 20%）→ pattern_entry_kelly_positions.csv。
+跑完后：默认不推「量能」。只推东财自选「M加」Top2；
+「Q」由 vp_combo_23_long_compare 推送；不推 M减 / 估值因子 / 量能。
+对「M加」推送票计算半凯利仓位（上限 20%）→ pattern_entry_kelly_positions.csv。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -1717,13 +1715,12 @@ def build_pattern_kelly_rows(
     skip_qm: bool = False,
 ) -> Tuple[List[dict], List[str]]:
     """
-    仅对「量能 / M加 / M减」推送池挂凯利（口径 A · 半凯利 · 上限 20%）。
-    形态建仓定向：不推 Q/估值因子，故凯利也不含这两项。
+    仅对「M加」推送池挂凯利（口径 A · 半凯利 · 上限 20%）。
+    不再为量能 / M减 / Q / 估值因子计凯利。
     """
     notes: List[str] = []
     rows: List[dict] = []
 
-    # 量能：与推送一致，仅待选后通过
     if not skip_mx_push:
         _dai, tong, _ = collect_mx_push_symbols(results)
         r1, _st, n1 = build_kelly_rows_for_symbols(
@@ -1737,16 +1734,15 @@ def build_pattern_kelly_rows(
         notes.append("量能推送已跳过，不计算其凯利仓位")
 
     if not skip_qm:
-        for group, path in (
-            (MX_MPLUS_GROUP_DEFAULT, mplus_csv),
-            (MX_MMINUS_GROUP_DEFAULT, mminus_csv),
-        ):
-            syms = _top_symbols_from_rank_csv(path, qm_top_n)
-            r, _st, n = build_kelly_rows_for_symbols(group, syms, name_map=name_map)
-            rows.extend(r)
-            notes.extend(n)
+        syms = _top_symbols_from_rank_csv(mplus_csv, qm_top_n)
+        r, _st, n = build_kelly_rows_for_symbols(
+            MX_MPLUS_GROUP_DEFAULT, syms, name_map=name_map
+        )
+        rows.extend(r)
+        notes.extend(n)
+        notes.append("M减 已不推送，不计算其凯利仓位")
     else:
-        notes.append("Q/M 排名已跳过，不计算 M加/M减 凯利仓位")
+        notes.append("Q/M 排名已跳过，不计算 M加 凯利仓位")
 
     return rows, notes
 
@@ -2015,9 +2011,7 @@ def main() -> None:
                 )
                 value_notes.extend(pn)
             else:
-                value_notes.append(
-                    "定向优化：形态建仓不推「估值因子」（改由 2+3 回测对比推送）"
-                )
+                value_notes.append("不推送「估值因子」（雷达只保留 M加 / Q）")
         else:
             # 仍写空表，便于工作流「查看」
             pd.DataFrame(
@@ -2047,8 +2041,8 @@ def main() -> None:
             top_n=int(args.qm_top_n),
             skip_push=bool(args.skip_qm_push),
             skip_fina=bool(args.skip_qm_fina),
-            # 定向：4+6 优势在 A/M+，双池仍推 M-；Q 改由 2+3 对比步骤推
-            push_labels=("M+", "M-"),
+            # 雷达缩池：只推 M加；Q 由 2+3 步骤推；不推 M减
+            push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
     else:
@@ -2089,11 +2083,11 @@ def main() -> None:
         for pn in value_notes:
             print(f"  {pn}")
     if qm_notes:
-        print("【M加 / M减】（定向不推 Q）")
+        print("【M加】（不推 Q / M减）")
         for pn in qm_notes:
             print(f"  {pn}")
     if kelly_notes:
-        print("【凯利仓位·量能/M加/M减】")
+        print("【凯利仓位·M加】")
         for pn in kelly_notes:
             print(f"  {pn}")
 

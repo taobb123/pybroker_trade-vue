@@ -3,16 +3,15 @@
 """
 雷达「强度」多轨道轮动回测（收盘换仓口径）。
 
-固定名单：成长因子六组各前 3（factor_growth_ranking.csv），全池去重后按日强度排序。
+固定名单：成长因子指定分组各前 3（默认六组；`--groups M加,Q` 可缩池），全池去重后按日强度排序。
 强度与盘中雷达一致：50 + 10×相对沪深300 + 8×相对申万板块（涨跌幅为百分点）。
 
 交易规则：
-- 五条独立轨道，分别跟踪强度第 1 / 2 / 3 / 4 / 5 名（持有切换逻辑相同）
-- 默认**周频调仓**：每个自然周的最后一个交易日，按当日强度排名决定目标；周内不换仓
+- 默认三条独立轨道，跟踪强度第 1 / 2 / 3 名（`--tracks` 可改）
+- `--freq weekly|daily|both`：周频 / 日频 / 两套都出
 - 换仓日收盘卖旧、收盘买新；目标不变则不交易
 - T+1：买入当日不可卖
 - 涨停买不进 / 跌停卖不出 / 停牌或买不足 1 手 → 换仓失败，继续持有旧票
-- `--freq daily` 可切回每个交易日看排名
 """
 
 from __future__ import annotations
@@ -51,8 +50,9 @@ MIN_COMMISSION = 5.0
 DEFAULT_CASH = 100_000.0
 DEFAULT_START = "2026-01-01"
 DEFAULT_FREQ = "weekly"
-TRACKS = (1, 2, 3, 4, 5)
+DEFAULT_TRACKS = (1, 2, 3)
 OUT_DIR = os.path.join(_SCRIPT_DIR, "output", "strength_rotation")
+OUT_DIR_MQ = os.path.join(_SCRIPT_DIR, "output", "strength_rotation_mq")
 
 
 def _sleep(sec: float = 0.12) -> None:
@@ -99,13 +99,17 @@ def commission_fee(notional: float) -> float:
     return max(MIN_COMMISSION, abs(float(notional)) * COMMISSION)
 
 
-def load_universe() -> pd.DataFrame:
+def load_universe(groups: Optional[list[str]] = None) -> pd.DataFrame:
     picks, hint = load_growth_factor_picks()
     if not picks:
         raise RuntimeError(hint or "成长因子名单为空，请先运行「按成长因子排序」。")
+    allow = {str(g).strip() for g in (groups or []) if str(g).strip()}
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for p in picks:
+        grp = str(p.get("group") or "").strip()
+        if allow and grp not in allow:
+            continue
         sym = six_digit(p.get("symbol") or "")
         if not sym or sym in seen:
             continue
@@ -114,11 +118,14 @@ def load_universe() -> pd.DataFrame:
             {
                 "symbol": sym,
                 "name": str(p.get("name") or "").strip(),
-                "group": p.get("group"),
+                "group": grp,
                 "group_rank": p.get("rank"),
                 "industry": p.get("industry") or "",
             }
         )
+    if not rows:
+        want = "、".join(allow) if allow else "全部组"
+        raise RuntimeError(f"成长因子名单中没有可用标的（筛选：{want}）。")
     return pd.DataFrame(rows)
 
 
@@ -609,7 +616,8 @@ def plot_equity(
         print(f"  [report] 跳过绘图: {exc}", flush=True)
         return
     fig, ax = plt.subplots(figsize=(10, 5.4))
-    for k in TRACKS:
+    track_ids = sorted({int(x) for x in equity_all["track"].dropna().unique()})
+    for k in track_ids:
         label = f"Rank {k}"
         g = equity_all[equity_all["track"] == k].sort_values("date")
         if g.empty:
@@ -655,21 +663,31 @@ def write_summary(
     metrics_df: pd.DataFrame,
     cfg: dict,
 ) -> None:
+    groups = cfg.get("groups") or []
+    tracks = cfg.get("tracks") or list(DEFAULT_TRACKS)
+    pool_desc = "、".join(str(g) for g in groups) if groups else "六组"
+    track_desc = "、".join(f"第 {k} 名" for k in tracks)
+    freq_desc = (
+        "每个自然周最后一个交易日"
+        if cfg.get("freq") == "weekly"
+        else "每个交易日"
+    )
+    n_track = len(tracks)
     lines = [
-        "# 雷达强度五轨道轮动回测",
+        f"# 雷达强度{n_track}轨道轮动回测",
         "",
         "## 口径",
         "",
-        "- 股票池：成长因子六组各前 3，回测期内**固定名单**（全池去重后按日强度排序）",
-        f"- 调仓频率：{'每个自然周最后一个交易日' if cfg.get('freq') == 'weekly' else '每个交易日'}；调仓日按**当日**强度排名",
-        "- 轨道：强度第 1～5 名各一条，独立满仓，持有/切换逻辑相同",
+        f"- 股票池：成长因子「{pool_desc}」各组前 3，回测期内**固定名单**（全池去重后按日强度排序）",
+        f"- 调仓频率：{freq_desc}；调仓日按**当日**强度排名",
+        f"- 轨道：{track_desc}各一条，独立满仓，持有/切换逻辑相同",
         "- 强度：`50 + 10×(个股涨跌−沪深300) + 8×(个股涨跌−申万板块)`，与雷达一致",
         "- 换仓：目标变了才换；**换仓日收盘卖旧、收盘买新**",
         "- T+1：买入当日不可卖；目标不变则等待",
         "- 涨停/跌停/停牌或不足 1 手：换仓失败，继续持有",
         f"- 区间：{cfg['start']} ~ {cfg['end']}　初始资金 {cfg['cash']:,.0f}　佣金万三（最低 5 元）+ 印花税 0.05%",
         "",
-        f"固定名单 {len(universe)} 只（六组各前 3 共 18 席，组间代码去重后 {len(universe)} 只）：",
+        f"固定名单 {len(universe)} 只（{pool_desc} 各组前 3，组间去重）：",
         "",
         "| 代码 | 名称 | 来源组 |",
         "| --- | --- | --- |",
@@ -696,32 +714,151 @@ def write_summary(
         f.write("\n".join(lines))
 
 
+def _split_csv(raw: str) -> list[str]:
+    return [x.strip() for x in str(raw or "").split(",") if x.strip()]
+
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="雷达强度五轨道轮动回测（收盘换仓）")
+    p = argparse.ArgumentParser(description="雷达强度多轨道轮动回测（收盘换仓）")
     p.add_argument("--start", default=DEFAULT_START, help="起始日 YYYY-MM-DD")
     p.add_argument("--end", default="", help="结束日，默认最近交易日")
     p.add_argument("--cash", type=float, default=DEFAULT_CASH, help="每条轨道初始资金")
     p.add_argument(
-        "--freq",
-        choices=("weekly", "daily"),
-        default=DEFAULT_FREQ,
-        help="调仓频率：weekly=每周最后一个交易日，daily=每个交易日",
+        "--groups",
+        default="",
+        help="成长因子分组，逗号分隔；默认六组。例：M加,Q",
     )
-    p.add_argument("--out", default=OUT_DIR, help="输出目录")
+    p.add_argument(
+        "--tracks",
+        default="1,2,3",
+        help="回测轨道名次，逗号分隔（默认 1,2,3）",
+    )
+    p.add_argument(
+        "--freq",
+        choices=("weekly", "daily", "both"),
+        default=DEFAULT_FREQ,
+        help="调仓频率：weekly / daily / both=日频+周频各出一套",
+    )
+    p.add_argument("--out", default="", help="输出目录；freq=both 时在其下写 daily/ weekly")
     return p.parse_args()
+
+
+def _write_freq_pack(
+    *,
+    freq: str,
+    dest: str,
+    ranks: pd.DataFrame,
+    bars: dict[str, pd.DataFrame],
+    names: dict[str, str],
+    hs300: pd.DataFrame,
+    universe: pd.DataFrame,
+    tracks: list[int],
+    cash: float,
+    start: str,
+    end: str,
+    groups: list[str],
+) -> pd.DataFrame:
+    os.makedirs(dest, exist_ok=True)
+    rebal_set: Optional[set[pd.Timestamp]] = None
+    if freq == "weekly":
+        cal = sorted(pd.Timestamp(d).normalize() for d in ranks["date"].unique())
+        rebal_days = week_last_trading_days(cal)
+        rebal_set = set(rebal_days)
+        print(f"  周频调仓日 {len(rebal_days)} 个", flush=True)
+    print(f"【回测】轨道 {' / '.join(str(k) for k in tracks)}（{freq}）", flush=True)
+    equity_frames = []
+    trade_frames = []
+    metrics_rows = []
+    for k in tracks:
+        eq, tr, met = run_track(
+            k, ranks, bars, names, cash, rebalance_dates=rebal_set
+        )
+        equity_frames.append(eq)
+        if not tr.empty:
+            trade_frames.append(tr)
+        metrics_rows.append(met)
+        print(
+            f"  第 {k} 名  收益={100*met['total_return']:.1f}%  "
+            f"年化={100*met['annual_return']:.1f}%  回撤={100*met['max_drawdown']:.1f}%  "
+            f"换仓买入 {met['n_buy']} 次",
+            flush=True,
+        )
+    equity_all = pd.concat(equity_frames, ignore_index=True)
+    trades_all = pd.concat(trade_frames, ignore_index=True) if trade_frames else pd.DataFrame()
+    metrics_df = pd.DataFrame(metrics_rows)
+    equity_all.to_csv(os.path.join(dest, "equity_curve.csv"), index=False, encoding="utf-8-sig")
+    trades_all.to_csv(os.path.join(dest, "trades.csv"), index=False, encoding="utf-8-sig")
+    metrics_df.to_csv(os.path.join(dest, "metrics.csv"), index=False, encoding="utf-8-sig")
+    plot_equity(
+        equity_all,
+        hs300,
+        os.path.join(dest, "equity_curve.png"),
+        title=f"Strength rotation NAV ({freq} rebalance)",
+    )
+    write_summary(
+        path=os.path.join(dest, "summary.md"),
+        universe=universe,
+        metrics_df=metrics_df,
+        cfg={
+            "start": start,
+            "end": end,
+            "cash": cash,
+            "freq": freq,
+            "groups": groups,
+            "tracks": tracks,
+        },
+    )
+    print(f"  输出 → {dest}", flush=True)
+    return metrics_df
+
+
+def _write_compare(path: str, daily: pd.DataFrame, weekly: pd.DataFrame, cfg: dict) -> None:
+    lines = [
+        "# M加+Q 三轨道 · 日频 vs 周频",
+        "",
+        f"- 区间：{cfg['start']} ~ {cfg['end']}",
+        f"- 股票池：{'、'.join(cfg.get('groups') or [])} 各组前 3",
+        "- 换仓：收盘卖旧买新；目标不变不换；T+1",
+        "",
+        "| 轨道 | 日频收益 | 周频收益 | 日频回撤 | 周频回撤 | 日频买入 | 周频买入 | 日频夏普 | 周频夏普 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    dmap = {int(r.track): r for r in daily.itertuples(index=False)} if daily is not None and not daily.empty else {}
+    wmap = {int(r.track): r for r in weekly.itertuples(index=False)} if weekly is not None and not weekly.empty else {}
+    for k in cfg.get("tracks") or []:
+        d, w = dmap.get(int(k)), wmap.get(int(k))
+        lines.append(
+            f"| 第 {int(k)} 名 | "
+            f"{_pct(d.total_return) if d else '—'} | {_pct(w.total_return) if w else '—'} | "
+            f"{_pct(d.max_drawdown) if d else '—'} | {_pct(w.max_drawdown) if w else '—'} | "
+            f"{int(d.n_buy) if d else '—'} | {int(w.n_buy) if w else '—'} | "
+            f"{(f'{float(d.sharpe):.2f}' if d else '—')} | {(f'{float(w.sharpe):.2f}' if w else '—')} |"
+        )
+    lines += ["", f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ""]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 
 def main() -> int:
     args = parse_args()
     end = str(args.end).strip() or datetime.now().strftime("%Y-%m-%d")
     start = str(args.start).strip()
-    out_dir = os.path.abspath(args.out)
-    os.makedirs(out_dir, exist_ok=True)
+    groups = _split_csv(args.groups)
+    tracks = [int(x) for x in _split_csv(args.tracks)] or list(DEFAULT_TRACKS)
+    freq_arg = str(args.freq).strip().lower() or DEFAULT_FREQ
+    freqs = ["daily", "weekly"] if freq_arg == "both" else [freq_arg]
+    default_out = OUT_DIR_MQ if groups == ["M加", "Q"] else OUT_DIR
+    out_root = os.path.abspath(str(args.out).strip() or default_out)
+    os.makedirs(out_root, exist_ok=True)
 
-    print("【1/5】读取固定名单（成长因子六组各前 3）", flush=True)
-    universe = load_universe()
-    print(f"  {len(universe)} 只: " + "、".join(f"{r.name}{r.symbol}" for r in universe.itertuples(index=False)), flush=True)
-    universe.to_csv(os.path.join(out_dir, "universe.csv"), index=False, encoding="utf-8-sig")
+    print("【1/5】读取固定名单", flush=True)
+    universe = load_universe(groups or None)
+    print(
+        f"  组={('、'.join(groups) if groups else '六组')}  {len(universe)} 只: "
+        + "、".join(f"{r.name}{r.symbol}" for r in universe.itertuples(index=False)),
+        flush=True,
+    )
+    universe.to_csv(os.path.join(out_root, "universe.csv"), index=False, encoding="utf-8-sig")
 
     print("【2/5】拉取日线 / 沪深300 / 申万板块", flush=True)
     pro = get_pro()
@@ -752,60 +889,36 @@ def main() -> int:
     ranks = build_daily_ranks(universe, bars, hs300, sector_of, sector_pct, start, end)
     if ranks.empty:
         raise RuntimeError("没有可用的日度强度，请检查行情区间。")
-    ranks.to_csv(os.path.join(out_dir, "daily_rank.csv"), index=False, encoding="utf-8-sig")
+    ranks.to_csv(os.path.join(out_root, "daily_rank.csv"), index=False, encoding="utf-8-sig")
     print(f"  {ranks['date'].nunique()} 个交易日 × {ranks['symbol'].nunique()} 只", flush=True)
 
-    freq = str(args.freq).strip().lower() or DEFAULT_FREQ
-    rebal_set: Optional[set[pd.Timestamp]] = None
-    if freq == "weekly":
-        cal = sorted(pd.Timestamp(d).normalize() for d in ranks["date"].unique())
-        rebal_days = week_last_trading_days(cal)
-        rebal_set = set(rebal_days)
-        print(f"  周频调仓日 {len(rebal_days)} 个（每周最后一个交易日）", flush=True)
-
-    print(f"【4/5】回测轨道 {' / '.join(str(k) for k in TRACKS)}（{freq}）", flush=True)
-    equity_frames = []
-    trade_frames = []
-    metrics_rows = []
-    for k in TRACKS:
-        eq, tr, met = run_track(
-            k, ranks, bars, names, float(args.cash), rebalance_dates=rebal_set
-        )
-        equity_frames.append(eq)
-        if not tr.empty:
-            trade_frames.append(tr)
-        metrics_rows.append(met)
-        print(
-            f"  第 {k} 名  收益={100*met['total_return']:.1f}%  "
-            f"年化={100*met['annual_return']:.1f}%  回撤={100*met['max_drawdown']:.1f}%  "
-            f"换仓买入 {met['n_buy']} 次",
-            flush=True,
+    metrics_by_freq: dict[str, pd.DataFrame] = {}
+    for freq in freqs:
+        dest = os.path.join(out_root, freq) if len(freqs) > 1 else out_root
+        metrics_by_freq[freq] = _write_freq_pack(
+            freq=freq,
+            dest=dest,
+            ranks=ranks,
+            bars=bars,
+            names=names,
+            hs300=hs300,
+            universe=universe,
+            tracks=tracks,
+            cash=float(args.cash),
+            start=start,
+            end=end,
+            groups=groups,
         )
 
-    print("【5/5】写出报告", flush=True)
-    equity_all = pd.concat(equity_frames, ignore_index=True)
-    trades_all = pd.concat(trade_frames, ignore_index=True) if trade_frames else pd.DataFrame()
-    metrics_df = pd.DataFrame(metrics_rows)
-    equity_all.to_csv(os.path.join(out_dir, "equity_curve.csv"), index=False, encoding="utf-8-sig")
-    trades_all.to_csv(os.path.join(out_dir, "trades.csv"), index=False, encoding="utf-8-sig")
-    metrics_df.to_csv(os.path.join(out_dir, "metrics.csv"), index=False, encoding="utf-8-sig")
-    plot_equity(
-        equity_all,
-        hs300,
-        os.path.join(out_dir, "equity_curve.png"),
-        title=(
-            "Strength rotation NAV (weekly rebalance)"
-            if freq == "weekly"
-            else "Strength rotation NAV (daily rebalance)"
-        ),
-    )
-    write_summary(
-        path=os.path.join(out_dir, "summary.md"),
-        universe=universe,
-        metrics_df=metrics_df,
-        cfg={"start": start, "end": end, "cash": float(args.cash), "freq": freq},
-    )
-    print(f"  输出 → {out_dir}", flush=True)
+    if "daily" in metrics_by_freq and "weekly" in metrics_by_freq:
+        cmp_path = os.path.join(out_root, "compare_daily_weekly.md")
+        _write_compare(
+            cmp_path,
+            metrics_by_freq["daily"],
+            metrics_by_freq["weekly"],
+            {"start": start, "end": end, "groups": groups, "tracks": tracks},
+        )
+        print(f"  日频/周频对照 → {cmp_path}", flush=True)
     return 0
 
 

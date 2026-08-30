@@ -10,8 +10,8 @@
      —— 可 --skip-backtest 暂时关掉，以加快链式运行
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
-  5) 定向推送（2+3 优势 Q/B，双池仍推 M-）：Q、估值因子、23M减 各 Top2
-  6) 半凯利仓位跟随推送名单写入 CSV/日志
+  5) 定向推送：只推东财「Q」Top2；不推估值因子 / 23M减
+  6) 半凯利仓位跟随「Q」推送名单写入 CSV/日志
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
 skip-backtest 时 23M减 改用 2+3 观察池当日 M- 截面，不依赖本次回测 snapshot。
@@ -130,12 +130,12 @@ def push_combo23_value_and_q(
     end_date: str,
     top_n: int = MX_TOP_N_DEFAULT,
     skip_push: bool = False,
+    skip_value_push: bool = True,
     skip_fina: bool = False,
 ) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
-    2+3 池：估值因子(B) + Q 排名 TopN 推送。
+    2+3 池：写估值/Q 排名表；默认只推「Q」，不推「估值因子」。
     返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
-    M- 表供 skip-backtest 时推送「23M减」，避免再跑一遍行情。
     """
     from fetch_pattern_entry import (  # noqa: WPS433
         push_rank_top_to_mx_group,
@@ -165,7 +165,7 @@ def push_combo23_value_and_q(
             s = _norm_symbol(raw)
             if len(s) == 6 and s not in v_top:
                 v_top.append(s)
-    if skip_push:
+    if skip_push or skip_value_push:
         notes.append(f"已跳过「{MX_VALUE_GROUP}」推送")
         pushed[MX_VALUE_GROUP] = v_top
     else:
@@ -499,7 +499,7 @@ def write_compare_report(
             "- 原步骤「量价六组合」仍只导出/归档 4+6；本步骤单独导出 2+3。",
             "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
             "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
-            f"- 定向推送：Q / 估值因子 / 「{MX_MMINUS_GROUP}」各 Top2（2+3 优势 Q/B，双池仍推 M-）。",
+            f"- 定向推送：只推「Q」Top2；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
             "- 半凯利仓位跟随上述推送名单（CSV/日志）。",
             "",
         ]
@@ -642,7 +642,7 @@ def main(argv=None) -> int:
             "# 仅多头年化对比（已暂时跳过回测）\n\n"
             f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
-            "- 仍导出 2+3 观察池，并推送东财自选「Q」「估值因子」「23M减」各 Top2。\n"
+            "- 仍导出 2+3 观察池，并推送东财自选「Q」Top2（不推估值因子 / 23M减）。\n"
             "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
         )
         with open(COMPARE_MD, "w", encoding="utf-8") as f:
@@ -673,25 +673,26 @@ def main(argv=None) -> int:
         print(f"  {note}", flush=True)
 
     end_date = (str(args.end).strip() or datetime.now().strftime("%Y-%m-%d"))[:10]
-    print("【东财自选·Q / 估值因子】", flush=True)
+    print("【东财自选·Q】", flush=True)
     _recs, vq_notes, pushed_map, mminus_ranked = push_combo23_value_and_q(
         pool_syms,
         name_map=pool_names,
         end_date=end_date,
         top_n=int(args.mx_top_n),
         skip_push=bool(args.skip_mx_push),
+        skip_value_push=True,
         skip_fina=bool(args.skip_fina),
     )
     for note in vq_notes:
         print(f"  {note}", flush=True)
 
-    print("【东财自选·23M减】", flush=True)
+    print("【23M减·仅排名不推送】", flush=True)
     push_syms, push_notes, top_df = push_mminus_top_to_mx(
         snap_path,
         top_n=int(args.mx_top_n),
         group_name=str(args.mx_group or MX_MMINUS_GROUP),
         out_rank_csv=MMINUS_TOP_CSV,
-        skip_push=bool(args.skip_mx_push),
+        skip_push=True,
         ranked_df=mminus_ranked if args.skip_backtest else None,
     )
     for note in push_notes:
@@ -704,15 +705,10 @@ def main(argv=None) -> int:
             if len(s) == 6:
                 name_map[s] = str(r.get("stock_name") or "") or name_map.get(s, "")
 
-    # 凯利跟随推送名单：Q / 估值因子 / 23M减（均用 combo23 净值）
-    print("【凯利仓位·Q / 估值因子 / 23M减】", flush=True)
+    print("【凯利仓位·Q】", flush=True)
     kelly_rows: List[dict] = []
     kelly_all_notes: List[str] = []
-    for group, syms in (
-        (MX_Q_GROUP, pushed_map.get(MX_Q_GROUP, [])),
-        (MX_VALUE_GROUP, pushed_map.get(MX_VALUE_GROUP, [])),
-        (str(args.mx_group or MX_MMINUS_GROUP), push_syms),
-    ):
+    for group, syms in ((MX_Q_GROUP, pushed_map.get(MX_Q_GROUP, [])),):
         rows, _st, kn = build_kelly_rows_for_symbols(
             group,
             syms,

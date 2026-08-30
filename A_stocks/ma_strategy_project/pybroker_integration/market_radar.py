@@ -57,9 +57,9 @@ _EM_HEADERS = {
     "Accept": "application/json,text/plain,*/*",
 }
 GROWTH_RANKING_CSV = _SCRIPT_DIR / "factor_growth_ranking.csv"
-GROWTH_GROUPS = ("M加", "Q", "M减", "量能", "估值因子", "23M减")
+GROWTH_GROUPS = ("M加", "Q")
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "按成长因子排序 · 六组各前3"
+GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q 各前3"
 
 
 class MarketRadarError(RuntimeError):
@@ -230,7 +230,7 @@ def growth_ranking_mtime() -> str:
 
 
 def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """工作流「按成长因子排序」产物：六组各取前 N（组内去重，组间可重复）。"""
+    """工作流「按成长因子排序」产物：GROWTH_GROUPS 各组取前 N（组内去重，组间可重复）。"""
     if not GROWTH_RANKING_CSV.is_file():
         return [], "未找到 factor_growth_ranking.csv，请先运行工作流「按成长因子排序」。"
     try:
@@ -285,7 +285,7 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
             taken += 1
     hint = None
     if not picks:
-        hint = "成长因子排序表中没有可用的六组标的。"
+        hint = "成长因子排序表中没有可用的 M加/Q 标的。"
     elif missing_groups:
         hint = f"排序表缺少分组：{'、'.join(missing_groups)}"
     return picks, hint
