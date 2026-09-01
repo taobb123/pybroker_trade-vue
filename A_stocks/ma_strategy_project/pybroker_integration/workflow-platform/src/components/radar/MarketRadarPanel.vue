@@ -204,7 +204,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">成长因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          工作流「按成长因子排序」仅 M加 / Q / 量能 各前 3 → 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          工作流「按成长因子排序」仅 M加 / Q / 量能 各前 5（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -355,7 +355,7 @@ defineExpose({ refresh: load })
           </p>
         </div>
         <span class="shrink-0 text-[11px] text-muted-foreground">
-          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q/量能 各前3
+          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q/量能 各前5
         </span>
       </div>
       <Tabs v-if="payload?.stocks.length" v-model="activeGroup" class="w-full">
@@ -414,7 +414,7 @@ defineExpose({ refresh: load })
             </li>
           </ul>
           <p v-else class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground">
-            「{{ tab.name }}」暂无 Top3，请确认桌面已同步并运行成长排序。
+            「{{ tab.name }}」暂无标的，请确认桌面已同步并运行成长排序。
           </p>
         </TabsContent>
       </Tabs>
@@ -427,7 +427,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有成长因子名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          盘中雷达盯工作流「按成长因子排序」的 M加 / Q / 量能 各前三（Tab 切换），不使用观察池。
+          盘中雷达盯工作流「按成长因子排序」的 M加 / Q / 量能 各前五（Tab 切换），不足五只则全列，不使用观察池。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

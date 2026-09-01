@@ -32,7 +32,7 @@ _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 class RadarBody(BaseModel):
-    """默认忽略前端自选，改用成长因子 M加/Q/量能 前三；symbols 仅作调试覆盖。"""
+    """默认忽略前端自选，改用成长因子 M加/Q/量能 前五；symbols 仅作调试覆盖。"""
 
     symbols: list[str] = Field(default_factory=list, max_length=MAX_SYMBOLS)
     use_watchlist: bool = False
