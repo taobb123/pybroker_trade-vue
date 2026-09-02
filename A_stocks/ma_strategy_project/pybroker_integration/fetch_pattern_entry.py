@@ -13,9 +13,9 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：默认不推「量能」。只推东财自选「M加」Top2；
-「Q」由 vp_combo_23_long_compare 推送；不推 M减 / 估值因子 / 量能。
-对「M加」推送票计算半凯利仓位（上限 20%）→ pattern_entry_kelly_positions.csv。
+跑完后：默认不推「量能」。只推东财自选「M加」观察池排名前13
+（先清空该组再写入）；「Q」由 vp_combo_23_long_compare 推送；
+不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2，不跟推送名单。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -58,7 +58,10 @@ from fetch_vp_six_combo import (  # noqa: E402
     remove_symbols_from_watch_pool,
     watch_csv_path,
 )
-from mx_self_select import add_symbols_to_group  # noqa: E402
+from mx_self_select import (  # noqa: E402
+    add_symbols_to_group,
+    replace_live_group_symbols,
+)
 from kelly_position import (  # noqa: E402
     build_kelly_rows_for_symbols,
     write_kelly_position_csv,
@@ -137,6 +140,8 @@ MX_MPLUS_GROUP_DEFAULT = "M加"
 MX_MMINUS_GROUP_DEFAULT = "M减"
 VALUE_TOP_N_DEFAULT = 2
 QM_TOP_N_DEFAULT = 2
+KELLY_TOP_N_DEFAULT = 2
+MX_PUSH_TOP_N_DEFAULT = 13
 
 
 def state_label_zh(state: str) -> str:
@@ -1515,7 +1520,7 @@ def push_rank_top_to_mx_group(
     label: str = "",
     exclude_symbols: Optional[Sequence[str]] = None,
 ) -> Tuple[List[str], List[str]]:
-    """推送任意排名表前 top_n 至东财自选分组。返回 (代码列表, 说明)。"""
+    """推送任意排名表前 top_n 至东财自选分组（先清空该组再写入）。返回 (代码列表, 说明)。"""
     notes: List[str] = []
     n = max(1, int(top_n))
     tag = label or group_name
@@ -1552,7 +1557,8 @@ def push_rank_top_to_mx_group(
     )
     if not syms:
         return [], notes
-    _ok, push_notes = add_symbols_to_group(syms, group_name=group_name)
+    notes.append(f"{tag}：先清空「{group_name}」再写入 Top{n}")
+    _ok, push_notes = replace_live_group_symbols(syms, group_name=group_name)
     notes.extend(push_notes)
     return syms, notes
 
@@ -1605,8 +1611,8 @@ def run_qm_rank_and_push(
     exclude_symbols: Optional[Sequence[str]] = None,
 ) -> List[str]:
     """
-    观察池 Q/M+/M- 排名写 CSV；按 push_labels 推东财自选。
-    push_labels 默认全推；形态建仓定向可传 ("M+", "M-") 不推 Q。
+    观察池 Q/M+/M- 排名写 CSV；按 push_labels 推东财自选（先清空该组再写入）。
+    push_labels 默认全推；形态建仓定向可传 ("M+",) 不推 Q。
     exclude_symbols：作废等代码，排名与推送均排除。
     """
     notes: List[str] = []
@@ -1715,8 +1721,8 @@ def build_pattern_kelly_rows(
     skip_qm: bool = False,
 ) -> Tuple[List[dict], List[str]]:
     """
-    仅对「M加」推送池挂凯利（口径 A · 半凯利 · 上限 20%）。
-    不再为量能 / M减 / Q / 估值因子计凯利。
+    仅对「M加」排名前 kelly_n 挂凯利（口径 A · 半凯利 · 上限 20%）。
+    与东财推送名单脱钩；不再为量能 / M减 / Q / 估值因子计凯利。
     """
     notes: List[str] = []
     rows: List[dict] = []
@@ -1740,6 +1746,9 @@ def build_pattern_kelly_rows(
         )
         rows.extend(r)
         notes.extend(n)
+        notes.append(
+            f"凯利取 M+ 排名 Top{max(1, int(qm_top_n))}，不跟东财推送名单"
+        )
         notes.append("M减 已不推送，不计算其凯利仓位")
     else:
         notes.append("Q/M 排名已跳过，不计算 M加 凯利仓位")
@@ -1902,7 +1911,13 @@ def main() -> None:
         "--qm-top-n",
         type=int,
         default=QM_TOP_N_DEFAULT,
-        help="Q/M+/M- 各推送只数（默认 2）",
+        help="M加凯利仓位只数（默认 2，不跟东财推送名单）",
+    )
+    parser.add_argument(
+        "--qm-push-top-n",
+        type=int,
+        default=MX_PUSH_TOP_N_DEFAULT,
+        help="东财「M加」推送只数（默认 13；先清空该组再写入）",
     )
     args = parser.parse_args()
 
@@ -2038,10 +2053,10 @@ def main() -> None:
             pool_syms,
             end_date=str(args.end_date),
             name_map=name_map,
-            top_n=int(args.qm_top_n),
+            top_n=int(args.qm_push_top_n),
             skip_push=bool(args.skip_qm_push),
             skip_fina=bool(args.skip_qm_fina),
-            # 雷达缩池：只推 M加；Q 由 2+3 步骤推；不推 M减
+            # 只推 M加前13（清空后写入）；Q 由 2+3 步骤推；不推 M减
             push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
@@ -2056,7 +2071,7 @@ def main() -> None:
         skip_mx_push=bool(args.skip_mx_push),
         mplus_csv=DEFAULT_MPLUS_OUT_CSV,
         mminus_csv=DEFAULT_MMINUS_OUT_CSV,
-        qm_top_n=int(args.qm_top_n),
+        qm_top_n=int(args.qm_top_n or KELLY_TOP_N_DEFAULT),
         skip_qm=bool(args.skip_qm_rank),
     )
     kelly_notes.extend(kn)

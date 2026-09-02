@@ -10,8 +10,9 @@
      —— 可 --skip-backtest 暂时关掉，以加快链式运行
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
-  5) 定向推送：只推东财「Q」Top2；不推估值因子 / 23M减
-  6) 半凯利仓位跟随「Q」推送名单写入 CSV/日志
+  5) 定向推送：只推东财「Q」观察池排名前13（先清空该组再写入）；
+     不推估值因子 / 23M减
+  6) 半凯利仍取 Q 排名 Top2，不跟推送名单
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
 skip-backtest 时 23M减 改用 2+3 观察池当日 M- 截面，不依赖本次回测 snapshot。
@@ -42,6 +43,7 @@ from fetch_vp_six_combo import (  # noqa: E402
 from market_neutral.data.pool_archive import save_watch_snapshot  # noqa: E402
 from market_neutral.run import main as market_neutral_main  # noqa: E402
 from mx_self_select import add_symbols_to_group  # noqa: E402
+from fetch_pattern_entry import _top_symbols_from_rank_csv  # noqa: E402
 from kelly_position import (  # noqa: E402
     build_kelly_rows_for_symbols,
     write_kelly_position_csv,
@@ -64,6 +66,8 @@ MX_MMINUS_GROUP = "23M减"
 MX_VALUE_GROUP = "估值因子"
 MX_Q_GROUP = "Q"
 MX_TOP_N_DEFAULT = 2
+MX_PUSH_TOP_N_DEFAULT = 13
+KELLY_TOP_N_DEFAULT = 2
 NEW_IDS = (2, 3)
 BASE_IDS = (4, 6)
 
@@ -129,13 +133,14 @@ def push_combo23_value_and_q(
     name_map: Dict[str, str],
     end_date: str,
     top_n: int = MX_TOP_N_DEFAULT,
+    push_top_n: int = MX_PUSH_TOP_N_DEFAULT,
     skip_push: bool = False,
     skip_value_push: bool = True,
     skip_fina: bool = False,
 ) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
-    2+3 池：写估值/Q 排名表；默认只推「Q」，不推「估值因子」。
-    返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
+    2+3 池：写估值/Q 排名表；默认只推「Q」前 push_top_n（清空后写入），
+    不推「估值因子」。返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
     """
     from fetch_pattern_entry import (  # noqa: WPS433
         push_rank_top_to_mx_group,
@@ -192,9 +197,10 @@ def push_combo23_value_and_q(
         ["rank", "asof", "symbol", "stock_name", "company_q", "roe", "ocf_to_or", "upside"],
     )
     notes.append(f"Q 排名表 → {q_path}")
+    q_n = max(1, int(push_top_n))
     q_top: List[str] = []
     if q_df is not None and not q_df.empty and "symbol" in q_df.columns:
-        for raw in q_df["symbol"].head(max(1, int(top_n))).tolist():
+        for raw in q_df["symbol"].head(q_n).tolist():
             s = _norm_symbol(raw)
             if len(s) == 6 and s not in q_top:
                 q_top.append(s)
@@ -204,7 +210,7 @@ def push_combo23_value_and_q(
     else:
         syms, pn = push_rank_top_to_mx_group(
             q_df if q_df is not None else pd.DataFrame(),
-            top_n=top_n,
+            top_n=q_n,
             group_name=MX_Q_GROUP,
             score_col="company_q",
             label="Q",
@@ -499,8 +505,8 @@ def write_compare_report(
             "- 原步骤「量价六组合」仍只导出/归档 4+6；本步骤单独导出 2+3。",
             "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
             "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
-            f"- 定向推送：只推「Q」Top2；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
-            "- 半凯利仓位跟随上述推送名单（CSV/日志）。",
+            f"- 定向推送：只推「Q」前{MX_PUSH_TOP_N_DEFAULT}（先清空该组再写入）；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
+            "- 半凯利取 Q 排名 Top2，不跟东财推送名单。",
             "",
         ]
     )
@@ -538,7 +544,19 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--mx-top-n",
         type=int,
         default=MX_TOP_N_DEFAULT,
-        help="推送 / 写出的 M- TopN（默认 2）",
+        help="写出的 M- TopN（默认 2；不推送）",
+    )
+    p.add_argument(
+        "--mx-push-top-n",
+        type=int,
+        default=MX_PUSH_TOP_N_DEFAULT,
+        help="东财「Q」推送只数（默认 13；先清空该组再写入）",
+    )
+    p.add_argument(
+        "--kelly-top-n",
+        type=int,
+        default=KELLY_TOP_N_DEFAULT,
+        help="Q 凯利仓位只数（默认 2，不跟东财推送名单）",
     )
     p.add_argument(
         "--mx-group",
@@ -642,7 +660,8 @@ def main(argv=None) -> int:
             "# 仅多头年化对比（已暂时跳过回测）\n\n"
             f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
-            "- 仍导出 2+3 观察池，并推送东财自选「Q」Top2（不推估值因子 / 23M减）。\n"
+            "- 仍导出 2+3 观察池，并推送东财自选「Q」前13（先清空该组再写入；不推估值因子 / 23M减）。\n"
+            "- 半凯利取 Q 排名 Top2，不跟推送名单。\n"
             "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
         )
         with open(COMPARE_MD, "w", encoding="utf-8") as f:
@@ -674,11 +693,12 @@ def main(argv=None) -> int:
 
     end_date = (str(args.end).strip() or datetime.now().strftime("%Y-%m-%d"))[:10]
     print("【东财自选·Q】", flush=True)
-    _recs, vq_notes, pushed_map, mminus_ranked = push_combo23_value_and_q(
+    _recs, vq_notes, _pushed_map, mminus_ranked = push_combo23_value_and_q(
         pool_syms,
         name_map=pool_names,
         end_date=end_date,
         top_n=int(args.mx_top_n),
+        push_top_n=int(args.mx_push_top_n),
         skip_push=bool(args.skip_mx_push),
         skip_value_push=True,
         skip_fina=bool(args.skip_fina),
@@ -706,17 +726,18 @@ def main(argv=None) -> int:
                 name_map[s] = str(r.get("stock_name") or "") or name_map.get(s, "")
 
     print("【凯利仓位·Q】", flush=True)
-    kelly_rows: List[dict] = []
-    kelly_all_notes: List[str] = []
-    for group, syms in ((MX_Q_GROUP, pushed_map.get(MX_Q_GROUP, [])),):
-        rows, _st, kn = build_kelly_rows_for_symbols(
-            group,
-            syms,
-            name_map=name_map,
-            source_dir_override=COMBO23_LATEST,
-        )
-        kelly_rows.extend(rows)
-        kelly_all_notes.extend(kn)
+    kelly_n = max(1, int(args.kelly_top_n))
+    kelly_syms = _top_symbols_from_rank_csv(Q_RANK_CSV, kelly_n)
+    kelly_rows, _st, kn = build_kelly_rows_for_symbols(
+        MX_Q_GROUP,
+        kelly_syms,
+        name_map=name_map,
+        source_dir_override=COMBO23_LATEST,
+    )
+    kelly_all_notes = list(kn)
+    kelly_all_notes.append(
+        f"凯利取 Q 排名 Top{kelly_n}，不跟东财推送名单"
+    )
     for note in kelly_all_notes:
         print(f"  {note}", flush=True)
     kelly_path = write_kelly_position_csv(kelly_rows, KELLY_OUT_CSV)

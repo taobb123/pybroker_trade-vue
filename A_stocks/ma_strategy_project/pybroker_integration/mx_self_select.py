@@ -372,6 +372,61 @@ def remove_symbols_from_group(
     return ok_all, notes
 
 
+def resolve_current_group_symbols(
+    group_name: str,
+    *,
+    apikey: str = "",
+    include_local_txt: bool = True,
+) -> Tuple[List[str], List[str]]:
+    """
+    东财该组现有代码，可选再并上本地 config/mx_groups/{名}.txt。
+    用于「先清空再写入」时确定要删哪些票。
+    """
+    notes: List[str] = []
+    g = _norm_group_name(group_name)
+    if not g:
+        notes.append("分组名为空，无法读取现有自选")
+        return [], notes
+    live = list_group_symbols(g, apikey=apikey)
+    if live:
+        notes.append(f"东财「{g}」现有 {len(live)} 只")
+    else:
+        notes.append(f"东财「{g}」拉取为空，清空将依赖本地分组文件")
+    extra: List[str] = []
+    if include_local_txt:
+        path = group_txt_path(g)
+        if os.path.isfile(path):
+            extra, _ln = load_group_symbols_txt(path)
+    combined = _uniq_codes(list(live) + list(extra))
+    if extra and len(combined) > len(live):
+        notes.append(
+            f"合并本地分组文件后待清空 {len(combined)} 只（东财 {len(live)} + 本地多出 {len(combined) - len(live)}）"
+        )
+    return combined, notes
+
+
+def replace_live_group_symbols(
+    symbols: Iterable[str],
+    *,
+    group_name: str,
+    apikey: str = "",
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> Tuple[bool, List[str]]:
+    """拉取该组现有成员 → 清空 → 按新名单写入。只动这一组。"""
+    current, notes = resolve_current_group_symbols(group_name, apikey=apikey)
+    if not current:
+        notes.append(f"未拉到「{_norm_group_name(group_name)}」现有成员，清空可能不完整")
+    ok, rn = replace_group_symbols(
+        symbols,
+        group_name=group_name,
+        current_symbols=current,
+        apikey=apikey,
+        chunk_size=chunk_size,
+    )
+    notes.extend(rn)
+    return ok, notes
+
+
 def replace_group_symbols(
     symbols: Iterable[str],
     *,

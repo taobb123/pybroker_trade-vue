@@ -91,7 +91,7 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；只推 M加（不推量能/M减/Q/估值）；半凯利跟随 M加；作废码剔除观察池
+  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；清空后推 M加前13（不推量能/M减/Q/估值）；半凯利仍取 M+ Top2，不跟推送；作废码剔除观察池
   symbols_paste: true
   symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
   symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
@@ -117,7 +117,7 @@ steps:
   - path: pattern_entry_q_rank.csv
     label: 观察池Q排名表
   - path: pattern_entry_mplus_rank.csv
-    label: 观察池M+排名表
+    label: 观察池M+排名表（清空后推送前13）
   - path: pattern_entry_mminus_rank.csv
     label: 观察池M-排名表
   - path: pattern_entry_kelly_positions.csv
@@ -141,7 +141,7 @@ steps:
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 暂跳过2+3回测；只推东财「Q」；不推估值因子/23M减；半凯利跟随 Q
+  frequency_note: 暂跳过2+3回测；清空后推东财「Q」前13；不推估值因子/23M减；半凯利仍取 Q Top2，不跟推送
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）
@@ -155,7 +155,7 @@ steps:
   - path: vp_combo_23_mminus_top.csv
     label: M- mud_minus Top（仅排名，不推送）
   - path: vp_combo_23_q_rank.csv
-    label: 2+3 池 Q 排名（推送「Q」）
+    label: 2+3 池 Q 排名（清空后推送前13）
   - path: vp_combo_23_valuation_rank.csv
     label: 2+3 池估值排名（仅排名，不推送）
   - path: vp_combo_23_kelly_positions.csv
