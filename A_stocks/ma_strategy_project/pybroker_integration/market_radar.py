@@ -58,8 +58,8 @@ _EM_HEADERS = {
 }
 GROWTH_RANKING_CSV = _SCRIPT_DIR / "factor_growth_ranking.csv"
 GROWTH_GROUPS = ("M加", "Q", "量能")
-GROWTH_TOP_N = 5
-GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q/量能 各前5"
+GROWTH_TOP_N = 3
+GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q/量能 各前3"
 
 
 class MarketRadarError(RuntimeError):

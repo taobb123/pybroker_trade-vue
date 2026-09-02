@@ -1,0 +1,2 @@
+﻿track,total_return,annual_return,max_drawdown,sharpe,avg_day_return,trade_days,n_buy,n_sell,n_roundtrips,win_rate,avg_hold_calendar_days,skipped_switches,end_equity,end_holding,end_holding_name,experiment,label
+1,0.7278368,1.3536581595340968,-0.27397941745452314,2.198751155025577,0.00414825835800863,161,97,96,96,0.5104166666666666,2.4791666666666665,21,172783.68,000056,*ST皇庭,mplus_top5,M加前五

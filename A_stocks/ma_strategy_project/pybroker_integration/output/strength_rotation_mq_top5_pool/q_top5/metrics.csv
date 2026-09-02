@@ -1,0 +1,2 @@
+﻿track,total_return,annual_return,max_drawdown,sharpe,avg_day_return,trade_days,n_buy,n_sell,n_roundtrips,win_rate,avg_hold_calendar_days,skipped_switches,end_equity,end_holding,end_holding_name,experiment,label
+1,-0.3336335,-0.4702478040634258,-0.5366806024443335,-0.8003699048113928,-0.0018353705025091751,161,122,121,121,0.4462809917355372,1.975206611570248,7,66636.65,600131,国网信通,q_top5,Q前五
