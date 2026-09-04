@@ -10,9 +10,9 @@
      —— 可 --skip-backtest 暂时关掉，以加快链式运行
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
-  5) 将 Q 观察池排名前13 作为参数调用独立成长因子，推东财「Q」
-     （打分失败则中止推送）；不推估值因子 / 23M减
-  6) 半凯利仍取 Q 排名 Top2，不跟推送名单
+  5) 将 Q 观察池排名前13 作为参数调用独立成长因子写 CSV（暂不推东财）
+     不推估值因子 / 23M减
+  6) 半凯利仍取 Q 排名 Top2
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
 skip-backtest 时 23M减 改用 2+3 观察池当日 M- 截面，不依赖本次回测 snapshot。
@@ -42,7 +42,6 @@ from fetch_vp_six_combo import (  # noqa: E402
 )
 from market_neutral.data.pool_archive import save_watch_snapshot  # noqa: E402
 from market_neutral.run import main as market_neutral_main  # noqa: E402
-from mx_self_select import add_symbols_to_group  # noqa: E402
 from fetch_pattern_entry import _top_symbols_from_rank_csv  # noqa: E402
 from kelly_position import (  # noqa: E402
     build_kelly_rows_for_symbols,
@@ -140,9 +139,9 @@ def push_combo23_value_and_q(
     skip_fina: bool = False,
 ) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
-    2+3 池：写估值/Q 排名表；将 Q 前 push_top_n 交给独立成长因子排序并推东财「Q」
-    （打分失败则中止推送），不推「估值因子」。
-    返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
+    2+3 池：写估值/Q 排名表；将 Q 前 push_top_n 交给独立成长因子排序写 CSV。
+    暂不推送东财分组，也不写「估值因子」。
+    返回 (记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
     """
     from fetch_pattern_entry import (  # noqa: WPS433
         _call_growth_factor_push,
@@ -206,23 +205,20 @@ def push_combo23_value_and_q(
             s = _norm_symbol(raw)
             if len(s) == 6 and s not in q_top:
                 q_top.append(s)
-    if skip_push:
-        notes.append(f"已跳过「{MX_Q_GROUP}」推送")
-        pushed[MX_Q_GROUP] = q_top
-    else:
-        notes.append(
-            f"Q 前{len(q_top)} 只作为参数调用独立成长因子 →「{MX_Q_GROUP}」"
-        )
-        syms, pn = _call_growth_factor_push(
-            q_top,
-            group_name=MX_Q_GROUP,
-            out_csv=Q_GROWTH_CSV,
-            name_map=name_map,
-        )
-        notes.extend(pn)
-        pushed[MX_Q_GROUP] = list(syms)
-        if syms:
-            records.append({"group": MX_Q_GROUP, "symbols": list(syms)})
+    notes.append(
+        f"Q 前{len(q_top)} 只调用独立成长因子（仅排序，暂不推送东财）"
+    )
+    syms, pn = _call_growth_factor_push(
+        q_top,
+        group_name=MX_Q_GROUP,
+        out_csv=Q_GROWTH_CSV,
+        name_map=name_map,
+        skip_push=True,
+    )
+    notes.extend(pn)
+    pushed[MX_Q_GROUP] = list(syms)
+    if syms:
+        records.append({"group": MX_Q_GROUP, "symbols": list(syms)})
 
     mminus_df = ranked_map.get("M-") if isinstance(ranked_map, dict) else None
     if mminus_df is None:
@@ -410,29 +406,8 @@ def push_mminus_top_to_mx(
     if top is not None and not top.empty:
         syms = [_norm_symbol(x) for x in top["symbol"].tolist()]
         syms = [s for s in syms if len(s) == 6]
-
-    if skip_push:
-        notes.append(f"已跳过推送「{group_name}」")
-        return syms, notes, top if top is not None else pd.DataFrame()
-    if not syms:
-        notes.append(f"无 Top 股票，跳过推送「{group_name}」")
-        return syms, notes, top if top is not None else pd.DataFrame()
-
-    brief = []
-    for _, r in top.iterrows():
-        name = str(r.get("stock_name") or "")
-        sc = r.get("mud_minus")
-        sc_s = f"{float(sc):.3f}" if sc == sc else "-"
-        brief.append(
-            f"{r.get('symbol')}{(' ' + name) if name else ''} mud_minus={sc_s}"
-        )
-    notes.append(
-        f"M- Top{len(syms)} →「{group_name}」: "
-        + ("；".join(brief) if brief else "（空）")
-    )
-    _ok, push_notes = add_symbols_to_group(syms, group_name=group_name)
-    notes.extend(push_notes)
-    return syms, notes, top
+    notes.append(f"「{group_name}」仅排名，暂不推送东财分组")
+    return syms, notes, top if top is not None else pd.DataFrame()
 
 
 def write_compare_report(
@@ -536,14 +511,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument(
         "--skip-backtest",
         action="store_true",
-        help="跳过 2+3 市场中性回测与年化对比，仍导出观察池并推送东财自选",
+        help="跳过 2+3 市场中性回测与年化对比，仍导出观察池并写 Q 成长表",
     )
     p.add_argument("--no-rotation", action="store_true")
     p.add_argument("--skip-fina", action="store_true")
     p.add_argument(
         "--skip-mx-push",
         action="store_true",
-        help="不推送 M- Top 至东财自选「23M减」",
+        help="兼容旧参数；东财分组推送已暂停",
     )
     p.add_argument(
         "--mx-top-n",
@@ -574,7 +549,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 def main(argv=None) -> int:
     args = parse_args(argv)
     print("=" * 64, flush=True)
-    print("combo2+3 · 东财推送" + ("（已跳过回测）" if args.skip_backtest else " · 回测对比仅多头年化"), flush=True)
+    print("combo2+3 · 观察池与 Q 成长排序" + ("（已跳过回测）" if args.skip_backtest else " · 回测对比仅多头年化"), flush=True)
     print("=" * 64, flush=True)
 
     if not args.skip_export:
@@ -665,7 +640,7 @@ def main(argv=None) -> int:
             "# 仅多头年化对比（已暂时跳过回测）\n\n"
             f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
-            "- 仍导出 2+3 观察池，并将 Q 前13 作为参数调用独立成长因子后推东财「Q」（打分失败则中止推送；不推估值因子 / 23M减）。\n"
+            "- 仍导出 2+3 观察池，并将 Q 前13 调用独立成长因子写 CSV（暂不推东财；不推估值因子 / 23M减）。\n"
             "- 半凯利取 Q 排名 Top2，不跟推送名单。\n"
             "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
         )
@@ -697,14 +672,14 @@ def main(argv=None) -> int:
         print(f"  {note}", flush=True)
 
     end_date = (str(args.end).strip() or datetime.now().strftime("%Y-%m-%d"))[:10]
-    print("【东财自选·Q】", flush=True)
+    print("【Q·成长因子】", flush=True)
     _recs, vq_notes, _pushed_map, mminus_ranked = push_combo23_value_and_q(
         pool_syms,
         name_map=pool_names,
         end_date=end_date,
         top_n=int(args.mx_top_n),
         push_top_n=int(args.mx_push_top_n),
-        skip_push=bool(args.skip_mx_push),
+        skip_push=True,
         skip_value_push=True,
         skip_fina=bool(args.skip_fina),
     )

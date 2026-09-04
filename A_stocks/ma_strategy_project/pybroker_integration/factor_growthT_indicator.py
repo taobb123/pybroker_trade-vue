@@ -318,8 +318,6 @@ from pybroker_integration.mx_self_select import (
     DEFAULT_MX_GROUPS_DIR,
     group_txt_path,
     load_group_symbols_txt,
-    replace_group_symbols,
-    replace_live_group_symbols,
 )
 
 # pybroker / 自定义行情源仅回测路径需要；排序推送勿在 import 时加载，
@@ -671,14 +669,15 @@ def rank_and_push_symbols(
     *,
     group_name: str,
     ranking_file: Optional[str] = None,
-    skip_push: bool = False,
+    skip_push: bool = True,
     name_map: Optional[Dict[str, str]] = None,
 ) -> Tuple[Optional[List[str]], List[str], Dict[str, Dict]]:
     """
-    对给定代码做成长因子排序并推东财同名分组。
-    成功返回 (新顺序, 日志, 分项)；打分失败返回 (None, 日志, {})，不改东财。
+    对给定代码做成长因子排序并写 CSV。
+    暂不推送东财分组。打分失败返回 (None, 日志, {})。
     """
     notes: List[str] = []
+    _ = skip_push  # 东财分组推送已暂停，参数保留兼容
     g = str(group_name or "").strip()
     if not g:
         notes.append("成长因子：分组名为空，已中止")
@@ -686,10 +685,10 @@ def rank_and_push_symbols(
     try:
         ranked, details, scores = rank_symbols_by_growth(symbols)
     except GrowthRankError as exc:
-        notes.append(f"「{g}」成长因子失败（{exc}），已中止推送")
+        notes.append(f"「{g}」成长因子失败（{exc}），已中止")
         return None, notes, {}
     except Exception as exc:
-        notes.append(f"「{g}」成长因子异常（{exc}），已中止推送")
+        notes.append(f"「{g}」成长因子异常（{exc}），已中止")
         return None, notes, {}
 
     names = dict(name_map or {})
@@ -699,14 +698,14 @@ def rank_and_push_symbols(
             names.update(get_stock_names(missing))
         except Exception:
             pass
-    print(f"【{g}】成长因子排序 {len(ranked)} 只（高→低）:")
+    print(f"【{g}】成长因子排序 {len(ranked)} 只（高→低）:", flush=True)
     brief = []
     for i, sym in enumerate(ranked, 1):
         sc = scores.get(sym)
         sc_s = f"{float(sc):.4f}" if sc is not None and sc == sc else "无财务分"
         nm = names.get(sym, "")
         line = f"{i}. {nm or sym} {sym}  {sc_s}"
-        print(f"  {line}")
+        print(f"  {line}", flush=True)
         brief.append(f"{i}.{sym} {sc_s}")
     notes.append(f"「{g}」成长因子顺序: " + "；".join(brief))
 
@@ -717,33 +716,27 @@ def rank_and_push_symbols(
             )
             notes.append(f"「{g}」成长因子排名表 → {gpath}")
         except Exception as save_err:
-            notes.append(f"「{g}」成长因子排名表写入失败（{save_err}），仍继续推送")
+            notes.append(f"「{g}」成长因子排名表写入失败（{save_err}）")
 
-    if skip_push:
-        notes.append(f"已跳过写回东财「{g}」")
-        return ranked, notes, details or {}
-
-    notes.append(f"「{g}」：先清空再按成长因子顺序写入")
-    ok, push_notes = replace_live_group_symbols(ranked, group_name=g)
-    notes.extend(push_notes)
-    if not ok:
-        notes.append(f"⚠ 「{g}」写回东财未完全成功")
+    msg = f"「{g}」仅保存排名，暂不推送东财分组"
+    notes.append(msg)
+    print(msg, flush=True)
     return ranked, notes, details or {}
 
 
 def run_from_upstream_top13(
     *,
     top_n: int = GROWTH_TOP_N_DEFAULT,
-    skip_push: bool = False,
+    skip_push: bool = True,
     ranking_file: Optional[str] = None,
 ) -> int:
-    """单独点「成长因子」：用形态建仓 M+ 前N、回测对比 Q 前N，各组独立排序后推东财。不排量能。"""
+    """单独点「成长因子」：用形态建仓 M+ 前N、回测对比 Q 前N，各组独立排序写 CSV。不排量能，暂不推东财。"""
     n = max(1, int(top_n))
     combined = ranking_file or DEFAULT_COMBINED_GROWTH_CSV
     print("=" * 80)
-    print("成长因子排序 · 上游前13（不读东财导出 txt，不排量能）")
-    print(f"M+ ← {os.path.basename(DEFAULT_MPLUS_RANK_CSV)}  Top{n} → 东财「M加」")
-    print(f"Q  ← {os.path.basename(DEFAULT_Q_RANK_CSV)}  Top{n} → 东财「Q」")
+    print("成长因子排序 · 上游前13（不读东财导出 txt，不排量能，暂不推东财）")
+    print(f"M+ ← {os.path.basename(DEFAULT_MPLUS_RANK_CSV)}  Top{n} → 「M加」成长表")
+    print(f"Q  ← {os.path.basename(DEFAULT_Q_RANK_CSV)}  Top{n} → 「Q」成长表")
     print("=" * 80)
 
     all_rows: List[dict] = []
@@ -785,13 +778,13 @@ def run_from_upstream_top13(
 def run_mx_group_growth_rank(
     group_names: Sequence[str],
     *,
-    skip_push: bool = False,
+    skip_push: bool = True,
     ranking_file: Optional[str] = None,
     groups_dir: Optional[str] = None,
 ) -> int:
     """
-    读取项目内分组 txt → 各组独立成长排序 → 推东财同名分组。
-    不回写桌面文件，也不覆盖分组 txt。
+    读取项目内分组 txt → 各组独立成长排序写 CSV。
+    暂不推送东财。不回写桌面文件，也不覆盖分组 txt。
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ranking_file = ranking_file or os.path.join(script_dir, "factor_growth_ranking.csv")
@@ -828,16 +821,7 @@ def run_mx_group_growth_rank(
             sc_s = f"{sc:.4f}" if sc is not None and sc == sc else "无财务分"
             print(f"    {i}. {names.get(sym, sym)} {sym}  {sc_s}")
         any_ok = True
-        if skip_push:
-            print(f"  已跳过写回东财「{g}」")
-            continue
-        ok, push_notes = replace_group_symbols(
-            ranked, group_name=g, current_symbols=current
-        )
-        for line in push_notes:
-            print(f"  {line}")
-        if not ok:
-            print(f"  ⚠ 「{g}」写回东财未完全成功")
+        print(f"  「{g}」仅保存排名，暂不推送东财分组")
         print(f"  未改写分组文件: {path}")
 
     if all_rows:
@@ -853,12 +837,12 @@ def run_mx_group_growth_rank(
 
 
 def main():
-    """默认：上游 M+/Q 前13 成长排序并推东财。--symbols+--group 供形态建仓/回测对比调用。"""
+    """默认：上游 M+/Q 前13 成长排序写 CSV。--symbols+--group 供形态建仓/回测对比调用。"""
     parser = argparse.ArgumentParser(description="稳健高质量成长因子")
     parser.add_argument(
         "--from-upstream-top13",
         action="store_true",
-        help="从形态建仓 M+排名表、回测对比 Q排名表取前N只，各组独立成长排序后推东财（不排量能）",
+        help="从形态建仓 M+排名表、回测对比 Q排名表取前N只，各组独立成长排序写 CSV（不排量能，暂不推东财）",
     )
     parser.add_argument(
         "--symbols",
@@ -868,7 +852,7 @@ def main():
     parser.add_argument(
         "--group",
         default="",
-        help="东财分组名（M加 或 Q）",
+        help="分组标签（M加 或 Q，仅用于 CSV）",
     )
     parser.add_argument(
         "--ranking-file",
@@ -894,7 +878,7 @@ def main():
     parser.add_argument(
         "--skip-mx-push",
         action="store_true",
-        help="只排序写 CSV，不写回东财自选",
+        help="兼容旧参数；东财分组推送已暂停，有无此开关都不写回",
     )
     parser.add_argument(
         "--backtest",
@@ -906,7 +890,7 @@ def main():
     symbols = parse_symbols_arg(str(args.symbols or ""))
     group = str(args.group or "").strip()
     ranking_file = str(args.ranking_file or "").strip() or None
-    skip_push = bool(args.skip_mx_push)
+    skip_push = True
 
     if symbols or group:
         if not symbols or not group:

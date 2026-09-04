@@ -3,9 +3,12 @@
 """
 东财妙想 Skills 自选股管理（mx_selfselect）。
 
-官方接口：
+官方接口（mx_selfselect）只操作通行证下的默认「我的自选」：
   GET/查询  POST .../self-select/get
   添加/删除 POST .../self-select/manage   Body: {"query": "自然语言"}
+
+App 首页→自选里的自定义分组（「M加」「Q」等）不在该 Skill 能力范围内。
+对这类分组名调用 manage 会被理解成写入「我的自选」，接口仍返回 OK。
 
 认证：Header apikey = Skills Key（mkt_...），优先环境变量 MX_APIKEY，
 其次可选本地文件 config/mx_apikey.txt（勿提交仓库）。
@@ -16,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -28,6 +32,8 @@ GET_URL = "https://mkapi2.dfcfs.com/finskillshub/api/claw/self-select/get"
 
 # 单次自然语言里放太多代码易失败，按批切分
 DEFAULT_CHUNK_SIZE = 20
+# 官方问句只覆盖默认自选；其它名字会静默写进「我的自选」
+_DEFAULT_SELF_SELECT_GROUPS = {"我的自选", "自选", "自选股"}
 _CODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 _GROUP_NAME_KEYS = (
     "groupName",
@@ -93,10 +99,36 @@ def _post_json(url: str, *, apikey: str, body: Optional[dict] = None, timeout: i
             return json.loads(err)
         except Exception:
             return {"status": getattr(e, "code", -1), "message": err[:500], "success": False}
+    except Exception as e:
+        return {"status": -1, "message": f"{type(e).__name__}: {e}", "success": False}
 
 
-def manage_self_select(query: str, *, apikey: str) -> dict:
-    return _post_json(MANAGE_URL, apikey=apikey, body={"query": str(query)})
+def _is_default_self_select_group(group_name: str) -> bool:
+    g = _norm_group_name(group_name)
+    return (not g) or (g in _DEFAULT_SELF_SELECT_GROUPS)
+
+
+def _named_group_unsupported_notes(group_name: str, action: str) -> List[str]:
+    g = _norm_group_name(group_name) or group_name
+    return [
+        f"无法{action}东财 App 分组「{g}」：妙想 Skills 只支持默认「我的自选」，"
+        f"不会写入首页→自选里的自定义分组。本次未调用添加/删除，以免把股票写进「我的自选」。"
+        f"请用本轮成长因子 CSV 在 App 中维护「{g}」。"
+    ]
+
+
+def manage_self_select(query: str, *, apikey: str, retries: int = 3) -> dict:
+    last: dict = {}
+    n = max(1, int(retries))
+    for i in range(n):
+        last = _post_json(MANAGE_URL, apikey=apikey, body={"query": str(query)})
+        status = last.get("status", last.get("code", -1))
+        msg = str(last.get("message") or "")
+        if status == 112 or "频率" in msg:
+            time.sleep(8 * (i + 1))
+            continue
+        return last
+    return last
 
 
 def get_self_select(*, apikey: str) -> dict:
@@ -272,12 +304,32 @@ def parse_self_select_groups(payload: Any) -> Dict[str, List[str]]:
             return
 
     walk(payload)
+    _extract_default_self_select(payload, groups)
     if not groups:
         try:
             _parse_groups_from_text(json.dumps(payload, ensure_ascii=False), groups)
         except Exception:
             pass
     return groups
+
+
+def _extract_default_self_select(payload: Any, groups: Dict[str, List[str]]) -> None:
+    """GET 返回的是选股表 dataList，不是 App 自定义分组。"""
+    if not isinstance(payload, dict):
+        return
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    if not isinstance(data, dict):
+        return
+    ar = data.get("allResults")
+    result = ar.get("result") if isinstance(ar, dict) else None
+    rows = result.get("dataList") if isinstance(result, dict) else None
+    if not isinstance(rows, list) or not rows:
+        return
+    title = _norm_group_name(data.get("title")) or "我的自选"
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        _add_code(groups, title, row.get("SECURITY_CODE") or row.get("code") or row.get("symbol"))
 
 
 def _parse_groups_from_text(text: str, groups: Dict[str, List[str]]) -> None:
@@ -390,6 +442,9 @@ def remove_symbols_from_group(
     if not key:
         notes.append("跳过删除自选：未配置 MX_APIKEY / config/mx_apikey.txt")
         return False, notes
+    if not _is_default_self_select_group(group_name):
+        notes.extend(_named_group_unsupported_notes(group_name, "清空"))
+        return False, notes
     syms = _uniq_codes(symbols)
     if not syms:
         notes.append(f"删除自选「{group_name}」：无代码")
@@ -449,6 +504,9 @@ def replace_live_group_symbols(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> Tuple[bool, List[str]]:
     """拉取该组现有成员 → 清空 → 按新名单写入。只动这一组。"""
+    g = _norm_group_name(group_name)
+    if not _is_default_self_select_group(g):
+        return False, _named_group_unsupported_notes(g, "写入")
     current, notes = resolve_current_group_symbols(group_name, apikey=apikey)
     if not current:
         notes.append(f"未拉到「{_norm_group_name(group_name)}」现有成员，清空可能不完整")
@@ -482,14 +540,23 @@ def replace_group_symbols(
     if not g:
         notes.append("写回自选失败：分组名为空")
         return False, notes
+    if not _is_default_self_select_group(g):
+        notes.extend(_named_group_unsupported_notes(g, "写入"))
+        return False, notes
     if not ranked:
         notes.append(f"「{g}」重排名单为空，不改自选")
         return True, notes
-    to_delete = current or ranked
-    ok_del, del_notes = remove_symbols_from_group(
-        to_delete, group_name=g, apikey=apikey, chunk_size=chunk_size
-    )
-    notes.extend(del_notes)
+    # 现有成员为空时，绝不能拿「新名单」去删：删的是尚未写入的票，组内旧票还在。
+    to_delete = current
+    if to_delete:
+        notes.append(f"「{g}」准备清空现有 {len(to_delete)} 只后再写入 {len(ranked)} 只")
+        ok_del, del_notes = remove_symbols_from_group(
+            to_delete, group_name=g, apikey=apikey, chunk_size=chunk_size
+        )
+        notes.extend(del_notes)
+    else:
+        notes.append(f"「{g}」未拉到现有成员，跳过删除，直接写入 {len(ranked)} 只（若组内仍是旧票，请检查拉取接口）")
+        _ok_del = True
     ok_add, add_notes = add_symbols_to_group(
         ranked, group_name=g, apikey=apikey, chunk_size=chunk_size
     )
@@ -526,6 +593,9 @@ def add_symbols_to_group(
     if not key:
         notes.append("跳过推送自选：未配置 MX_APIKEY / config/mx_apikey.txt")
         return False, notes
+    if not _is_default_self_select_group(group_name):
+        notes.extend(_named_group_unsupported_notes(group_name, "写入"))
+        return False, notes
 
     syms: List[str] = []
     seen = set()
@@ -551,7 +621,7 @@ def add_symbols_to_group(
         if isinstance(msg, dict):
             msg = json.dumps(msg, ensure_ascii=False)[:200]
         msg_s = str(msg)[:240]
-        if status in (0, "0") or str(resp.get("message", "")).upper() == "OK":
+        if _manage_ok(resp):
             notes.append(f"已推送 {len(batch)} 只 → 分组「{g}」| {msg_s}")
         else:
             ok_all = False

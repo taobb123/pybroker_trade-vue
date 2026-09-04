@@ -13,10 +13,9 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：默认不推「量能」。M+ 动量前13 作为参数调用独立成长因子，
-按成长因子顺序写入东财「M加」（打分失败则中止推送）；
-「Q」由 vp_combo_23_long_compare 同样调用成长因子推送。
-不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2，不跟推送名单。
+跑完后：默认不推东财分组。M+ 动量前13 作为参数调用独立成长因子写 CSV；
+「Q」由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
+不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -1519,18 +1518,18 @@ def _call_growth_factor_push(
     group_name: str,
     out_csv: str = "",
     name_map: Optional[Dict[str, str]] = None,
-    skip_push: bool = False,
+    skip_push: bool = True,
 ) -> Tuple[List[str], List[str]]:
-    """调用独立成长因子：排序后推东财。失败返回空名单且不推送。"""
+    """调用独立成长因子：排序写 CSV。暂不推送东财。失败返回空名单。"""
     try:
         from factor_growthT_indicator import rank_and_push_symbols  # noqa: WPS433
     except Exception as exc:
-        return [], [f"成长因子模块导入失败（{exc}），已中止推送「{group_name}」"]
+        return [], [f"成长因子模块导入失败（{exc}）"]
     ranked, notes, _details = rank_and_push_symbols(
         list(syms),
         group_name=group_name,
         ranking_file=str(out_csv or "") or None,
-        skip_push=skip_push,
+        skip_push=True,
         name_map=name_map,
     )
     return list(ranked or []), notes
@@ -1637,10 +1636,10 @@ def run_qm_rank_and_push(
     exclude_symbols: Optional[Sequence[str]] = None,
 ) -> List[str]:
     """
-    观察池 Q/M+/M- 排名写 CSV；形态建仓将 M+ TopN 作为参数调用独立成长因子并推「M加」。
-    push_labels 默认全推；形态建仓定向可传 ("M+",) 不推 Q。
-    成长因子打分失败则中止该组东财推送。
-    exclude_symbols：作废等代码，排名与推送均排除。
+    观察池 Q/M+/M- 排名写 CSV；形态建仓将 M+ TopN 作为参数调用独立成长因子。
+    push_labels 决定哪些标签走成长因子（形态建仓传 ("M+",)）。
+    暂不推送东财分组。
+    exclude_symbols：作废等代码，排名均排除。
     """
     notes: List[str] = []
     try:
@@ -1696,14 +1695,8 @@ def run_qm_rank_and_push(
         n_rows = 0 if df is None or df.empty else len(df)
         notes.append(f"{label} 排名表({n_rows}) → {out}")
         label_key = label.upper()
-        do_push = (allow is None) or (label_key in allow)
-        if skip_push or not do_push:
-            if not do_push:
-                notes.append(f"定向：不推送「{group}」（{label}）")
-            else:
-                notes.append(f"已跳过「{group}」推送")
-            continue
-        if label_key == "M+":
+        do_growth = (allow is None) or (label_key in allow)
+        if label_key == "M+" and do_growth:
             top_syms: List[str] = []
             seen_top = set()
             work = df if df is not None else pd.DataFrame()
@@ -1725,25 +1718,21 @@ def run_qm_rank_and_push(
                     if len(s) == 6 and nm:
                         names_top[s] = nm
             notes.append(
-                f"M+ 动量前{len(top_syms)} 只作为参数调用独立成长因子 →「{group}」"
+                f"M+ 动量前{len(top_syms)} 只调用独立成长因子（仅排序，暂不推送东财）"
             )
             _syms, pn = _call_growth_factor_push(
                 top_syms,
                 group_name=group,
                 out_csv=mplus_growth_out_csv,
                 name_map=names_top,
+                skip_push=True,
             )
             notes.extend(pn)
             continue
-        _syms, pn = push_rank_top_to_mx_group(
-            df if df is not None else pd.DataFrame(),
-            top_n=top_n,
-            group_name=group,
-            score_col=score_col,
-            label=label,
-            exclude_symbols=list(ban),
-        )
-        notes.extend(pn)
+        if not do_growth:
+            notes.append(f"定向：不跑成长因子「{group}」（{label}）")
+        else:
+            notes.append(f"「{group}」仅排名，暂不推送东财分组")
     return notes
 
 
@@ -1934,7 +1923,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-mx-push",
         action="store_true",
-        help="不推送形态「待选后通过」到东财自选「量能」",
+        help="不推送形态「待选后通过」到东财（东财分组推送已暂停）",
     )
     parser.add_argument(
         "--skip-value-rank",
@@ -1959,7 +1948,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-qm-push",
         action="store_true",
-        help="计算 Q/M 排名但不推送东财自选",
+        help="计算 Q/M 排名但不推送东财（东财分组推送已暂停）",
     )
     parser.add_argument(
         "--skip-qm-fina",
@@ -2028,13 +2017,7 @@ def main() -> None:
     out_df.to_csv(out_path, index=False, encoding="utf-8-sig")
 
     prune_notes = prune_invalid_watch_pools(results)
-    mx_notes: List[str] = []
-    if not bool(args.skip_mx_push):
-        mx_notes = push_selected_to_mx_group(
-            results, group_name=str(args.mx_group or MX_PUSH_GROUP_DEFAULT)
-        )
-    else:
-        mx_notes = ["已跳过东财自选推送（--skip-mx-push）"]
+    mx_notes: List[str] = ["暂不推送东财分组"]
 
     value_notes: List[str] = []
     value_path = ""
@@ -2113,9 +2096,9 @@ def main() -> None:
             end_date=str(args.end_date),
             name_map=name_map,
             top_n=int(args.qm_push_top_n),
-            skip_push=bool(args.skip_qm_push),
+            skip_push=True,
             skip_fina=bool(args.skip_qm_fina),
-            # M+ 动量前13 作为参数调用独立成长因子，推东财「M加」；Q 由 2+3 步骤调用成长因子
+            # M+ 动量前13 调用独立成长因子写 CSV；暂不推东财。Q 由 2+3 步骤同样只排序。
             push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
@@ -2157,7 +2140,7 @@ def main() -> None:
         for pn in value_notes:
             print(f"  {pn}")
     if qm_notes:
-        print("【M加】（动量前13 调用独立成长因子后推送；不推 Q / M减）")
+        print("【M加】（动量前13 调用独立成长因子写 CSV；暂不推东财）")
         for pn in qm_notes:
             print(f"  {pn}")
     if kelly_notes:

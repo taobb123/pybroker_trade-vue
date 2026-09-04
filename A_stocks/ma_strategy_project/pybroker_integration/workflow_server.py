@@ -221,6 +221,7 @@ def _extract_column_text(
 def build_env(cfg: dict[str, Any]) -> dict[str, str]:
     env = dict(os.environ)
     # 子进程 Python 尽量用 UTF-8 写 stdout/stderr，便于与网页 UTF-8 一致（可在 YAML extra_env 覆盖）
+    env.setdefault("PYTHONUNBUFFERED", "1")
     env.setdefault("PYTHONUTF8", "1")
     env.setdefault("PYTHONIOENCODING", "utf-8:replace")
     # 保证 data.* / pybroker_integration.* 可被策略脚本 import（与本地 sys.path 注入对齐）

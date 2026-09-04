@@ -91,7 +91,7 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；M+动量前13调用独立成长因子后推「M加」（打分失败则中止；不推量能/M减/Q/估值）；半凯利仍取 M+ Top2
+  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；M+动量前13调用独立成长因子写 CSV（暂不推东财）；半凯利仍取 M+ Top2
   symbols_paste: true
   symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
   symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
@@ -119,7 +119,7 @@ steps:
   - path: pattern_entry_mplus_rank.csv
     label: M+动量排名（取前13交成长因子）
   - path: pattern_entry_mplus_growth_rank.csv
-    label: M+前13成长因子排序（推送东财「M加」）
+    label: M+前13成长因子排序
   - path: pattern_entry_mminus_rank.csv
     label: 观察池M-排名表
   - path: pattern_entry_kelly_positions.csv
@@ -140,10 +140,11 @@ steps:
   - --variants
   - A,B,Q,M+,M-
   - --skip-backtest
+  - --skip-mx-push
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 暂跳过2+3回测；Q前13调用独立成长因子后推东财「Q」（打分失败则中止；不推估值因子/23M减）；半凯利仍取 Q Top2
+  frequency_note: 暂跳过2+3回测；Q前13调用独立成长因子写 CSV（暂不推东财）；半凯利仍取 Q Top2
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）
@@ -159,7 +160,7 @@ steps:
   - path: vp_combo_23_q_rank.csv
     label: 2+3 池 Q 排名（取前13交成长因子）
   - path: vp_combo_23_q_growth_rank.csv
-    label: Q前13成长因子排序（推送东财「Q」）
+    label: Q前13成长因子排序
   - path: vp_combo_23_valuation_rank.csv
     label: 2+3 池估值排名（仅排名，不推送）
   - path: vp_combo_23_kelly_positions.csv
@@ -306,9 +307,10 @@ steps:
   script: factor_growthT_indicator.py
   args:
   - --from-upstream-top13
+  - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 读取形态建仓 M+前13、回测对比 Q前13，组内成长排序后推东财「M加」「Q」；不排量能、不读东财导出 txt
+  frequency_note: 读取形态建仓 M+前13、回测对比 Q前13，组内成长排序写 CSV；不排量能、暂不推东财
   workspace_inputs:
   - path: pattern_entry_mplus_rank.csv
     label: 形态建仓 M+动量排名（取前13）

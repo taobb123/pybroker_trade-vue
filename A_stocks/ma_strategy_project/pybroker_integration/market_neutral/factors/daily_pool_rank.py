@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""观察池当日截面：Q / M+ / M- 排名（供 fetch_pattern_entry 推送东财自选）。"""
+"""观察池当日截面：Q / M+ / M- 排名（供 fetch_pattern_entry 写排名表）。"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
