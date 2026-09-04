@@ -223,6 +223,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+function isNetworkFetchError(e: unknown): boolean {
+  const msg = String(e)
+  return (
+    e instanceof TypeError ||
+    /failed to fetch|networkerror|load failed|fetch failed/i.test(msg)
+  )
+}
+
+function isTransientHttp(status: number): boolean {
+  return status === 502 || status === 503 || status === 504
+}
+
+async function fetchAllowingBlips(url: string, init?: RequestInit): Promise<Response> {
+  let lastErr: unknown
+  for (let i = 0; i < 5; i++) {
+    try {
+      return await fetch(url, init)
+    } catch (e) {
+      lastErr = e
+      if (!isNetworkFetchError(e) || i === 4) throw e
+      await sleep(800 * (i + 1))
+    }
+  }
+  throw lastErr
+}
+
 /** 线上经 Worker：短请求启动 + 轮询；避免同步长连接被网关掐断后落入 mock */
 export async function runWorkflowStep(
   stepId: string,
@@ -234,11 +260,14 @@ export async function runWorkflowStep(
 
   try {
     // 1) 异步启动
-    const startRes = await fetch(apiUrl(`/api/run/step/${encodeURIComponent(stepId)}/async`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+    const startRes = await fetchAllowingBlips(
+      apiUrl(`/api/run/step/${encodeURIComponent(stepId)}/async`),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+    )
     const startText = await startRes.text()
     if (!startRes.ok) {
       // 旧后端无 async 接口时回退同步（本地 uvicorn）
@@ -270,11 +299,32 @@ export async function runWorkflowStep(
 
     // 2) 轮询（同源短请求，可经 Worker）
     const deadline = Date.now() + 30 * 60 * 1000
+    let lastPollErr = ''
     while (Date.now() < deadline) {
       await sleep(1500)
-      const pollRes = await fetch(apiUrl(`/api/run/jobs/${encodeURIComponent(jobId)}`))
+      let pollRes: Response
+      try {
+        pollRes = await fetchAllowingBlips(apiUrl(`/api/run/jobs/${encodeURIComponent(jobId)}`))
+      } catch (e) {
+        lastPollErr = String(e)
+        continue
+      }
       const pollText = await pollRes.text()
       if (!pollRes.ok) {
+        if (isTransientHttp(pollRes.status)) {
+          lastPollErr = `HTTP ${pollRes.status}`
+          continue
+        }
+        if (pollRes.status === 404) {
+          return {
+            exit_code: 1,
+            merged_log: [
+              `# run failed · ${stepId}`,
+              '任务记录丢失（后端可能已重启）。产物若已生成请到「报告」查看，否则请重跑。',
+              pollText.slice(0, 500),
+            ].join('\n'),
+          }
+        }
         return {
           exit_code: 1,
           merged_log: `# run failed · ${stepId}\n轮询 HTTP ${pollRes.status}\n${pollText.slice(0, 2000)}`,
@@ -288,10 +338,8 @@ export async function runWorkflowStep(
       try {
         job = JSON.parse(pollText) as typeof job
       } catch {
-        return {
-          exit_code: 1,
-          merged_log: `# run failed · ${stepId}\n轮询响应不是 JSON\n${pollText.slice(0, 2000)}`,
-        }
+        lastPollErr = '轮询响应不是 JSON'
+        continue
       }
       if (job.status === 'done') {
         const result = job.result
@@ -310,7 +358,13 @@ export async function runWorkflowStep(
     }
     return {
       exit_code: 1,
-      merged_log: `# run failed · ${stepId}\n等待超时（30 分钟）`,
+      merged_log: [
+        `# run failed · ${stepId}`,
+        '等待超时（30 分钟）',
+        lastPollErr ? `最后一次轮询：${lastPollErr}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     }
   } catch (e) {
     if (isLocal) {

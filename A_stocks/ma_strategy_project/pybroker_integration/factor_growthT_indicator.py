@@ -298,14 +298,14 @@ b > 0 说明提升。
 
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import sys
 import numpy as np
 import pandas as pd
-import pybroker as pyb
-from pybroker import Strategy, StrategyConfig, ExecContext
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from datetime import datetime, timedelta
 
 # 添加项目根目录到路径
@@ -313,7 +313,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from pybroker_integration.custom_data_source import create_custom_data_source
 from pybroker_integration.steady_quality_financial import build_steady_quality_scores
 from pybroker_integration.mx_self_select import (
     DEFAULT_MX_GROUPS_DIR,
@@ -322,12 +321,20 @@ from pybroker_integration.mx_self_select import (
     replace_group_symbols,
 )
 
-# 启用数据源缓存
-pyb.enable_data_source_cache('factor_growth_cache')
+# pybroker / 自定义行情源仅回测路径需要；排序推送勿在 import 时加载，
+# 否则会写缓存目录并拖垮 uvicorn --reload，前端轮询变成 Failed to fetch。
+
+
+def _pyb():
+    import pybroker as pyb
+
+    return pyb
+
 
 # ==================== 稳健型高质量四层评分逻辑（见文件头注释） ====================
 
 def _ensure_quality_rank_params():
+    pyb = _pyb()
     if pyb.param('top_10_pct_symbols') is not None:
         return
     symbols = pyb.param('symbols_for_quality')
@@ -350,12 +357,14 @@ def _ensure_quality_rank_params():
     pyb.param('target_symbols', target_symbols)
 
 
-def rank_stocks_by_quality(ctxs: Dict[str, ExecContext]) -> List[str]:
+def rank_stocks_by_quality(ctxs: Dict[str, Any]) -> List[str]:
+    pyb = _pyb()
     _ensure_quality_rank_params()
     return pyb.param('top_10_pct_symbols') or []
 
 
-def execute_quality_strategy(ctx: ExecContext):
+def execute_quality_strategy(ctx: Any):
+    pyb = _pyb()
     target_symbols = pyb.param('target_symbols')
     if target_symbols is None or len(target_symbols) == 0:
         return
@@ -724,6 +733,11 @@ def main():
     print(f"  - 初始资金: {initial_cash:,} 元")
     print(f"  - 回测日期: {start_date} 至 {end_date}")
 
+    import pybroker as pyb
+    from pybroker import Strategy, StrategyConfig
+    from pybroker_integration.custom_data_source import create_custom_data_source
+
+    pyb.enable_data_source_cache('factor_growth_cache')
     pyb.param('top_n', top_n)
     pyb.param('symbols_for_quality', symbols)
 
