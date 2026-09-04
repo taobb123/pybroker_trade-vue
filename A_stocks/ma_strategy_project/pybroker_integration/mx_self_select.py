@@ -190,6 +190,42 @@ def group_txt_path(group_name: str, groups_dir: str = "") -> str:
     return os.path.join(d, f"{str(group_name).strip()}.txt")
 
 
+def write_group_symbols_txt(
+    group_name: str,
+    symbols: Sequence[str],
+    *,
+    groups_dir: str = "",
+    source_note: str = "",
+) -> Tuple[str, List[str]]:
+    """
+    把代码写入 config/mx_groups/{名}.txt，供「按成长因子排序」与本步推送共用同一名单。
+    不回写桌面。返回 (路径, 日志)。
+    """
+    notes: List[str] = []
+    g = str(group_name or "").strip()
+    codes: List[str] = []
+    seen = set()
+    for raw in symbols:
+        s = "".join(ch for ch in str(raw) if ch.isdigit()).zfill(6)
+        if len(s) != 6 or s in seen:
+            continue
+        seen.add(s)
+        codes.append(s)
+    path = group_txt_path(g, groups_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    note = str(source_note or "").strip() or "工作流本轮待成长排序名单"
+    lines = [
+        f"# 自选分组 {g} · {note}",
+        f"# count={len(codes)}",
+        *codes,
+        "",
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    notes.append(f"已写入「{g}」名单 {len(codes)} 只 → {path}")
+    return path, notes
+
+
 def _group_name_from_mapping(obj: dict) -> str:
     for k in _GROUP_NAME_KEYS:
         if k in obj and isinstance(obj[k], str) and obj[k].strip():

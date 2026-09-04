@@ -13,10 +13,10 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：默认不推「量能」。只推东财自选「M加」：观察池 M+ 前13
-经成长因子重排后写入（先清空该组；打分失败则中止推送）；
-「Q」由 vp_combo_23_long_compare 推送；不推 M减 / 估值因子 / 量能。
-半凯利仍取 M+ 排名 Top2，不跟推送名单。
+跑完后：默认不推「量能」。M+ 动量前13 作为参数调用独立成长因子，
+按成长因子顺序写入东财「M加」（打分失败则中止推送）；
+「Q」由 vp_combo_23_long_compare 同样调用成长因子推送。
+不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2，不跟推送名单。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -1513,54 +1513,27 @@ def rank_observation_pool_by_valuation(
     return out, notes
 
 
-def _growth_rerank_for_mx_push(
+def _call_growth_factor_push(
     syms: Sequence[str],
     *,
-    tag: str,
     group_name: str,
     out_csv: str = "",
     name_map: Optional[Dict[str, str]] = None,
-) -> Tuple[Optional[List[str]], List[str]]:
-    """
-    将待推送名单交成长因子重排。成功返回 (新顺序, 日志)；
-    失败返回 (None, 日志)，调用方必须中止东财推送。
-    """
-    notes: List[str] = []
+    skip_push: bool = False,
+) -> Tuple[List[str], List[str]]:
+    """调用独立成长因子：排序后推东财。失败返回空名单且不推送。"""
     try:
-        from factor_growthT_indicator import (  # noqa: WPS433
-            GrowthRankError,
-            rank_symbols_by_growth,
-            write_growth_rank_csv,
-        )
+        from factor_growthT_indicator import rank_and_push_symbols  # noqa: WPS433
     except Exception as exc:
-        notes.append(
-            f"{tag}：成长因子模块导入失败（{exc}），已中止推送「{group_name}」"
-        )
-        return None, notes
-    notes.append(f"{tag}：前{len(syms)} 只交成长因子重排后再推「{group_name}」")
-    try:
-        ranked, details, scores = rank_symbols_by_growth(syms)
-    except GrowthRankError as exc:
-        notes.append(f"{tag}：成长因子失败（{exc}），已中止推送「{group_name}」")
-        return None, notes
-    except Exception as exc:
-        notes.append(f"{tag}：成长因子异常（{exc}），已中止推送「{group_name}」")
-        return None, notes
-    brief_g = []
-    for i, s in enumerate(ranked, 1):
-        sc = scores.get(s)
-        sc_s = f"{float(sc):.4f}" if sc is not None and sc == sc else "无财务分"
-        brief_g.append(f"{i}.{s} {sc_s}")
-    notes.append(f"{tag} 成长因子顺序: " + ("；".join(brief_g) if brief_g else "（空）"))
-    if out_csv:
-        try:
-            gpath = write_growth_rank_csv(
-                group_name, ranked, details, out_csv, name_map=name_map
-            )
-            notes.append(f"{tag} 成长因子排名表 → {gpath}")
-        except Exception as save_err:
-            notes.append(f"{tag}：成长因子排名表写入失败（{save_err}），仍按新顺序推送")
-    return ranked, notes
+        return [], [f"成长因子模块导入失败（{exc}），已中止推送「{group_name}」"]
+    ranked, notes, _details = rank_and_push_symbols(
+        list(syms),
+        group_name=group_name,
+        ranking_file=str(out_csv or "") or None,
+        skip_push=skip_push,
+        name_map=name_map,
+    )
+    return list(ranked or []), notes
 
 
 def push_rank_top_to_mx_group(
@@ -1571,9 +1544,6 @@ def push_rank_top_to_mx_group(
     score_col: str,
     label: str = "",
     exclude_symbols: Optional[Sequence[str]] = None,
-    growth_rerank: bool = False,
-    growth_out_csv: str = "",
-    name_map: Optional[Dict[str, str]] = None,
 ) -> Tuple[List[str], List[str]]:
     """推送任意排名表前 top_n 至东财自选分组（先清空该组再写入）。返回 (代码列表, 说明)。"""
     notes: List[str] = []
@@ -1595,12 +1565,8 @@ def push_rank_top_to_mx_group(
     syms = [_norm_symbol(x) for x in top["symbol"].tolist()]
     syms = [s for s in syms if len(s) == 6]
     brief = []
-    csv_names: Dict[str, str] = dict(name_map or {})
     for _, r in top.iterrows():
         name = str(r.get("stock_name") or "")
-        s = _norm_symbol(r.get("symbol"))
-        if len(s) == 6 and name:
-            csv_names[s] = name
         sc = r.get(score_col) if score_col in r.index else None
         if score_col == "upside" and sc is not None and sc == sc:
             sc_s = f"{100 * float(sc):.1f}%"
@@ -1616,25 +1582,7 @@ def push_rank_top_to_mx_group(
     )
     if not syms:
         return [], notes
-    if growth_rerank:
-        growth_syms, gn = _growth_rerank_for_mx_push(
-            syms,
-            tag=tag,
-            group_name=group_name,
-            out_csv=str(growth_out_csv or ""),
-            name_map=csv_names,
-        )
-        notes.extend(gn)
-        if growth_syms is None:
-            return [], notes
-        syms = [s for s in growth_syms if len(s) == 6]
-        if not syms:
-            notes.append(f"{tag}：成长因子结果无有效代码，已中止推送「{group_name}」")
-            return [], notes
-    notes.append(
-        f"{tag}：先清空「{group_name}」再写入"
-        + ("成长因子顺序" if growth_rerank else f" Top{n}")
-    )
+    notes.append(f"{tag}：先清空「{group_name}」再写入 Top{n}")
     _ok, push_notes = replace_live_group_symbols(syms, group_name=group_name)
     notes.extend(push_notes)
     return syms, notes
@@ -1689,9 +1637,9 @@ def run_qm_rank_and_push(
     exclude_symbols: Optional[Sequence[str]] = None,
 ) -> List[str]:
     """
-    观察池 Q/M+/M- 排名写 CSV；按 push_labels 推东财自选（先清空该组再写入）。
+    观察池 Q/M+/M- 排名写 CSV；形态建仓将 M+ TopN 作为参数调用独立成长因子并推「M加」。
     push_labels 默认全推；形态建仓定向可传 ("M+",) 不推 Q。
-    推送 M+ 前会将 TopN 交成长因子重排，打分失败则中止该组推送。
+    成长因子打分失败则中止该组东财推送。
     exclude_symbols：作废等代码，排名与推送均排除。
     """
     notes: List[str] = []
@@ -1755,7 +1703,38 @@ def run_qm_rank_and_push(
             else:
                 notes.append(f"已跳过「{group}」推送")
             continue
-        use_growth = label_key == "M+"
+        if label_key == "M+":
+            top_syms: List[str] = []
+            seen_top = set()
+            work = df if df is not None else pd.DataFrame()
+            if work is not None and not work.empty and "symbol" in work.columns:
+                banned = {_norm_symbol(x) for x in ban}
+                for raw in work["symbol"].tolist():
+                    s = _norm_symbol(raw)
+                    if len(s) != 6 or s in seen_top or s in banned:
+                        continue
+                    seen_top.add(s)
+                    top_syms.append(s)
+                    if len(top_syms) >= int(top_n):
+                        break
+            names_top = dict(name_map)
+            if work is not None and not work.empty and "stock_name" in work.columns:
+                for _, r in work.iterrows():
+                    s = _norm_symbol(r.get("symbol"))
+                    nm = str(r.get("stock_name") or "")
+                    if len(s) == 6 and nm:
+                        names_top[s] = nm
+            notes.append(
+                f"M+ 动量前{len(top_syms)} 只作为参数调用独立成长因子 →「{group}」"
+            )
+            _syms, pn = _call_growth_factor_push(
+                top_syms,
+                group_name=group,
+                out_csv=mplus_growth_out_csv,
+                name_map=names_top,
+            )
+            notes.extend(pn)
+            continue
         _syms, pn = push_rank_top_to_mx_group(
             df if df is not None else pd.DataFrame(),
             top_n=top_n,
@@ -1763,9 +1742,6 @@ def run_qm_rank_and_push(
             score_col=score_col,
             label=label,
             exclude_symbols=list(ban),
-            growth_rerank=use_growth,
-            growth_out_csv=mplus_growth_out_csv if use_growth else "",
-            name_map=name_map,
         )
         notes.extend(pn)
     return notes
@@ -2000,7 +1976,7 @@ def main() -> None:
         "--qm-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="东财「M加」推送只数（默认 13；成长因子重排后清空写入，打分失败则中止）",
+        help="交给独立成长因子的 M+ 动量只数（默认 13；打分失败则中止推送）",
     )
     args = parser.parse_args()
 
@@ -2139,7 +2115,7 @@ def main() -> None:
             top_n=int(args.qm_push_top_n),
             skip_push=bool(args.skip_qm_push),
             skip_fina=bool(args.skip_qm_fina),
-            # 只推 M加前13（成长因子重排后清空写入）；Q 由 2+3 步骤推；不推 M减
+            # M+ 动量前13 作为参数调用独立成长因子，推东财「M加」；Q 由 2+3 步骤调用成长因子
             push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
@@ -2181,7 +2157,7 @@ def main() -> None:
         for pn in value_notes:
             print(f"  {pn}")
     if qm_notes:
-        print("【M加】（前13经成长因子重排后推送；不推 Q / M减）")
+        print("【M加】（动量前13 调用独立成长因子后推送；不推 Q / M减）")
         for pn in qm_notes:
             print(f"  {pn}")
     if kelly_notes:
