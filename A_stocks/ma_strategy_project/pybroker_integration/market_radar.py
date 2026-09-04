@@ -56,10 +56,14 @@ _EM_HEADERS = {
     "Referer": "https://quote.eastmoney.com/",
     "Accept": "application/json,text/plain,*/*",
 }
-GROWTH_RANKING_CSV = _SCRIPT_DIR / "factor_growth_ranking.csv"
-GROWTH_GROUPS = ("M加", "Q", "量能")
+GROWTH_PICK_TABLES = (
+    ("M加", _SCRIPT_DIR / "pattern_entry_mplus_growth_rank.csv"),
+    ("Q", _SCRIPT_DIR / "vp_combo_23_q_growth_rank.csv"),
+)
+GROWTH_GROUPS = ("M加", "Q")
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q/量能 各前3"
+GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q 各前3"
+GROWTH_FILES_LABEL = "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv"
 
 
 class MarketRadarError(RuntimeError):
@@ -223,71 +227,108 @@ def get_tushare_bundle() -> tuple[Any, Any]:
     return ts, ts.pro_api()
 
 
+def _read_csv_flexible(path: Path) -> pd.DataFrame:
+    """utf-8-sig / utf-8 / gb18030 依次试读，避免 UTF-8 BOM 被当成 gbk 解码失败。"""
+    if not path.is_file():
+        return pd.DataFrame()
+    for enc in ("utf-8-sig", "utf-8", "gb18030", "gbk", "cp936"):
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            continue
+    return pd.DataFrame()
+
+
 def growth_ranking_mtime() -> str:
-    if GROWTH_RANKING_CSV.is_file():
-        return str(int(GROWTH_RANKING_CSV.stat().st_mtime))
+    times: list[int] = []
+    for _group, path in GROWTH_PICK_TABLES:
+        if path.is_file():
+            times.append(int(path.stat().st_mtime))
+    if times:
+        return str(max(times))
     return "missing"
 
 
-def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """工作流「按成长因子排序」产物：GROWTH_GROUPS 各组取前 N（组内去重，组间可重复）。"""
-    if not GROWTH_RANKING_CSV.is_file():
-        return [], "未找到 factor_growth_ranking.csv，请先运行工作流「按成长因子排序」。"
-    try:
-        df = pd.read_csv(GROWTH_RANKING_CSV, encoding="utf-8-sig")
-    except Exception:
-        df = pd.read_csv(GROWTH_RANKING_CSV, encoding="gbk")
+def _picks_from_growth_table(
+    path: Path,
+    group: str,
+    top_n: int,
+) -> list[dict[str, Any]]:
+    df = _read_csv_flexible(path)
     if df is None or df.empty:
-        return [], "成长因子排序表为空，请重新运行「按成长因子排序」。"
+        return []
     cols = {str(c).strip(): c for c in df.columns}
     group_col = cols.get("分组")
-    rank_col = cols.get("排名")
-    code_col = cols.get("股票代码") or cols.get("代码")
-    name_col = cols.get("股票名称") or cols.get("名称")
-    ind_col = cols.get("行业")
-    if group_col is None or code_col is None:
-        return [], "成长因子排序表缺少「分组」或「股票代码」列。"
+    rank_col = cols.get("排名") or cols.get("rank")
+    code_col = cols.get("股票代码") or cols.get("代码") or cols.get("symbol")
+    name_col = cols.get("股票名称") or cols.get("名称") or cols.get("stock_name")
+    ind_col = cols.get("行业") or cols.get("industry")
+    if code_col is None:
+        return []
+    work = df.copy()
+    if group_col is not None:
+        sub = work[work[group_col].astype(str).str.strip() == group]
+        if not sub.empty:
+            work = sub.copy()
+    if rank_col is not None:
+        work["_rank"] = pd.to_numeric(work[rank_col], errors="coerce")
+        work = work.sort_values("_rank", ascending=True, na_position="last")
+    picks: list[dict[str, Any]] = []
+    seen_in_group: set[str] = set()
+    for _, row in work.iterrows():
+        if len(picks) >= top_n:
+            break
+        sym = six_digit(row.get(code_col))
+        if not sym or sym in seen_in_group:
+            continue
+        seen_in_group.add(sym)
+        rank_val = row.get("_rank") if "_rank" in work.columns else None
+        try:
+            rank_n = int(rank_val) if rank_val is not None and rank_val == rank_val else len(picks) + 1
+        except (TypeError, ValueError):
+            rank_n = len(picks) + 1
+        picks.append(
+            {
+                "symbol": sym,
+                "name": str(row.get(name_col) or "").strip() if name_col else "",
+                "group": group,
+                "rank": rank_n,
+                "industry": str(row.get(ind_col) or "").strip() if ind_col else "",
+            }
+        )
+    return picks
 
+
+def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
+    """工作流「按成长因子排序」的 M加 / Q 表：各组取前 N（组内去重，组间可重复）。不含量能。"""
     picks: list[dict[str, Any]] = []
     missing_groups: list[str] = []
-    for group in GROWTH_GROUPS:
-        sub = df[df[group_col].astype(str).str.strip() == group]
-        if sub.empty:
+    empty_groups: list[str] = []
+    for group, path in GROWTH_PICK_TABLES:
+        if not path.is_file():
             missing_groups.append(group)
             continue
-        work = sub.copy()
-        if rank_col is not None:
-            work["_rank"] = pd.to_numeric(work[rank_col], errors="coerce")
-            work = work.sort_values("_rank", ascending=True, na_position="last")
-        taken = 0
-        seen_in_group: set[str] = set()
-        for _, row in work.iterrows():
-            if taken >= top_n:
-                break
-            sym = six_digit(row.get(code_col))
-            if not sym or sym in seen_in_group:
-                continue
-            seen_in_group.add(sym)
-            rank_val = row.get("_rank") if "_rank" in work.columns else None
-            try:
-                rank_n = int(rank_val) if rank_val is not None and rank_val == rank_val else taken + 1
-            except (TypeError, ValueError):
-                rank_n = taken + 1
-            picks.append(
-                {
-                    "symbol": sym,
-                    "name": str(row.get(name_col) or "").strip() if name_col else "",
-                    "group": group,
-                    "rank": rank_n,
-                    "industry": str(row.get(ind_col) or "").strip() if ind_col else "",
-                }
-            )
-            taken += 1
+        group_picks = _picks_from_growth_table(path, group, top_n)
+        if not group_picks:
+            empty_groups.append(group)
+            continue
+        picks.extend(group_picks)
     hint = None
     if not picks:
-        hint = "成长因子排序表中没有可用的 M加/Q/量能 标的。"
-    elif missing_groups:
-        hint = f"排序表缺少分组：{'、'.join(missing_groups)}"
+        if missing_groups and len(missing_groups) == len(GROWTH_PICK_TABLES):
+            hint = "未找到 M加/Q 成长排序表，请先运行工作流「按成长因子排序」。"
+        else:
+            hint = "M加/Q 成长排序表中没有可用标的，请重新运行「按成长因子排序」。"
+    else:
+        bits: list[str] = []
+        if missing_groups:
+            bits.append(f"缺少文件：{'、'.join(missing_groups)}")
+        if empty_groups:
+            bits.append(f"表为空：{'、'.join(empty_groups)}")
+        if bits:
+            hint = "；".join(bits)
     return picks, hint
 
 
@@ -295,7 +336,7 @@ def universe_payload(picks: list[dict[str, Any]], hint: str | None) -> dict[str,
     return {
         "source": "growth_factor",
         "label": GROWTH_UNIVERSE_LABEL,
-        "file": "factor_growth_ranking.csv",
+        "file": GROWTH_FILES_LABEL,
         "hint": hint,
         "count": len(picks),
         "picks": picks,

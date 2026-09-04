@@ -17,17 +17,23 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
+import time
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+# 工作流 PYTHONPATH 会把 pybroker_integration 放在前面，必须把 ma_strategy_project 顶到最前，
+# 否则 `import config` 会命中本目录的 config 包，读不到上级 config/settings.py。
+if _PROJECT_ROOT in sys.path:
+    sys.path.remove(_PROJECT_ROOT)
+sys.path.insert(0, _PROJECT_ROOT)
 
 YEARS = 6  # 拉取年数（含 5 年年报 + 1 年缓冲）
 
@@ -86,12 +92,41 @@ def _to_ts_code(code: str) -> str:
     return f"{code}.SH"
 
 
-def _get_tushare_token() -> str:
+def _token_from_settings_file(path: Path) -> str:
+    """按文件路径加载 DATA_CONFIG，避开 pybroker_integration/config 包遮挡。"""
+    if not path.is_file():
+        return ""
     try:
-        from config.settings import DATA_CONFIG
-        return (DATA_CONFIG or {}).get("tushare_token", "") or ""
+        spec = importlib.util.spec_from_file_location("_steady_quality_settings", path)
+        if spec is None or spec.loader is None:
+            return ""
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        cfg = getattr(mod, "DATA_CONFIG", None) or {}
+        return str(cfg.get("tushare_token") or "").strip()
     except Exception:
         return ""
+
+
+def _resolve_tushare_token() -> Tuple[str, str]:
+    env = (os.getenv("TUSHARE_TOKEN") or "").strip()
+    if env:
+        return env, "TUSHARE_TOKEN"
+    script_dir = Path(__file__).resolve().parent
+    candidates = (
+        (Path(_PROJECT_ROOT) / "config" / "settings.py", "ma_strategy_project/config/settings.py"),
+        (script_dir / "config" / "settings.py", "pybroker_integration/config/settings.py"),
+    )
+    for path, label in candidates:
+        tok = _token_from_settings_file(path)
+        if tok:
+            return tok, label
+    return "", "missing"
+
+
+def _get_tushare_token() -> str:
+    token, _src = _resolve_tushare_token()
+    return token
 
 
 def _year_end_only(s: pd.Series) -> pd.Series:
@@ -110,12 +145,101 @@ def _year_end_only(s: pd.Series) -> pd.Series:
     return s
 
 
+def _prepare_stmt(df: Optional[pd.DataFrame]) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if "end_date" not in out.columns:
+        return out
+    parsed = pd.to_datetime(out["end_date"], errors="coerce")
+    if parsed.isna().all():
+        parsed = pd.to_datetime(out["end_date"], format="%Y%m%d", errors="coerce")
+    out["end_date"] = parsed
+    out = out.dropna(subset=["end_date"])
+    subset = ["ts_code", "end_date"] if "ts_code" in out.columns else ["end_date"]
+    out = out.drop_duplicates(subset=subset, keep="first")
+    return out.sort_values("end_date", ascending=False)
+
+
 def _tushare_to_series(df: Optional[pd.DataFrame], col: str) -> pd.Series:
-    if df is None or df.empty or col not in df.columns:
+    work = _prepare_stmt(df)
+    if work.empty or col not in work.columns:
         return pd.Series(dtype=float)
-    s = df.set_index("end_date")[col].copy()
-    s = pd.to_numeric(s, errors="coerce").dropna().sort_index(ascending=False)
+    s = work.set_index("end_date")[col].copy()
+    s = pd.to_numeric(s, errors="coerce").dropna()
+    s = s[~s.index.duplicated(keep="first")].sort_index(ascending=False)
     return s
+
+
+def _call_with_fields(fetch_fn, field_sets: List[str], **kwargs):
+    """字段无权限时整表会空/抛错，从完整字段集回退到最小字段集。"""
+    last_err: Optional[Exception] = None
+    for fields in field_sets:
+        try:
+            df = fetch_fn(fields=fields, **kwargs)
+            if df is not None and not getattr(df, "empty", True):
+                return df
+        except Exception as exc:
+            last_err = exc
+            continue
+    if last_err and not field_sets:
+        raise last_err
+    return pd.DataFrame()
+
+
+_INCOME_FIELDS = [
+    "ts_code,end_date,revenue,oper_cost,n_income_attr_p,total_revenue,operate_profit,ebit,int_exp,fin_exp",
+    "ts_code,end_date,revenue,oper_cost,n_income_attr_p,operate_profit,fin_exp",
+    "ts_code,end_date,revenue,oper_cost,n_income_attr_p",
+]
+_BALANCE_FIELDS = [
+    "ts_code,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int,money_cap,trad_asset,st_borr,lt_borr,bond_payable,inventories",
+    "ts_code,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int,inventories",
+    "ts_code,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int",
+]
+_CASHFLOW_FIELDS = [
+    "ts_code,end_date,n_cashflow_act,c_pay_acq_const_fiolta,free_cashflow,net_profit",
+    "ts_code,end_date,n_cashflow_act,c_pay_acq_const_fiolta,net_profit",
+    "ts_code,end_date,n_cashflow_act,c_pay_acq_const_fiolta",
+]
+
+
+def _annual_periods(years: int) -> List[str]:
+    now = datetime.now()
+    # 当年年报尚未发布，VIP period=YYYY1231 会空；从最近已结束会计年度开始。
+    last_year = now.year if now.month >= 12 else now.year - 1
+    return [f"{y}1231" for y in range(last_year, last_year - years, -1)]
+
+
+def _raw_from_stmts(inc, bal, cf) -> Dict:
+    return {
+        "income": {
+            "revenue": _tushare_to_series(inc, "revenue"),
+            "cogs": _tushare_to_series(inc, "oper_cost"),
+            "net_income": _tushare_to_series(inc, "n_income_attr_p"),
+            "operate_profit": _tushare_to_series(inc, "operate_profit"),
+            "ebit": _tushare_to_series(inc, "ebit"),
+            "int_exp": _tushare_to_series(inc, "int_exp"),
+            "fin_exp": _tushare_to_series(inc, "fin_exp"),
+        },
+        "cashflow": {
+            "ocf": _tushare_to_series(cf, "n_cashflow_act"),
+            "capex": _tushare_to_series(cf, "c_pay_acq_const_fiolta"),
+            "free_cashflow": _tushare_to_series(cf, "free_cashflow"),
+            "net_profit": _tushare_to_series(cf, "net_profit"),
+        },
+        "balance": {
+            "total_assets": _tushare_to_series(bal, "total_assets"),
+            "total_liab": _tushare_to_series(bal, "total_liab"),
+            "equity": _tushare_to_series(bal, "total_hldr_eqy_exc_min_int"),
+            "money_cap": _tushare_to_series(bal, "money_cap"),
+            "trad_asset": _tushare_to_series(bal, "trad_asset"),
+            "st_borr": _tushare_to_series(bal, "st_borr"),
+            "lt_borr": _tushare_to_series(bal, "lt_borr"),
+            "bond_payable": _tushare_to_series(bal, "bond_payable"),
+            "inventories": _tushare_to_series(bal, "inventories"),
+        },
+    }
 
 
 def _linear_slope(y: np.ndarray) -> float:
@@ -139,14 +263,18 @@ def fetch_tushare_bulk(
     years: int = YEARS,
 ) -> Dict[str, Dict]:
     """拉取 Tushare 三表（扩展字段）+ 年报过滤，按 symbol 拆分。"""
-    token = _get_tushare_token()
+    token, token_src = _resolve_tushare_token()
     if not token:
+        print("  未找到 Tushare token：请检查 ma_strategy_project/config/settings.py 或环境变量 TUSHARE_TOKEN")
+        print("  （工作流 PYTHONPATH 会让 pybroker_integration/config 挡住 config.settings，已改为按文件路径读取）")
         return {}
+    print(f"  Tushare token 已配置（来源 {token_src}，长度 {len(token)}）")
     try:
         import tushare as ts
         ts.set_token(token)
         pro = ts.pro_api()
-    except Exception:
+    except Exception as exc:
+        print(f"  初始化 Tushare 失败: {exc}")
         return {}
 
     sym_to_ts: Dict[str, str] = {}
@@ -160,155 +288,84 @@ def fetch_tushare_bulk(
     if not sym_to_ts:
         return {}
     ts_set = set(sym_to_ts.values())
-    current_year = datetime.now().year
-    periods = [f"{y}1231" for y in range(current_year, current_year - years, -1)]
+    periods = _annual_periods(years)
+    now = datetime.now()
+    end_date = f"{now.year}1231"
+    start_date = f"{now.year - years}0101"
 
-    def _vip_concat(fetch_fn, name: str = ""):
+    def _vip_concat(api_fn, field_sets: List[str], name: str = ""):
         dfs: List[pd.DataFrame] = []
         for p in periods:
-            try:
-                df = fetch_fn(p)
-                if df is None or df.empty:
-                    continue
-                before = len(df)
-                df = df[df["ts_code"].isin(ts_set)].copy()
-                if not df.empty:
-                    dfs.append(df)
-            except Exception as e:
-                if name and not dfs:
-                    print(f"  [{name}] period={p} 调用异常: {e}")
+            df = _call_with_fields(api_fn, field_sets, period=p)
+            if df is None or df.empty:
                 continue
+            if "ts_code" not in df.columns:
+                continue
+            df = df[df["ts_code"].isin(ts_set)].copy()
+            if not df.empty:
+                dfs.append(df)
         if not dfs:
             return pd.DataFrame()
-        df_all = pd.concat(dfs, ignore_index=True)
-        if "end_date" in df_all.columns:
-            df_all["end_date"] = pd.to_datetime(df_all["end_date"], format="%Y%m%d", errors="coerce")
-            df_all = df_all.dropna(subset=["end_date"]).sort_values(["ts_code", "end_date"], ascending=False)
-        return df_all
+        return _prepare_stmt(pd.concat(dfs, ignore_index=True))
 
-    # 诊断：用第一个可用报告期试拉一次，区分「接口无数据」与「过滤后无数据」
-    _diag_period = periods[1] if len(periods) > 1 else periods[0]
+    diag_period = periods[0]
     try:
-        _diag = pro.income_vip(period=_diag_period, fields="ts_code,end_date,revenue")
-        if _diag is None or _diag.empty:
-            print(f"  诊断: income_vip(period={_diag_period}) 返回空（可能无 VIP 权限或该期未发布）")
+        diag = _call_with_fields(
+            pro.income_vip,
+            ["ts_code,end_date,revenue"],
+            period=diag_period,
+        )
+        if diag is None or diag.empty:
+            print(f"  诊断: income_vip(period={diag_period}) 返回空，将回退非 VIP 单只接口")
         else:
-            _in_ts = _diag[_diag["ts_code"].isin(ts_set)]
-            print(f"  诊断: income_vip(period={_diag_period}) 全市场 {len(_diag)} 行，股票池匹配 {len(_in_ts)} 行")
+            in_ts = diag[diag["ts_code"].isin(ts_set)] if "ts_code" in diag.columns else diag.iloc[0:0]
+            print(f"  诊断: income_vip(period={diag_period}) 全市场 {len(diag)} 行，股票池匹配 {len(in_ts)} 行")
     except Exception as e:
         print(f"  诊断: income_vip 调用异常: {e}")
 
-    # 使用与 quality_growth_financial 相同的最小字段集，保证 VIP 接口能返回数据；扩展字段缺失时指标为 NaN
-    income_all = _vip_concat(
-        lambda p: pro.income_vip(
-            period=p,
-            fields="ts_code,end_date,revenue,oper_cost,n_income_attr_p,total_revenue,operate_profit,ebit,int_exp,fin_exp",
-        ),
-        name="income_vip",
-    )
-    balance_all = _vip_concat(
-        lambda p: pro.balancesheet_vip(
-            period=p,
-            fields="ts_code,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int,money_cap,trad_asset,st_borr,lt_borr,bond_payable,inventories",
-        ),
-        name="balancesheet_vip",
-    )
-    cashflow_all = _vip_concat(
-        lambda p: pro.cashflow_vip(
-            period=p,
-            fields="ts_code,end_date,n_cashflow_act,c_pay_acq_const_fiolta,free_cashflow,net_profit",
-        ),
-        name="cashflow_vip",
-    )
-    if income_all.empty and balance_all.empty and cashflow_all.empty:
-        print("  Tushare VIP 三表均无数据，尝试按单只股票拉取（非 VIP 接口）...")
-        end_date = f"{current_year}1231"
-        start_date = f"{current_year - years}0101"
-        bulk_fallback: Dict[str, Dict] = {}
-        for i, (sym, ts_code) in enumerate(sym_to_ts.items()):
-            try:
-                inc = pro.income(ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
-                                 fields="ts_code,end_date,revenue,oper_cost,n_income_attr_p,operate_profit,ebit,int_exp,fin_exp")
-                bal = pro.balancesheet(ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
-                                       fields="ts_code,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int,money_cap,trad_asset,st_borr,lt_borr,bond_payable,inventories")
-                cf = pro.cashflow(ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
-                                  fields="ts_code,end_date,n_cashflow_act,c_pay_acq_const_fiolta,free_cashflow,net_profit")
-            except Exception:
-                continue
-            if (inc is None or inc.empty) and (bal is None or bal.empty):
-                continue
-            raw = {
-                "income": {
-                    "revenue": _tushare_to_series(inc, "revenue"),
-                    "cogs": _tushare_to_series(inc, "oper_cost"),
-                    "net_income": _tushare_to_series(inc, "n_income_attr_p"),
-                    "operate_profit": _tushare_to_series(inc, "operate_profit"),
-                    "ebit": _tushare_to_series(inc, "ebit"),
-                    "int_exp": _tushare_to_series(inc, "int_exp"),
-                    "fin_exp": _tushare_to_series(inc, "fin_exp"),
-                },
-                "cashflow": {
-                    "ocf": _tushare_to_series(cf, "n_cashflow_act"),
-                    "capex": _tushare_to_series(cf, "c_pay_acq_const_fiolta"),
-                    "free_cashflow": _tushare_to_series(cf, "free_cashflow"),
-                    "net_profit": _tushare_to_series(cf, "net_profit"),
-                },
-                "balance": {
-                    "total_assets": _tushare_to_series(bal, "total_assets"),
-                    "total_liab": _tushare_to_series(bal, "total_liab"),
-                    "equity": _tushare_to_series(bal, "total_hldr_eqy_exc_min_int"),
-                    "money_cap": _tushare_to_series(bal, "money_cap"),
-                    "trad_asset": _tushare_to_series(bal, "trad_asset"),
-                    "st_borr": _tushare_to_series(bal, "st_borr"),
-                    "lt_borr": _tushare_to_series(bal, "lt_borr"),
-                    "bond_payable": _tushare_to_series(bal, "bond_payable"),
-                    "inventories": _tushare_to_series(bal, "inventories"),
-                },
-            }
-            bulk_fallback[sym] = raw
-            if (i + 1) % 10 == 0:
-                print(f"    已拉取 {i + 1}/{len(sym_to_ts)} 只...")
-        if not bulk_fallback:
-            print("  按单只拉取仍无数据，请检查 Tushare token 或网络")
-            return {}
-        print(f"  按单只拉取成功 {len(bulk_fallback)} 只")
-        return bulk_fallback
+    income_all = _vip_concat(pro.income_vip, _INCOME_FIELDS, "income_vip")
+    balance_all = _vip_concat(pro.balancesheet_vip, _BALANCE_FIELDS, "balancesheet_vip")
+    cashflow_all = _vip_concat(pro.cashflow_vip, _CASHFLOW_FIELDS, "cashflow_vip")
 
     bulk: Dict[str, Dict] = {}
-    for sym, ts_code in sym_to_ts.items():
-        inc_sym = income_all[income_all["ts_code"] == ts_code] if not income_all.empty else pd.DataFrame()
-        bal_sym = balance_all[balance_all["ts_code"] == ts_code] if not balance_all.empty else pd.DataFrame()
-        cf_sym = cashflow_all[cashflow_all["ts_code"] == ts_code] if not cashflow_all.empty else pd.DataFrame()
-        raw = {
-            "income": {
-                "revenue": _tushare_to_series(inc_sym, "revenue"),
-                "cogs": _tushare_to_series(inc_sym, "oper_cost"),
-                "net_income": _tushare_to_series(inc_sym, "n_income_attr_p"),
-                "operate_profit": _tushare_to_series(inc_sym, "operate_profit"),
-                "ebit": _tushare_to_series(inc_sym, "ebit"),
-                "int_exp": _tushare_to_series(inc_sym, "int_exp"),
-                "fin_exp": _tushare_to_series(inc_sym, "fin_exp"),
-            },
-            "cashflow": {
-                "ocf": _tushare_to_series(cf_sym, "n_cashflow_act"),
-                "capex": _tushare_to_series(cf_sym, "c_pay_acq_const_fiolta"),
-                "free_cashflow": _tushare_to_series(cf_sym, "free_cashflow"),
-                "net_profit": _tushare_to_series(cf_sym, "net_profit"),
-            },
-            "balance": {
-                "total_assets": _tushare_to_series(bal_sym, "total_assets"),
-                "total_liab": _tushare_to_series(bal_sym, "total_liab"),
-                "equity": _tushare_to_series(bal_sym, "total_hldr_eqy_exc_min_int"),
-                "money_cap": _tushare_to_series(bal_sym, "money_cap"),
-                "trad_asset": _tushare_to_series(bal_sym, "trad_asset"),
-                "st_borr": _tushare_to_series(bal_sym, "st_borr"),
-                "lt_borr": _tushare_to_series(bal_sym, "lt_borr"),
-                "bond_payable": _tushare_to_series(bal_sym, "bond_payable"),
-                "inventories": _tushare_to_series(bal_sym, "inventories"),
-            },
-        }
-        bulk[sym] = raw
-    return bulk
+    if not (income_all.empty and balance_all.empty and cashflow_all.empty):
+        for sym, ts_code in sym_to_ts.items():
+            inc_sym = income_all[income_all["ts_code"] == ts_code] if not income_all.empty else pd.DataFrame()
+            bal_sym = balance_all[balance_all["ts_code"] == ts_code] if not balance_all.empty else pd.DataFrame()
+            cf_sym = cashflow_all[cashflow_all["ts_code"] == ts_code] if not cashflow_all.empty else pd.DataFrame()
+            bulk[sym] = _raw_from_stmts(inc_sym, bal_sym, cf_sym)
+        n_ok = sum(1 for raw in bulk.values() if not raw["income"]["revenue"].empty)
+        print(f"  VIP 三表拆分完成，收入序列非空 {n_ok}/{len(bulk)} 只")
+        if n_ok > 0:
+            return bulk
+
+    print("  Tushare VIP 三表不可用或股票池未匹配，尝试按单只拉取（非 VIP 接口）...")
+    bulk_fallback: Dict[str, Dict] = {}
+    for i, (sym, ts_code) in enumerate(sym_to_ts.items()):
+        inc = _call_with_fields(
+            pro.income, list(reversed(_INCOME_FIELDS)),
+            ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
+        )
+        bal = _call_with_fields(
+            pro.balancesheet, list(reversed(_BALANCE_FIELDS)),
+            ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
+        )
+        cf = _call_with_fields(
+            pro.cashflow, list(reversed(_CASHFLOW_FIELDS)),
+            ts_code=ts_code, start_date=start_date, end_date=end_date, report_type="1",
+        )
+        if (inc is None or inc.empty) and (bal is None or bal.empty):
+            time.sleep(0.12)
+            continue
+        bulk_fallback[sym] = _raw_from_stmts(inc, bal, cf)
+        if (i + 1) % 10 == 0:
+            print(f"    已拉取 {i + 1}/{len(sym_to_ts)} 只...")
+        time.sleep(0.12)
+    if not bulk_fallback:
+        print("  按单只拉取仍无数据，请检查 Tushare token、积分权限或网络")
+        return {}
+    print(f"  按单只拉取成功 {len(bulk_fallback)} 只")
+    return bulk_fallback
 
 
 def get_industry_and_gross_margin_by_symbol(

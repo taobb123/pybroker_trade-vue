@@ -308,12 +308,16 @@ import pandas as pd
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from datetime import datetime, timedelta
 
-# 添加项目根目录到路径
+# 添加项目根目录到路径（必须顶到最前，避免 pybroker_integration/config 挡住 config.settings）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+if PROJECT_ROOT in sys.path:
+    sys.path.remove(PROJECT_ROOT)
+sys.path.insert(0, PROJECT_ROOT)
 
-from pybroker_integration.steady_quality_financial import build_steady_quality_scores
+from pybroker_integration.steady_quality_financial import (
+    build_steady_quality_scores,
+    _get_tushare_token as _growth_tushare_token,
+)
 from pybroker_integration.mx_self_select import (
     DEFAULT_MX_GROUPS_DIR,
     group_txt_path,
@@ -380,7 +384,7 @@ def execute_quality_strategy(ctx: Any):
                 ctx.buy_shares = ctx.calc_target_shares(weight)
                 ctx.score = factor_scores.get(ctx.symbol, 0.0)
     except Exception as e:
-        print(f"⚠ 警告: {ctx.symbol} 策略执行异常: {e}")
+        print(f"[warn] 警告: {ctx.symbol} 策略执行异常: {e}")
 
 
 def load_stock_pool(file_path: str) -> List[str]:
@@ -390,7 +394,7 @@ def load_stock_pool(file_path: str) -> List[str]:
             symbols = [s.strip() for s in content.replace('\n', ' ').split() if s.strip()]
             return symbols
     except Exception as e:
-        print(f"✗ 加载股票池失败: {e}")
+        print(f"[fail] 加载股票池失败: {e}")
         return []
 
 
@@ -398,8 +402,7 @@ def get_stock_names(symbols: List[str]) -> Dict[str, str]:
     """使用 Tushare Pro stock_basic 批量获取股票名称，返回 {代码: 名称}。"""
     result = {s: s for s in symbols}
     try:
-        from config.settings import DATA_CONFIG
-        token = (DATA_CONFIG or {}).get("tushare_token", "") or ""
+        token = _growth_tushare_token()
         if not token:
             return result
         import tushare as ts
@@ -422,7 +425,7 @@ def get_stock_names(symbols: List[str]) -> Dict[str, str]:
             else:
                 result[sym] = code_to_name.get(sym, sym)
     except Exception as e:
-        print(f"⚠ 获取股票名称失败: {e}，将使用代码显示")
+        print(f"[warn] 获取股票名称失败: {e}，将使用代码显示")
     return result
 
 
@@ -430,8 +433,7 @@ def get_stock_industries(symbols: List[str]) -> Dict[str, str]:
     """使用 Tushare Pro stock_basic 批量获取股票行业信息，返回 {代码: 行业名称}。"""
     result = {s: "" for s in symbols}
     try:
-        from config.settings import DATA_CONFIG
-        token = (DATA_CONFIG or {}).get("tushare_token", "") or ""
+        token = _growth_tushare_token()
         if not token:
             return result
         import tushare as ts
@@ -464,7 +466,7 @@ def get_stock_industries(symbols: List[str]) -> Dict[str, str]:
             else:
                 result[sym] = code_to_industry.get(sym, "")
     except Exception as e:
-        print(f"⚠ 获取股票行业失败: {e}，将返回空行业字段")
+        print(f"[warn] 获取股票行业失败: {e}，将返回空行业字段")
     return result
 
 
@@ -532,9 +534,9 @@ def _save_ranking_csv(rows: List[dict], ranking_file: str) -> None:
     ranking_df.to_csv(tmp_file, index=False, encoding="utf-8-sig")
     try:
         os.replace(tmp_file, ranking_file)
-        print(f"✓ 排名已保存: {ranking_file}")
+        print(f"[ok] 排名已保存: {ranking_file}")
     except OSError:
-        print(f"✓ 排名已写入: {tmp_file}")
+        print(f"[ok] 排名已写入: {tmp_file}")
         print(
             f"  若 {os.path.basename(ranking_file)} 被其他程序打开，请关闭后手动将 .tmp 重命名为该文件。"
         )
@@ -593,11 +595,11 @@ def write_growth_rank_csv(
         try:
             names.update(get_stock_names(missing))
         except Exception as exc:
-            print(f"⚠ 成长因子补名称失败: {exc}")
+            print(f"[warn] 成长因子补名称失败: {exc}")
     try:
         industries = get_stock_industries(list(ranked))
     except Exception as exc:
-        print(f"⚠ 成长因子补行业失败: {exc}")
+        print(f"[warn] 成长因子补行业失败: {exc}")
         industries = {s: "" for s in ranked}
     rows = _ranking_rows(group_name, ranked, details, names, industries)
     _save_ranking_csv(rows, out)
@@ -643,14 +645,22 @@ def parse_symbols_arg(raw: str) -> List[str]:
     return out
 
 
+def _read_csv_flexible(path: str) -> pd.DataFrame:
+    for enc in ("utf-8-sig", "utf-8", "gb18030", "gbk", "cp936"):
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            continue
+    return pd.DataFrame()
+
+
 def top_symbols_from_rank_csv(path: str, top_n: int = GROWTH_TOP_N_DEFAULT) -> List[str]:
     p = os.path.abspath(path)
     if not os.path.isfile(p):
         return []
-    try:
-        df = pd.read_csv(p, encoding="utf-8-sig")
-    except Exception:
-        return []
+    df = _read_csv_flexible(p)
     if df is None or df.empty or "symbol" not in df.columns:
         return []
     n = max(1, int(top_n))
@@ -767,7 +777,7 @@ def run_from_upstream_top13(
         try:
             _save_ranking_csv(all_rows, combined)
         except Exception as save_err:
-            print(f"⚠ 保存合并成长表失败: {save_err}")
+            print(f"[warn] 保存合并成长表失败: {save_err}")
     else:
         _save_ranking_csv([], combined)
         print("成长表为空（上游前13均不可用或打分失败）")
@@ -796,7 +806,7 @@ def run_mx_group_growth_rank(
     print(f"名单目录: {groups_dir}")
     print("=" * 80)
     if not wanted:
-        print("✗ 未指定分组")
+        print("[fail] 未指定分组")
         return 2
 
     all_rows: List[dict] = []
@@ -828,7 +838,7 @@ def run_mx_group_growth_rank(
         try:
             _save_ranking_csv(all_rows, ranking_file)
         except Exception as save_err:
-            print(f"⚠ 保存排名失败: {save_err}")
+            print(f"[warn] 保存排名失败: {save_err}")
     else:
         _save_ranking_csv([], ranking_file)
         print("成长表为空（各分组均无代码）")
@@ -894,7 +904,7 @@ def main():
 
     if symbols or group:
         if not symbols or not group:
-            print("✗ 指定 --symbols 时必须同时给 --group（M加 或 Q）")
+            print("[fail] 指定 --symbols 时必须同时给 --group（M加 或 Q）")
             raise SystemExit(2)
         ranked, notes, _details = rank_and_push_symbols(
             symbols,
@@ -908,7 +918,7 @@ def main():
 
     if not bool(args.backtest):
         if str(args.from_mx_groups or "").strip():
-            print("⚠ --from-mx-groups 已停用（量能已退出）。改走上游 M+/Q 前13。")
+            print("[warn] --from-mx-groups 已停用（量能已退出）。改走上游 M+/Q 前13。")
         raise SystemExit(
             run_from_upstream_top13(
                 top_n=int(args.top_n),
@@ -926,10 +936,10 @@ def main():
     symbols = load_stock_pool(stock_pool_file)
 
     if not symbols:
-        print("✗ 股票池为空，无法继续")
+        print("[fail] 股票池为空，无法继续")
         return
 
-    print(f"✓ 股票池加载成功: {len(symbols)} 只股票")
+    print(f"[ok] 股票池加载成功: {len(symbols)} 只股票")
     print(f"  股票列表: {', '.join(symbols[:10])}{'...' if len(symbols) > 10 else ''}")
 
     top_n = 10
@@ -960,10 +970,10 @@ def main():
     factor_scores = pyb.param('factor_scores') or {}
 
     if not target_symbols:
-        print("✗ 未能得到有效的前 10% 股票（财务数据可能全部失败），退出")
+        print("[fail] 未能得到有效的前 10% 股票（财务数据可能全部失败），退出")
         return
 
-    print(f"\n✓ 稳健高质量前 10% 共 {len(top_10_pct)} 只，实际持仓前 {len(target_symbols)} 只")
+    print(f"\n[ok] 稳健高质量前 10% 共 {len(top_10_pct)} 只，实际持仓前 {len(target_symbols)} 只")
 
     config = StrategyConfig(max_long_positions=top_n, initial_cash=initial_cash)
     data_source = create_custom_data_source()
@@ -985,7 +995,7 @@ def main():
     try:
         result = strategy.backtest(warmup=1)
         elapsed = time.time() - start_time
-        print(f"\n✓ 回测完成！耗时: {elapsed:.2f} 秒")
+        print(f"\n[ok] 回测完成！耗时: {elapsed:.2f} 秒")
 
         if hasattr(result, 'metrics_df') and result.metrics_df is not None:
             print("\n策略表现指标:")
@@ -1020,7 +1030,7 @@ def main():
         if hasattr(result, 'trades') and result.trades is not None and not result.trades.empty:
             csv_file = os.path.join(script_dir, 'factor_growth_trades.csv')
             result.trades.to_csv(csv_file, index=False, encoding='utf-8-sig')
-            print(f"\n✓ 交易记录已保存: {csv_file}")
+            print(f"\n[ok] 交易记录已保存: {csv_file}")
 
         if factor_details and factor_scores:
             ranking_data = []
@@ -1048,20 +1058,20 @@ def main():
                 ranking_df.to_csv(tmp_file, index=False, encoding='utf-8-sig')
                 try:
                     os.replace(tmp_file, ranking_file)
-                    print(f"✓ 排名已保存: {ranking_file}")
+                    print(f"[ok] 排名已保存: {ranking_file}")
                 except OSError:
                     # 原文件被占用（如 Excel 打开）时替换失败，保留 .tmp 并提示
-                    print(f"✓ 排名已写入: {tmp_file}")
+                    print(f"[ok] 排名已写入: {tmp_file}")
                     print(f"  若 {os.path.basename(ranking_file)} 被其他程序打开，请关闭后手动将 .tmp 重命名为该文件。")
             except Exception as save_err:
-                print(f"⚠ 保存排名失败: {save_err}")
+                print(f"[warn] 保存排名失败: {save_err}")
 
         print("\n" + "=" * 80)
         print("策略执行完成")
         print("=" * 80)
 
     except Exception as e:
-        print(f"\n✗ 回测错误: {e}")
+        print(f"\n[fail] 回测错误: {e}")
         import traceback
         traceback.print_exc()
         raise
