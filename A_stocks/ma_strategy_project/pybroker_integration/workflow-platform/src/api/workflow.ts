@@ -166,6 +166,7 @@ const MOCK_STEPS: WorkflowStep[] = [
       { path: 'pattern_entry_valuation_rank.csv', label: '观察池估值排名表' },
       { path: 'pattern_entry_q_rank.csv', label: '观察池Q排名表' },
       { path: 'pattern_entry_mplus_rank.csv', label: '观察池M+排名表' },
+      { path: 'pattern_entry_mplus_growth_rank.csv', label: 'M+前13成长因子重排（推送东财）' },
       { path: 'pattern_entry_mminus_rank.csv', label: '观察池M-排名表' },
     ],
   }),

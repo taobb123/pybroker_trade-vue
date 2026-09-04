@@ -10,7 +10,8 @@
      —— 可 --skip-backtest 暂时关掉，以加快链式运行
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
-  5) 定向推送：只推东财「Q」观察池排名前13（先清空该组再写入）；
+  5) 定向推送：Q 观察池排名前13经成长因子重排后推东财「Q」
+     （先清空该组再写入；打分失败则中止推送）；
      不推估值因子 / 23M减
   6) 半凯利仍取 Q 排名 Top2，不跟推送名单
 
@@ -62,6 +63,7 @@ MMINUS_TOP_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_mminus_top.csv")
 KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_kelly_positions.csv")
 VALUE_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_valuation_rank.csv")
 Q_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_rank.csv")
+Q_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_growth_rank.csv")
 MX_MMINUS_GROUP = "23M减"
 MX_VALUE_GROUP = "估值因子"
 MX_Q_GROUP = "Q"
@@ -139,7 +141,8 @@ def push_combo23_value_and_q(
     skip_fina: bool = False,
 ) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
-    2+3 池：写估值/Q 排名表；默认只推「Q」前 push_top_n（清空后写入），
+    2+3 池：写估值/Q 排名表；默认只推「Q」前 push_top_n
+    （先经成长因子重排，打分失败则中止推送；清空后写入），
     不推「估值因子」。返回 (推送记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
     """
     from fetch_pattern_entry import (  # noqa: WPS433
@@ -214,10 +217,14 @@ def push_combo23_value_and_q(
             group_name=MX_Q_GROUP,
             score_col="company_q",
             label="Q",
+            growth_rerank=True,
+            growth_out_csv=Q_GROWTH_CSV,
+            name_map=name_map,
         )
         notes.extend(pn)
-        pushed[MX_Q_GROUP] = list(syms) if syms else q_top
-        records.append({"group": MX_Q_GROUP, "symbols": list(pushed[MX_Q_GROUP])})
+        pushed[MX_Q_GROUP] = list(syms)
+        if syms:
+            records.append({"group": MX_Q_GROUP, "symbols": list(syms)})
 
     mminus_df = ranked_map.get("M-") if isinstance(ranked_map, dict) else None
     if mminus_df is None:
@@ -505,7 +512,7 @@ def write_compare_report(
             "- 原步骤「量价六组合」仍只导出/归档 4+6；本步骤单独导出 2+3。",
             "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
             "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
-            f"- 定向推送：只推「Q」前{MX_PUSH_TOP_N_DEFAULT}（先清空该组再写入）；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
+            f"- 定向推送：Q 前{MX_PUSH_TOP_N_DEFAULT} 经成长因子重排后写入「Q」（打分失败则中止推送）；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
             "- 半凯利取 Q 排名 Top2，不跟东财推送名单。",
             "",
         ]
@@ -550,7 +557,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--mx-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="东财「Q」推送只数（默认 13；先清空该组再写入）",
+        help="东财「Q」推送只数（默认 13；成长因子重排后清空写入，打分失败则中止）",
     )
     p.add_argument(
         "--kelly-top-n",
@@ -660,7 +667,7 @@ def main(argv=None) -> int:
             "# 仅多头年化对比（已暂时跳过回测）\n\n"
             f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
-            "- 仍导出 2+3 观察池，并推送东财自选「Q」前13（先清空该组再写入；不推估值因子 / 23M减）。\n"
+            "- 仍导出 2+3 观察池，并将 Q 前13 经成长因子重排后推东财「Q」（先清空该组再写入；打分失败则中止推送；不推估值因子 / 23M减）。\n"
             "- 半凯利取 Q 排名 Top2，不跟推送名单。\n"
             "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
         )

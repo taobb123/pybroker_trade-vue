@@ -532,6 +532,70 @@ def _save_ranking_csv(rows: List[dict], ranking_file: str) -> None:
         )
 
 
+class GrowthRankError(RuntimeError):
+    """成长因子打分失败；形态建仓 / 回测对比应中止东财推送。"""
+
+
+def rank_symbols_by_growth(
+    symbols: Sequence[str],
+) -> Tuple[List[str], Dict[str, Dict], Dict[str, float]]:
+    """
+    对给定代码按成长因子排序（财务不足的票排末尾）。
+    无有效代码、接口异常、或全部无财务分时抛 GrowthRankError。
+    """
+    uniq: List[str] = []
+    seen = set()
+    for raw in symbols:
+        s = "".join(ch for ch in str(raw) if ch.isdigit()).zfill(6)
+        if len(s) != 6 or s in seen:
+            continue
+        seen.add(s)
+        uniq.append(s)
+    if not uniq:
+        raise GrowthRankError("无有效 6 位代码")
+    try:
+        ranked, details, scores = _rank_symbols_keep_all(uniq)
+    except GrowthRankError:
+        raise
+    except Exception as exc:
+        raise GrowthRankError(f"打分异常: {exc}") from exc
+    if not ranked:
+        raise GrowthRankError("排序结果为空")
+    scored = [s for s, sc in scores.items() if sc is not None and sc == sc]
+    if not scored:
+        raise GrowthRankError("财务数据全部缺失或无效")
+    return ranked, details or {}, scores
+
+
+def write_growth_rank_csv(
+    group_name: str,
+    ranked: Sequence[str],
+    details: Dict[str, Dict],
+    path: str,
+    name_map: Optional[Dict[str, str]] = None,
+) -> str:
+    """写出成长因子重排表，供工作流「报告」查看。"""
+    out = os.path.abspath(path)
+    ddir = os.path.dirname(out)
+    if ddir:
+        os.makedirs(ddir, exist_ok=True)
+    names = dict(name_map or {})
+    missing = [s for s in ranked if not str(names.get(s) or "").strip()]
+    if missing:
+        try:
+            names.update(get_stock_names(missing))
+        except Exception as exc:
+            print(f"⚠ 成长因子补名称失败: {exc}")
+    try:
+        industries = get_stock_industries(list(ranked))
+    except Exception as exc:
+        print(f"⚠ 成长因子补行业失败: {exc}")
+        industries = {s: "" for s in ranked}
+    rows = _ranking_rows(group_name, ranked, details, names, industries)
+    _save_ranking_csv(rows, out)
+    return out
+
+
 def run_mx_group_growth_rank(
     group_names: Sequence[str],
     *,
