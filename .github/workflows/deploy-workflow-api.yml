@@ -40,10 +40,45 @@ jobs:
               echo "ERROR: 服务器尚未 git clone。请先按部署文档初始化。"
               exit 1
             fi
+            SRC="$REPO_DIR/A_stocks/ma_strategy_project/pybroker_integration"
+            PRESERVE_DIR="${TMPDIR:-/tmp}/pybroker-runtime-preserve"
+            mkdir -p "$PRESERVE_DIR"
+            rm -f "$PRESERVE_DIR/runtime.tgz"
+            if [ -d "$SRC" ]; then
+              (
+                cd "$SRC"
+                shopt -s nullglob
+                items=(
+                  vp_combo_watch_*.csv
+                  vp_six_combo_scan.csv
+                  dc_concept_ma5_scan.csv
+                  dc_concept_ma5_members.csv
+                  pattern_entry_*.csv
+                  vp_combo_23_*.csv
+                  vp_combo_23_vs_46_long_annual.md
+                  stocks_pool.txt
+                  config/fetch_vp_six_combo_symbols.txt
+                  config/fetch_pattern_entry_symbols.txt
+                  config/fetch_pattern_entry_symbols_*.txt
+                )
+                [ -d market_neutral/archive/watch_pool ] && items+=(market_neutral/archive/watch_pool)
+                [ -d market_neutral/output/latest ] && items+=(market_neutral/output/latest)
+                [ -d market_neutral/output/combo23_latest ] && items+=(market_neutral/output/combo23_latest)
+                if [ "${#items[@]}" -gt 0 ]; then
+                  tar czf "$PRESERVE_DIR/runtime.tgz" "${items[@]}"
+                  echo "runtime backup: ${#items[@]} paths"
+                fi
+              )
+            fi
             cd "$REPO_DIR"
             git fetch origin main
             git checkout main
             git reset --hard origin/main
+            if [ -f "$PRESERVE_DIR/runtime.tgz" ]; then
+              mkdir -p "$SRC"
+              tar xzf "$PRESERVE_DIR/runtime.tgz" -C "$SRC"
+              echo "runtime restore → $SRC"
+            fi
             SYNC="$REPO_DIR/A_stocks/ma_strategy_project/pybroker_integration/scripts/sync_workflow_api_on_server.sh"
             chmod +x "$SYNC"
             bash "$SYNC"

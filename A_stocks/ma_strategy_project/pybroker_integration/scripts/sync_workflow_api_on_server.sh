@@ -13,6 +13,12 @@ if [[ ! -d "$REPO_DIR/.git" ]]; then
   exit 1
 fi
 
+_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$_HERE/preserve_runtime_outputs.sh"
+PRESERVE_DIR="${TMPDIR:-/tmp}/pybroker-runtime-preserve"
+runtime_backup "$SRC" "$PRESERVE_DIR"
+
 cd "$REPO_DIR"
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
@@ -22,6 +28,8 @@ if [[ ! -d "$SRC" ]]; then
   echo "ERROR: 缺少目录 $SRC"
   exit 1
 fi
+
+runtime_restore "$SRC" "$PRESERVE_DIR"
 
 # 迁移旧精简部署的 SQLite（仅首次）
 if [[ -d "$OLD_APP_DIR/.pybrokercache" && ! -d "$SRC/.pybrokercache" ]]; then

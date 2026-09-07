@@ -4,3 +4,16 @@ config/mx_apikey.txt
 .env
 .env.*
 .cache/
+
+# 工作流运行产物（香港机网站现读这些文件；入库会被部署 reset 覆盖）
+vp_combo_watch_*.csv
+vp_six_combo_scan.csv
+dc_concept_ma5_scan.csv
+dc_concept_ma5_members.csv
+pattern_entry_*.csv
+vp_combo_23_*.csv
+vp_combo_23_vs_46_long_annual.md
+stocks_pool.txt
+config/fetch_vp_six_combo_symbols.txt
+config/fetch_pattern_entry_symbols.txt
+config/fetch_pattern_entry_symbols_*.txt

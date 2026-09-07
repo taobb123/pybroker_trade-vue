@@ -41,7 +41,7 @@ _active_proc: subprocess.Popen[bytes] | None = None
 import yaml
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -507,6 +507,14 @@ class WorkspaceFilePut(BaseModel):
     content: str
 
 
+def _no_store_json(payload: dict, status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        payload,
+        status_code=status_code,
+        headers={"Cache-Control": "no-store, must-revalidate"},
+    )
+
+
 @app.get("/api/workspace/file")
 def api_workspace_file(path: str):
     cfg = load_config()
@@ -515,9 +523,9 @@ def api_workspace_file(path: str):
     except HTTPException:
         raise
     if not p.is_file():
-        return {"exists": False, "content": ""}
+        return _no_store_json({"exists": False, "content": ""})
     try:
-        return {"exists": True, "content": _read_text_file(p)}
+        return _no_store_json({"exists": True, "content": _read_text_file(p)})
     except OSError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -548,7 +556,7 @@ def api_workspace_table(path: str, max_rows: int = _TABLE_PREVIEW_MAX):
     suf = p.suffix.lower()
     if suf in (".xlsx", ".xls"):
         if not p.is_file():
-            return {
+            return _no_store_json({
                 "exists": False,
                 "path": path_key,
                 "headers": [],
@@ -556,8 +564,8 @@ def api_workspace_table(path: str, max_rows: int = _TABLE_PREVIEW_MAX):
                 "truncated": False,
                 "preview_unsupported": True,
                 "preview_note": "Excel 文件请在本地打开；网页内仅预览 .csv / .tsv。",
-            }
-        return {
+            })
+        return _no_store_json({
             "exists": True,
             "path": path_key,
             "headers": [],
@@ -565,7 +573,7 @@ def api_workspace_table(path: str, max_rows: int = _TABLE_PREVIEW_MAX):
             "truncated": False,
             "preview_unsupported": True,
             "preview_note": "Excel 文件请在本地用 WPS/Excel 打开；网页内仅预览 .csv / .tsv。",
-        }
+        })
     if suf in _IMAGE_SUFFIX or suf in (".md", ".markdown", ".txt"):
         # 兼容旧前端误调 table：返回可识别字段，避免裸 HTTP 400
         if suf in (".md", ".markdown"):
@@ -577,7 +585,7 @@ def api_workspace_table(path: str, max_rows: int = _TABLE_PREVIEW_MAX):
         else:
             kind = "image"
             note = "图片请用图形预览打开。"
-        return {
+        return _no_store_json({
             "exists": p.is_file(),
             "path": path_key,
             "headers": [],
@@ -586,29 +594,29 @@ def api_workspace_table(path: str, max_rows: int = _TABLE_PREVIEW_MAX):
             "preview_unsupported": True,
             "preview_kind": kind,
             "preview_note": note,
-        }
+        })
     if suf not in _TABULAR_SUFFIX:
         raise HTTPException(
             status_code=400,
             detail="仅支持 .csv / .tsv 表格预览；另支持图片、.md 文档与 .txt 文本预览",
         )
     if not p.is_file():
-        return {
+        return _no_store_json({
             "exists": False,
             "path": path_key,
             "headers": [],
             "rows": [],
             "truncated": False,
-        }
+        })
     try:
         headers, rows, truncated = _parse_tabular(p, max_rows)
-        return {
+        return _no_store_json({
             "exists": True,
             "path": path_key,
             "headers": headers,
             "rows": rows,
             "truncated": truncated,
-        }
+        })
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"无法解析表格: {e}") from e
 
