@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-量价六组合分类（Phase2 五维共振）——接在「沿 MA5 多头扫描」之后。
+量价六组合分类（Phase2 五维共振）。与「沿 MA5 多头扫描」相互独立，不读取其扫描表。
 
-输入：默认取 ma5_trend_scan.csv 中 in_trend / signal 为真的命中股；
-也可通过 --symbols 或 --pool 自定义列表覆盖。
+输入：--symbols，或非空自定义列表；二者皆空时用 stocks_pool.txt。
+仅当显式传入 --ma5-csv 时，才改用该表中的命中股。
 输出：每票一个主标签，对应 docs/量价五维共振模型.md 第十二节六种组合：
 
   1 底部+缩量
@@ -19,13 +19,12 @@ Phase1 位置×量能定主标签；Phase2 换手+筹码修正匹配度、有限
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_vp_six_combo.py
-    python pybroker_integration/fetch_vp_six_combo.py --ma5-csv pybroker_integration/ma5_trend_scan.csv
     python pybroker_integration/fetch_vp_six_combo.py --symbols 002821,600519
     python pybroker_integration/fetch_vp_six_combo.py --diagnose
     python pybroker_integration/fetch_vp_six_combo.py --phase1-only
     python pybroker_integration/fetch_vp_six_combo.py --skip-chips
 
-股票列表优先级：--symbols > 非空 --pool 自定义列表 > MA5 扫描命中股。
+股票列表优先级：--symbols > 非空 --pool 自定义列表 > 显式 --ma5-csv > stocks_pool.txt。
 
 下游形态建仓：按 watch_combo_ids（默认 4、6）滚动合并 vp_combo_watch_{id}.csv
 （最多 6 个交易日、同票只留最新）与 config/fetch_pattern_entry_symbols*.txt；
@@ -64,7 +63,7 @@ from trend_pullback_chips import (  # noqa: E402
     get_tushare_pro,
 )
 
-DEFAULT_MA5_CSV = os.path.join(_SCRIPT_DIR, "ma5_trend_scan.csv")
+DEFAULT_STOCKS_POOL_TXT = os.path.join(_SCRIPT_DIR, "stocks_pool.txt")
 DEFAULT_OUT_CSV = os.path.join(_SCRIPT_DIR, "vp_six_combo_scan.csv")
 DEFAULT_SYMBOLS_POOL_TXT = os.path.join(
     _SCRIPT_DIR, "config", "fetch_vp_six_combo_symbols.txt"
@@ -321,9 +320,10 @@ def resolve_hits(
     *,
     symbols_arg: str,
     pool_path: str,
+    stocks_pool: str,
     ma5_csv: str,
 ) -> Tuple[pd.DataFrame, List[str]]:
-    """优先自定义列表，否则回退 MA5 链式命中股。"""
+    """自定义列表优先。不默认读取 MA5 扫描表。"""
     cli_syms = _parse_symbols_text(symbols_arg)
     if cli_syms:
         return hits_from_symbols(cli_syms, source_note="自定义 --symbols")
@@ -336,7 +336,19 @@ def resolve_hits(
                 pool_syms, source_note=f"自定义列表 {os.path.abspath(pool)}"
             )
 
-    return load_ma5_hits(ma5_csv)
+    ma5 = str(ma5_csv or "").strip()
+    if ma5:
+        return load_ma5_hits(ma5)
+
+    pool_syms = load_symbols_pool_txt(stocks_pool)
+    if pool_syms:
+        return hits_from_symbols(
+            pool_syms, source_note=f"股票池 {os.path.abspath(stocks_pool)}"
+        )
+    return (
+        pd.DataFrame(columns=["symbol", "stock_name"]),
+        [f"自定义列表与股票池均为空，未扫描：{os.path.abspath(stocks_pool)}"],
+    )
 
 
 def fetch_bars_with_turnover(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -1372,18 +1384,27 @@ def main() -> None:
     cfg = VP_SIX_CONFIG
     today = datetime.now().strftime("%Y-%m-%d")
     parser = argparse.ArgumentParser(
-        description="量价六组合分类（MA5 命中股 Phase2 五维共振）"
+        description="量价六组合分类（Phase2 五维共振；默认不读 MA5 扫描表）"
     )
-    parser.add_argument("--ma5-csv", default=DEFAULT_MA5_CSV, help="MA5 扫描 CSV")
+    parser.add_argument(
+        "--ma5-csv",
+        default="",
+        help="可选。显式传入时才用该 MA5 扫描表的命中股，不作为默认输入",
+    )
+    parser.add_argument(
+        "--stocks-pool",
+        default=DEFAULT_STOCKS_POOL_TXT,
+        help="自定义列表为空且未传 --ma5-csv 时使用的股票池",
+    )
     parser.add_argument(
         "--pool",
         default=DEFAULT_SYMBOLS_POOL_TXT,
-        help="自定义股票列表 txt（非空则优先于 --ma5-csv；默认 config/fetch_vp_six_combo_symbols.txt）",
+        help="自定义股票列表 txt（非空则优先；默认 config/fetch_vp_six_combo_symbols.txt）",
     )
     parser.add_argument(
         "--symbols",
         default="",
-        help="自定义股票代码（逗号/空白分隔）；非空则忽略 --pool 与 --ma5-csv",
+        help="自定义股票代码（逗号/空白分隔）；非空则忽略 --pool、--ma5-csv 与股票池",
     )
     parser.add_argument("--end-date", default=today, help="截止日期 YYYY-MM-DD")
     parser.add_argument(
@@ -1440,6 +1461,7 @@ def main() -> None:
     hits_df, notes = resolve_hits(
         symbols_arg=str(args.symbols),
         pool_path=str(args.pool),
+        stocks_pool=str(args.stocks_pool),
         ma5_csv=str(args.ma5_csv),
     )
     for n in notes:

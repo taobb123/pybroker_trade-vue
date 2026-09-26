@@ -51,6 +51,7 @@ steps:
   args: []
   highlight: core
   frequency: daily
+  frequency_note: 独立步骤；只写 MA5 多头扫描表，不向六组合传递名单
   workspace_inputs:
   - path: stocks_pool.txt
     label: 股票池列表
@@ -58,20 +59,20 @@ steps:
   - path: ma5_trend_scan.csv
     label: MA5 多头扫描表
 - id: fetch_vp_six_combo
-  title: 量价六组合分类（MA5 后）
+  title: 量价六组合分类
   type: script
   script: fetch_vp_six_combo.py
   args: []
   highlight: chain
   tier: advanced
   frequency: daily
-  frequency_note: 跟随 fetch_a_low_ma5 · Phase2；watch4/6 滚动≤6交易日、同票留最新；可粘贴列表覆盖
+  frequency_note: 不跟随 MA5 扫描 · Phase2；名单优先粘贴/自定义列表，否则股票池；watch4/6 滚动≤6交易日、同票留最新
   symbols_paste: true
   workspace_inputs:
   - path: config/fetch_vp_six_combo_symbols.txt
     label: 自定义股票列表（可选）
-  - path: ma5_trend_scan.csv
-    label: MA5 多头扫描表
+  - path: stocks_pool.txt
+    label: 股票池列表
   workspace_outputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表
