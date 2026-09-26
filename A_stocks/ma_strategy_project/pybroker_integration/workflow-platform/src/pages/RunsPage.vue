@@ -102,7 +102,6 @@ function onClear() {
               </TableCell>
               <TableCell>
                 <p class="text-sm font-medium">{{ run.stepTitle }}</p>
-                <p class="font-mono text-[11px] text-muted-foreground">{{ run.stepId }}</p>
               </TableCell>
               <TableCell>
                 <div class="flex items-center gap-2">

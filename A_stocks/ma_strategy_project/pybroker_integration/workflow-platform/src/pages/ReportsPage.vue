@@ -330,9 +330,9 @@ async function onPickOutput(out: WorkspaceOutput) {
 
     <div class="grid gap-3 sm:grid-cols-3">
       <KpiCard
-        label="当前 Workflow"
-        :value="store.selectedRun?.stepId ?? (pathOutputs[0] ? '预览' : '—')"
-        :hint="store.selectedRun?.stepTitle"
+        label="当前步骤"
+        :value="store.selectedRun?.stepTitle || (pathOutputs[0] ? '预览' : '—')"
+        value-class="text-sm font-semibold leading-snug break-words normal-nums"
       />
       <KpiCard label="输出表数量" :value="String(outputs.length)" />
       <KpiCard
@@ -350,8 +350,8 @@ async function onPickOutput(out: WorkspaceOutput) {
             <CardTitle class="text-base">
               {{ store.selectedRun?.stepTitle ?? '工作区输出预览' }}
             </CardTitle>
-            <CardDescription class="font-mono">
-              {{ store.selectedRun?.stepId ?? activePath }}
+            <CardDescription v-if="!store.selectedRun && activePath" class="font-mono">
+              {{ activePath }}
             </CardDescription>
           </div>
           <div v-if="store.selectedRun" class="flex items-center gap-2">

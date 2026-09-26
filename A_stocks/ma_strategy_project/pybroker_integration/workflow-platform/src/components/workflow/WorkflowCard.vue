@@ -71,7 +71,6 @@ async function onRun() {
     <CardHeader class="space-y-2 border-b px-4 py-3">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="font-mono text-[11px] text-muted-foreground">{{ step.id }}</p>
           <h3 class="text-base font-semibold leading-snug">{{ step.title }}</h3>
         </div>
         <Button

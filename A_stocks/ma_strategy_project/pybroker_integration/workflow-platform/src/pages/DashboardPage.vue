@@ -60,7 +60,8 @@ async function runRecentStep(run: RunRecord, ev: Event) {
       <KpiCard label="成功" :value="String(store.successRuns.length)" delta-tone="up" />
       <KpiCard
         label="最近成功"
-        :value="lastSuccess ? lastSuccess.stepId : '—'"
+        :value="lastSuccess ? lastSuccess.stepTitle || '—' : '—'"
+        value-class="text-sm font-semibold leading-snug break-words normal-nums"
         :delta="lastSuccess ? formatTime(lastSuccess.finishedAt) : undefined"
         delta-tone="up"
       />
@@ -97,8 +98,8 @@ async function runRecentStep(run: RunRecord, ev: Event) {
             @click="openRecentRun(run.stepId, run.id)"
           >
             <p class="truncate text-sm font-medium">{{ run.stepTitle }}</p>
-            <p class="font-mono text-[11px] text-muted-foreground">
-              {{ run.stepId }} · {{ formatTime(run.finishedAt) }}
+            <p class="text-[11px] text-muted-foreground">
+              {{ formatTime(run.finishedAt) }}
             </p>
           </button>
           <span

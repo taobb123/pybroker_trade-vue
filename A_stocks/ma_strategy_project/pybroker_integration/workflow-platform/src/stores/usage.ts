@@ -30,12 +30,12 @@ export const useUsageStore = defineStore('usage', () => {
 
   const topWorkflows = computed(() => {
     const runs = loadRunHistory()
-    return countBy(runs, (r) => r.stepId)
+    return countBy(runs, (r) => r.stepTitle || r.stepId)
   })
 
   const topStrategies = computed(() => {
     const runs = loadRunHistory().filter((r) => r.status === 'success')
-    return countBy(runs, (r) => r.stepId)
+    return countBy(runs, (r) => r.stepTitle || r.stepId)
   })
 
   return {

@@ -479,7 +479,6 @@ watch([tableHost, tableExpanded], () => {
     >
       <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1 space-y-1">
-          <p class="font-mono text-[11px] text-muted-foreground">{{ step.id }}</p>
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-lg font-semibold tracking-tight break-words">{{ step.title }}</h3>
             <Badge
@@ -797,7 +796,7 @@ watch([tableHost, tableExpanded], () => {
       <SheetContent side="right" class="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle>运行参数</SheetTitle>
-          <SheetDescription class="font-mono">{{ step.id }}</SheetDescription>
+          <SheetDescription>{{ step.title }}</SheetDescription>
         </SheetHeader>
 
         <div class="flex-1 space-y-4 overflow-y-auto px-4 pb-2">

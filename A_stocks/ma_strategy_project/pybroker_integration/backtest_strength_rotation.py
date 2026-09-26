@@ -813,14 +813,21 @@ def _write_freq_pack(
 
 
 def _write_compare(path: str, daily: pd.DataFrame, weekly: pd.DataFrame, cfg: dict) -> None:
+    names = [str(x).strip() for x in (cfg.get("names") or []) if str(x).strip()]
+    name_line = f"- 固定名单：{'、'.join(names)}" if names else ""
     lines = [
         "# M加+Q 三轨道 · 日频 vs 周频",
         "",
         f"- 区间：{cfg['start']} ~ {cfg['end']}",
         f"- 股票池：{'、'.join(cfg.get('groups') or [])} 各组前 3",
         "- 换仓：收盘卖旧买新；目标不变不换；T+1",
+        "- 胜率：完整一轮（买入后卖出）盈亏>0 的比例",
+    ]
+    if name_line:
+        lines.append(name_line)
+    lines += [
         "",
-        "| 轨道 | 日频收益 | 周频收益 | 日频回撤 | 周频回撤 | 日频买入 | 周频买入 | 日频夏普 | 周频夏普 |",
+        "| 轨道 | 日频收益 | 周频收益 | 日频回撤 | 周频回撤 | 日频买入 | 周频买入 | 日频胜率 | 周频胜率 |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     dmap = {int(r.track): r for r in daily.itertuples(index=False)} if daily is not None and not daily.empty else {}
@@ -832,7 +839,7 @@ def _write_compare(path: str, daily: pd.DataFrame, weekly: pd.DataFrame, cfg: di
             f"{_pct(d.total_return) if d else '—'} | {_pct(w.total_return) if w else '—'} | "
             f"{_pct(d.max_drawdown) if d else '—'} | {_pct(w.max_drawdown) if w else '—'} | "
             f"{int(d.n_buy) if d else '—'} | {int(w.n_buy) if w else '—'} | "
-            f"{(f'{float(d.sharpe):.2f}' if d else '—')} | {(f'{float(w.sharpe):.2f}' if w else '—')} |"
+            f"{_pct(d.win_rate) if d else '—'} | {_pct(w.win_rate) if w else '—'} |"
         )
     lines += ["", f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ""]
     with open(path, "w", encoding="utf-8") as f:
@@ -916,7 +923,13 @@ def main() -> int:
             cmp_path,
             metrics_by_freq["daily"],
             metrics_by_freq["weekly"],
-            {"start": start, "end": end, "groups": groups, "tracks": tracks},
+            {
+                "start": start,
+                "end": end,
+                "groups": groups,
+                "tracks": tracks,
+                "names": [str(r.name) for r in universe.itertuples(index=False)],
+            },
         )
         print(f"  日频/周频对照 → {cmp_path}", flush=True)
     return 0

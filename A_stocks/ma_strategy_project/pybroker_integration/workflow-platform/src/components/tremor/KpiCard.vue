@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { HTMLAttributes } from 'vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 defineProps<{
   label: string
@@ -7,6 +9,8 @@ defineProps<{
   delta?: string
   deltaTone?: 'up' | 'down' | 'neutral'
   hint?: string
+  /** 功能名等长文本：换行，不用数字字号 */
+  valueClass?: HTMLAttributes['class']
 }>()
 </script>
 
@@ -14,7 +18,7 @@ defineProps<{
   <Card>
     <CardHeader class="pb-2">
       <CardDescription>{{ label }}</CardDescription>
-      <CardTitle class="text-2xl tabular-nums">{{ value }}</CardTitle>
+      <CardTitle :class="cn('text-2xl tabular-nums', valueClass)">{{ value }}</CardTitle>
     </CardHeader>
     <CardContent class="pt-0">
       <p

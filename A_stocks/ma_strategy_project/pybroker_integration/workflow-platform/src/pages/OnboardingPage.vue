@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   ONBOARDING_BONUS_RUNS,
   ONBOARDING_PERSONAS,
-  ONBOARDING_RECOMMENDED_STEP_ID,
   ONBOARDING_RECOMMENDED_TITLE,
   resolveOnboardingLanding,
   type OnboardingPersonaId,
@@ -111,9 +110,7 @@ async function finish() {
         <div v-else-if="step === 2" class="space-y-3">
           <div class="rounded-lg border px-3 py-3">
             <p class="text-sm font-medium">{{ ONBOARDING_RECOMMENDED_TITLE }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              步骤 ID：{{ ONBOARDING_RECOMMENDED_STEP_ID }} · 基础策略 · Free 可用
-            </p>
+            <p class="mt-1 text-xs text-muted-foreground">基础策略 · Free 可用</p>
           </div>
           <ul class="space-y-1.5 text-sm text-muted-foreground">
             <li class="flex items-start gap-2">

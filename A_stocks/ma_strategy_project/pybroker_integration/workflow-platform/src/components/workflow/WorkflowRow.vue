@@ -20,7 +20,6 @@ const emit = defineEmits<{
     class="group flex items-center gap-4 border-b px-4 py-3 last:border-b-0 hover:bg-muted/50"
   >
     <button type="button" class="min-w-0 flex-1 text-left" @click="emit('open')">
-      <p class="font-mono text-[11px] text-muted-foreground">{{ step.id }}</p>
       <p class="truncate text-sm font-medium">{{ step.title }}</p>
       <p v-if="step.description" class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
         {{ step.description }}

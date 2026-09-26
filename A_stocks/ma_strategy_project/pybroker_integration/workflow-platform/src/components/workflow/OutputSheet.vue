@@ -46,9 +46,7 @@ function openOutputLink(out: { path?: string; label: string; glob?: string }) {
     <SheetContent side="right" class="flex w-full flex-col sm:max-w-xl">
       <SheetHeader>
         <SheetTitle>{{ store.activeStep?.title ?? '输出' }}</SheetTitle>
-        <SheetDescription class="font-mono">
-          {{ store.activeStep?.id ?? '选择 Workflow 后运行' }}
-        </SheetDescription>
+        <SheetDescription v-if="!store.activeStep">选择工作流后运行</SheetDescription>
       </SheetHeader>
 
       <div class="flex items-center gap-2 px-4">
