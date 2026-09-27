@@ -86,8 +86,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--upside-min", type=float, default=0.0, help="兼容旧参数")
     p.add_argument(
         "--variants",
-        default="A,B,Q,M+,M-",
-        help="组别：A形态 B相对PE Q公司估值 M+动量MUD M-反转MUD C合成",
+        default="A,B,Q,G,M+,M-",
+        help="组别：A形态 B相对PE Q公司估值 G增长因子 M+动量MUD M-反转MUD C合成",
     )
     p.add_argument("--skip-pattern-history", action="store_true")
     p.add_argument("--no-archive", action="store_true")
@@ -246,7 +246,7 @@ def main(argv=None) -> int:
 
     rebal_by_variant = {}
     for v in variants:
-        rebal_by_variant[v] = rebal_q if v == "Q" else rebal_default
+        rebal_by_variant[v] = rebal_q if v in ("Q", "G") else rebal_default
 
     print("[data] 个股行情 …", flush=True)
     bars = fetch_stock_bars(symbols, warm_start, cfg.end_date)
@@ -318,9 +318,24 @@ def main(argv=None) -> int:
         )
         print(f"[factor] Q 行数 {len(q_panel)}", flush=True)
 
+    need_g = "G" in variants
+    g_panel = pd.DataFrame()
+    if need_g:
+        print("[factor] 增长因子 G …", flush=True)
+        from market_neutral.factors.growth import build_growth_panel
+
+        g_panel = build_growth_panel(
+            symbols,
+            rebal_q,
+            name_map=name_map,
+            start_date=cfg.start_date,
+            end_date=cfg.end_date,
+        )
+        print(f"[factor] G 行数 {len(g_panel)}", flush=True)
+
     print("[factor] 对齐截面 …", flush=True)
     factor = build_aligned_factor_panel(
-        pattern, valuation, mud, q_panel, all_rebal
+        pattern, valuation, mud, q_panel, all_rebal, growth_panel=g_panel
     )
     print(f"[factor] 对齐后 {len(factor)} 行", flush=True)
 

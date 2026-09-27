@@ -98,6 +98,8 @@ function mapUniverse(raw: unknown): RadarUniverse | null {
     hint: row.hint ? str(row.hint) : null,
     count: num(row.count) ?? 0,
     picks: Array.isArray(row.picks) ? (row.picks as Raw[]).map(mapPick) : [],
+    groups: Array.isArray(row.groups) ? (row.groups as unknown[]).map(str).filter(Boolean) : [],
+    reportExpired: Boolean(row.report_expired),
   }
 }
 

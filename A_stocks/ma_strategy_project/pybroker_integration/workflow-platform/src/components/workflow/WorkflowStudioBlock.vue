@@ -51,8 +51,10 @@ import type { WorkflowStep } from '@/api/types'
 import { isPathOutput } from '@/api/types'
 import { isPredictionKlinePath } from '@/api/kline'
 import {
+  fetchBacktestCompareSwitch,
   fetchWorkspaceFile,
   fetchWorkspaceTable,
+  saveBacktestCompareSwitch,
   saveWorkspaceFile,
   type TablePreview,
 } from '@/api/workflow'
@@ -108,6 +110,29 @@ const tableVisible = ref(false)
 const tableLoadedPath = ref('')
 const TABLE_PREVIEW_ROWS = 40
 let tableObserver: IntersectionObserver | null = null
+
+const isBacktestCompare = computed(() => props.step.id === 'vp_combo_23_long_compare')
+const backtestOpen = ref(false)
+const switchBusy = ref(false)
+
+async function loadBacktestSwitch() {
+  if (!isBacktestCompare.value) return
+  const row = await fetchBacktestCompareSwitch()
+  if (row) backtestOpen.value = row.enabled
+}
+
+async function toggleBacktest() {
+  if (!isBacktestCompare.value || switchBusy.value) return
+  switchBusy.value = true
+  const next = !backtestOpen.value
+  const row = await saveBacktestCompareSwitch(next)
+  switchBusy.value = false
+  if (!row) {
+    alert('回测开关没有保存成功，请确认工作流服务已启动。')
+    return
+  }
+  backtestOpen.value = row.enabled
+}
 
 const isCodeFilterTool = computed(
   () =>
@@ -438,6 +463,7 @@ watch(inputPath, (path) => {
 })
 
 onMounted(() => {
+  void loadBacktestSwitch()
   if (props.focused) {
     tableExpanded.value = true
     tableVisible.value = true
@@ -535,6 +561,16 @@ watch([tableHost, tableExpanded], () => {
             详情
           </Button>
           <Button
+            v-if="isBacktestCompare"
+            size="sm"
+            variant="outline"
+            :disabled="switchBusy"
+            :title="backtestOpen ? '关闭后跳过回测，因子只留现有四组' : '打开后运行本步才会重算年化，并启用冠军因子追加'"
+            @click="toggleBacktest"
+          >
+            {{ backtestOpen ? '关闭回测' : '打开回测' }}
+          </Button>
+          <Button
             v-if="step.runnable"
             size="sm"
             :disabled="runDisabled"
@@ -565,6 +601,13 @@ watch([tableHost, tableExpanded], () => {
           </Button>
         </div>
       </div>
+      <p v-if="isBacktestCompare" class="text-[11px] leading-relaxed text-muted-foreground">
+        {{
+          backtestOpen
+            ? '回测已打开。运行本步会重算仅多头年化；报告未超过一个月时，2+3 与 4+6 各追加一个年化最高、且不在现有因子里的 Tab。'
+            : '回测已关闭（默认）。跳过回测，市场雷达因子只保留 M加 / Q / G·4+6 / G·2+3。'
+        }}
+      </p>
     </div>
 
     <!-- 前端工具：股票代码清洗 -->

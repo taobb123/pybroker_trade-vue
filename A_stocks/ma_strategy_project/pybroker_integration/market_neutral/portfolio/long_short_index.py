@@ -153,6 +153,13 @@ def select_long_short(
         if df.empty:
             return pd.DataFrame(), pd.DataFrame(), note
         ranked = df.sort_values(["factor", "symbol"], ascending=[False, True])
+    elif v == "G":
+        df["factor"] = pd.to_numeric(df.get("growth_score"), errors="coerce")
+        df = df[df["factor"].notna()].copy()
+        note = "growth_score"
+        if df.empty:
+            return pd.DataFrame(), pd.DataFrame(), note
+        ranked = df.sort_values(["factor", "symbol"], ascending=[False, True])
     elif v == "M+":
         df["factor"] = pd.to_numeric(df.get("mud_plus"), errors="coerce")
         df = df[df["factor"].notna()].copy()

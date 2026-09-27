@@ -32,7 +32,7 @@ class MNConfig:
     upside_winsor_q_high: float = 0.95
     upside_clip_low: float = -0.80
     upside_clip_high: float = 1.50
-    variants: Tuple[str, ...] = ("A", "B", "Q", "M+", "M-")
+    variants: Tuple[str, ...] = ("A", "B", "Q", "G", "M+", "M-")
     initial_cash: float = 1_000_000.0
     commission_rate: float = 0.0003
     # Q 单独调仓频率：monthly | quarterly

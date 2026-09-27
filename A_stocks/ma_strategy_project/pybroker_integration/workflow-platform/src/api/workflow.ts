@@ -469,6 +469,49 @@ export async function saveWorkspaceFile(path: string, content: string): Promise<
   }
 }
 
+export type BacktestCompareSwitch = {
+  enabled: boolean
+  expired: boolean
+  append: boolean
+  generatedAt: string | null
+}
+
+export async function fetchBacktestCompareSwitch(): Promise<BacktestCompareSwitch | null> {
+  try {
+    const res = await fetch(apiUrl('/api/backtest-compare-switch'))
+    if (!res.ok) return null
+    const row = (await res.json()) as Record<string, unknown>
+    return {
+      enabled: Boolean(row.enabled),
+      expired: Boolean(row.expired),
+      append: Boolean(row.append),
+      generatedAt: row.generated_at ? String(row.generated_at) : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function saveBacktestCompareSwitch(enabled: boolean): Promise<BacktestCompareSwitch | null> {
+  try {
+    const res = await fetch(apiUrl('/api/backtest-compare-switch'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    })
+    if (!res.ok) return null
+    const row = (await res.json()) as Record<string, unknown>
+    return {
+      enabled: Boolean(row.enabled),
+      expired: Boolean(row.expired),
+      append: Boolean(row.append),
+      generatedAt: row.generated_at ? String(row.generated_at) : null,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function resolveLatestGlob(
   glob: string,
 ): Promise<{ rel_path?: string; exists?: boolean } | null> {

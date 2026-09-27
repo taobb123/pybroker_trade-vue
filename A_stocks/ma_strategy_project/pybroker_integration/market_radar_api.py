@@ -17,7 +17,7 @@ from market_radar import (
     MarketRadarError,
     build_market_radar,
     growth_ranking_mtime,
-    load_growth_factor_picks,
+    load_radar_factor_picks,
     session_state,
     six_digit,
     universe_payload,
@@ -66,7 +66,7 @@ def _placeholder_stocks(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _error_payload(message: str) -> dict[str, Any]:
-    picks, hint = load_growth_factor_picks()
+    picks, hint, radar_route = load_radar_factor_picks()
     return {
         "ok": False,
         "error": message,
@@ -75,7 +75,13 @@ def _error_payload(message: str) -> dict[str, Any]:
         "cached": False,
         "sector_stale": None,
         "source": GROWTH_UNIVERSE_LABEL,
-        "universe": universe_payload(picks, hint),
+        "universe": universe_payload(
+            picks,
+            hint,
+            groups=list(radar_route.get("groups") or ()),
+            report_expired=bool(radar_route.get("expired")),
+            report_generated_at=radar_route.get("generated_at"),
+        ),
         "indexes": [],
         "sectors": [],
         "stocks": _placeholder_stocks(picks),

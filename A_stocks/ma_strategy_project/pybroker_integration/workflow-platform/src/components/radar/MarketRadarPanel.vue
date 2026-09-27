@@ -18,8 +18,8 @@ import {
 } from '@/domain/marketRadar'
 
 const GROWTH_STEP_ID = 'growth_factor'
-/** 与后端 GROWTH_GROUPS 顺序一致；默认展开第一组 */
-const GROWTH_GROUPS = ['M加', 'Q'] as const
+/** 现有四组；年化追加的 Tab 由接口 groups 接在后面 */
+const BASE_GROUPS = ['M加', 'Q', 'G·4+6', 'G·2+3'] as const
 const HIGHLIGHT_MS = 2500
 
 const props = defineProps<{
@@ -33,7 +33,7 @@ const loading = ref(false)
 const payload = ref<MarketRadarPayload | null>(null)
 const error = ref('')
 const clock = ref('')
-const activeGroup = ref<string>(GROWTH_GROUPS[0])
+const activeGroup = ref<string>(BASE_GROUPS[0])
 const watchlistEl = ref<HTMLElement | null>(null)
 const highlightKey = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -47,9 +47,14 @@ const sectorMaxAbs = computed(() => {
   return Math.max(3, ...vals, 0)
 })
 
+const groupNames = computed(() => {
+  const fromApi = payload.value?.universe?.groups?.filter(Boolean) ?? []
+  return fromApi.length ? fromApi : [...BASE_GROUPS]
+})
+
 const stocksByGroup = computed(() => {
   const map = new Map<string, RadarStock[]>()
-  for (const g of GROWTH_GROUPS) map.set(g, [])
+  for (const g of groupNames.value) map.set(g, [])
   for (const st of payload.value?.stocks ?? []) {
     const g = st.group || ''
     if (!map.has(g)) map.set(g, [])
@@ -59,7 +64,7 @@ const stocksByGroup = computed(() => {
 })
 
 const groupTabs = computed(() =>
-  GROWTH_GROUPS.map((g) => ({
+  groupNames.value.map((g) => ({
     name: g,
     count: stocksByGroup.value.get(g)?.length ?? 0,
   })),
@@ -97,8 +102,8 @@ function stockRowKey(st: Pick<RadarStock, 'group' | 'symbol'>) {
 }
 
 function groupOrder(group: string | null) {
-  const i = GROWTH_GROUPS.indexOf(group as (typeof GROWTH_GROUPS)[number])
-  return i >= 0 ? i : GROWTH_GROUPS.length
+  const i = groupNames.value.indexOf(group || '')
+  return i >= 0 ? i : groupNames.value.length
 }
 
 /** 该板块自选中强度最高的一只（并列时取更靠前的分组） */
@@ -168,6 +173,13 @@ function openGrowthWorkflow() {
   void router.push({ path: '/workflows', query: { step: GROWTH_STEP_ID } })
 }
 
+/** 各组表格来源不同；空态不要把 G 也指到成长因子排序。 */
+function emptyGroupHint(name: string) {
+  if (name.endsWith('·4+6') || name === 'G·4+6') return '请先运行「形态建仓」生成该组表格。'
+  if (name.endsWith('·2+3') || name === 'G·2+3') return '请先运行「回测对比」生成该组表格。'
+  return '请先运行「按成长因子排序」生成该组表格。'
+}
+
 onMounted(() => {
   tickClock()
   clockTimer = setInterval(tickClock, 1000)
@@ -202,9 +214,9 @@ defineExpose({ refresh: load })
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           盘中市场雷达
         </p>
-        <h3 class="mt-0.5 text-base font-semibold">成长因子自选 · 相对板块与大盘</h3>
+        <h3 class="mt-0.5 text-base font-semibold">因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          工作流「按成长因子排序」仅 M加 / Q 各前 3（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          M加 / Q 来自「按成长因子排序」，G·4+6 来自「形态建仓」，G·2+3 来自「回测对比」，各组前 3（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -326,7 +338,7 @@ defineExpose({ refresh: load })
           v-else
           class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground"
         >
-          <p v-if="emptyUniverse">请先运行「按成长因子排序」，生成 M加 / Q 名单。</p>
+          <p v-if="emptyUniverse">请先运行「按成长因子排序」「形态建仓」「回测对比」，生成 M加 / Q / G 名单。</p>
           <p v-else-if="loading">正在映射申万行业…</p>
           <p v-else>暂无板块数据</p>
           <Button
@@ -355,7 +367,7 @@ defineExpose({ refresh: load })
           </p>
         </div>
         <span class="shrink-0 text-[11px] text-muted-foreground">
-          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q 各前3
+          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q/G·4+6/G·2+3 各前3
         </span>
       </div>
       <Tabs v-if="payload?.stocks.length" v-model="activeGroup" class="w-full">
@@ -414,7 +426,7 @@ defineExpose({ refresh: load })
             </li>
           </ul>
           <p v-else class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground">
-            「{{ tab.name }}」暂无标的，请先运行「按成长因子排序」生成该组表格。
+            「{{ tab.name }}」暂无标的，{{ emptyGroupHint(tab.name) }}
           </p>
         </TabsContent>
       </Tabs>
@@ -425,9 +437,9 @@ defineExpose({ refresh: load })
         <div class="flex size-10 items-center justify-center rounded-full bg-muted">
           <Activity class="size-5 text-muted-foreground" />
         </div>
-        <p class="text-sm font-medium">还没有成长因子名单</p>
+        <p class="text-sm font-medium">还没有因子自选名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          盘中雷达盯工作流「按成长因子排序」写出的 M加、Q 表各前三（Tab 切换），不足三只则全列，不使用观察池、不含「量能」。
+          M加、Q 来自「按成长因子排序」，G·4+6 来自「形态建仓」，G·2+3 来自「回测对比」。各组取前三（不足则全列），不使用观察池、不含「量能」。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

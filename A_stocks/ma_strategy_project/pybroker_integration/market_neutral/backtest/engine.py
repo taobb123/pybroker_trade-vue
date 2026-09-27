@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -271,6 +271,7 @@ def run_all_variants(
         "B": "upside",
         "C": "composite_ac",
         "Q": "company_q",
+        "G": "growth_score",
         "M+": "mud_plus",
         "M-": "mud_minus",
     }
@@ -313,7 +314,7 @@ def run_all_variants(
         fcol = FACTOR_COL.get(key, "upside")
         fwd = (
             int(cfg.ic_forward_days_q)
-            if key == "Q"
+            if key in ("Q", "G")
             else int(cfg.ic_forward_days)
         )
         ic_info = compute_rank_ic(
@@ -325,7 +326,7 @@ def run_all_variants(
         )
         met = dict(met)
         met.update(ic_info)
-        met["rebalance_freq"] = cfg.q_rebalance if key == "Q" else cfg.rebalance
+        met["rebalance_freq"] = cfg.q_rebalance if key in ("Q", "G") else cfg.rebalance
         results[key] = {
             "equity": eq,
             "rebalance": reb,
@@ -362,14 +363,38 @@ def run_all_variants(
     return results
 
 
+def _asof_merge(base: pd.DataFrame, panel: pd.DataFrame, cols: Sequence[str]) -> pd.DataFrame:
+    """把慢变量截面按 date<=调仓日贴到每个调仓日。"""
+    if panel is None or panel.empty or not cols:
+        return base
+    src = panel.copy()
+    src["date"] = pd.to_datetime(src["date"]).dt.normalize()
+    src["symbol"] = src["symbol"].astype(str).str.zfill(6)
+    rows = []
+    for dt, g in base.groupby("date"):
+        dt = pd.Timestamp(dt).normalize()
+        sub = src[src["date"] <= dt]
+        if sub.empty:
+            gg = g.copy()
+            for c in cols:
+                gg[c] = np.nan
+            rows.append(gg)
+            continue
+        last = sub["date"].max()
+        day = sub[sub["date"] == last][["symbol"] + list(cols)]
+        rows.append(g.merge(day, on="symbol", how="left"))
+    return pd.concat(rows, ignore_index=True) if rows else base
+
+
 def build_aligned_factor_panel(
     pattern_panel: pd.DataFrame,
     valuation_panel: pd.DataFrame,
     mud_panel: pd.DataFrame,
     q_panel: pd.DataFrame,
     all_rebal_dates: Sequence[pd.Timestamp],
+    growth_panel: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
-    """合并形态/PE/MUD/Q 到统一调仓日截面。"""
+    """合并形态/PE/MUD/Q/G 到统一调仓日截面。"""
     base = _align_valuation_to_rebalance(pattern_panel, valuation_panel, all_rebal_dates)
     if base is None or base.empty:
         # 尝试用 mud 做底
@@ -389,25 +414,11 @@ def build_aligned_factor_panel(
         base = base.merge(m[["date", "symbol"] + cols], on=["date", "symbol"], how="outer")
 
     if q_panel is not None and not q_panel.empty:
-        q = q_panel.copy()
-        q["date"] = pd.to_datetime(q["date"]).dt.normalize()
-        q["symbol"] = q["symbol"].astype(str).str.zfill(6)
-        cols = [c for c in ("company_q", "roe", "ocf_to_or") if c in q.columns]
-        # Q 调仓日可能是月/季；asof 到 base 的每个 date
-        q_rows = []
-        for dt, g in base.groupby("date"):
-            dt = pd.Timestamp(dt).normalize()
-            sub = q[q["date"] <= dt]
-            if sub.empty:
-                gg = g.copy()
-                for c in cols:
-                    gg[c] = np.nan
-                q_rows.append(gg)
-                continue
-            last = sub["date"].max()
-            day_q = sub[sub["date"] == last][["symbol"] + cols]
-            q_rows.append(g.merge(day_q, on="symbol", how="left"))
-        base = pd.concat(q_rows, ignore_index=True) if q_rows else base
+        cols = [c for c in ("company_q", "roe", "ocf_to_or") if c in q_panel.columns]
+        base = _asof_merge(base, q_panel, cols)
+
+    if growth_panel is not None and not growth_panel.empty and "growth_score" in growth_panel.columns:
+        base = _asof_merge(base, growth_panel, ["growth_score"])
 
     if "stock_name" in base.columns:
         base["stock_name"] = base["stock_name"].fillna("")

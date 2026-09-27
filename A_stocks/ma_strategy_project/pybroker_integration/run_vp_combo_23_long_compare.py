@@ -62,6 +62,7 @@ KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_kelly_positions.csv")
 VALUE_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_valuation_rank.csv")
 Q_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_rank.csv")
 Q_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_growth_rank.csv")
+G_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_g_rank.csv")
 MX_MMINUS_GROUP = "23M减"
 MX_VALUE_GROUP = "估值因子"
 MX_Q_GROUP = "Q"
@@ -504,7 +505,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--rebalance", default="weekly", choices=["weekly", "monthly"])
     p.add_argument("--q-rebalance", default="monthly", choices=["monthly", "quarterly"])
     p.add_argument("--quantile", type=float, default=0.10)
-    p.add_argument("--variants", default="A,B,Q,M+,M-")
+    p.add_argument("--variants", default="A,B,Q,G,M+,M-")
     p.add_argument("--scan-csv", default=DEFAULT_SCAN)
     p.add_argument("--baseline-metrics", default=BASELINE_METRICS)
     p.add_argument("--skip-export", action="store_true", help="不从 scan 导出 2+3")
@@ -636,28 +637,11 @@ def main(argv=None) -> int:
         print(f"对比表 → {csv_path}", flush=True)
         print(f"摘要   → {md_path}", flush=True)
     else:
-        skip_md = (
-            "# 仅多头年化对比（已暂时跳过回测）\n\n"
-            f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            "- 本步骤暂不跑 combo2+3 市场中性回测，也不更新年化对比表。\n"
-            "- 仍导出 2+3 观察池，并将 Q 前13 调用独立成长因子写 CSV（暂不推东财；不推估值因子 / 23M减）。\n"
-            "- 半凯利取 Q 排名 Top2，不跟推送名单。\n"
-            "- 恢复回测：从工作流参数中去掉 `--skip-backtest`。\n"
-        )
-        with open(COMPARE_MD, "w", encoding="utf-8") as f:
-            f.write(skip_md)
-        if not os.path.isfile(COMPARE_CSV):
-            pd.DataFrame(
-                columns=[
-                    "variant",
-                    "pool_23_annual",
-                    "pool_46_annual",
-                    "delta_23_minus_46",
-                    "note",
-                ]
-            ).to_csv(COMPARE_CSV, index=False, encoding="utf-8-sig")
-        print("【仅多头年化对比】已跳过", flush=True)
-        print(f"  说明 → {COMPARE_MD}", flush=True)
+        print("【仅多头年化对比】已跳过回测，保留已有对比表", flush=True)
+        if os.path.isfile(COMPARE_MD):
+            print(f"  摘要保持 → {COMPARE_MD}", flush=True)
+        else:
+            print("  尚无对比表；恢复回测请去掉 --skip-backtest", flush=True)
 
     # 优先用本次 run 目录的 snapshot；否则 combo23_latest
     snap_candidates = [
@@ -684,6 +668,19 @@ def main(argv=None) -> int:
         skip_fina=bool(args.skip_fina),
     )
     for note in vq_notes:
+        print(f"  {note}", flush=True)
+
+    print("【G·2+3】", flush=True)
+    from market_neutral.factors.growth import write_yoy_rank_csv
+
+    g_notes = write_yoy_rank_csv(
+        pool_syms,
+        asof=end_date,
+        path=G_RANK_CSV,
+        group_name="G·2+3",
+        name_map=pool_names,
+    )
+    for note in g_notes:
         print(f"  {note}", flush=True)
 
     print("【23M减·仅排名不推送】", flush=True)

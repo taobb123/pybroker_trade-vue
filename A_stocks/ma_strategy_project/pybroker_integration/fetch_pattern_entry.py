@@ -72,6 +72,7 @@ DEFAULT_VALUE_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_valuation_rank.
 DEFAULT_Q_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_q_rank.csv")
 DEFAULT_MPLUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_rank.csv")
 DEFAULT_MPLUS_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_growth_rank.csv")
+DEFAULT_G_RANK_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_g_rank.csv")
 DEFAULT_MMINUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mminus_rank.csv")
 DEFAULT_KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_kelly_positions.csv")
 
@@ -2043,7 +2044,7 @@ def main() -> None:
         pool_syms.append(s)
     if invalid_syms:
         print(
-            f"【筛选】本轮作废 {len(invalid_syms)} 只，已排除出估值/Q/M+/M- 排名与推送池"
+            f"【筛选】本轮作废 {len(invalid_syms)} 只，已排除出估值/Q/M+/M-/G 排名与推送池"
         )
 
     if not bool(args.skip_value_rank):
@@ -2105,6 +2106,16 @@ def main() -> None:
     else:
         qm_notes = ["已跳过 Q/M 排名（--skip-qm-rank）"]
 
+    from market_neutral.factors.growth import write_yoy_rank_csv
+
+    g_notes = write_yoy_rank_csv(
+        pool_syms,
+        asof=str(args.end_date),
+        path=DEFAULT_G_RANK_CSV,
+        group_name="G·4+6",
+        name_map=name_map,
+    )
+
     kelly_notes: List[str] = []
     kelly_rows, kn = build_pattern_kelly_rows(
         results,
@@ -2142,6 +2153,10 @@ def main() -> None:
     if qm_notes:
         print("【M加】（动量前13 调用独立成长因子写 CSV；暂不推东财）")
         for pn in qm_notes:
+            print(f"  {pn}")
+    if g_notes:
+        print("【G·4+6】（观察池增长因子排序；不改入池，不推东财）")
+        for pn in g_notes:
             print(f"  {pn}")
     if kelly_notes:
         print("【凯利仓位·M加】")

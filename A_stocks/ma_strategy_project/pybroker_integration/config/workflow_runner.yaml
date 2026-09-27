@@ -92,7 +92,7 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；M+动量前13调用独立成长因子写 CSV（暂不推东财）；半凯利仍取 M+ Top2
+  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；M+动量前13调用四层成长因子写 CSV；观察池另按增长因子写 G·4+6（暂不推东财）；半凯利仍取 M+ Top2
   symbols_paste: true
   symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
   symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
@@ -121,6 +121,8 @@ steps:
     label: M+动量排名（取前13交成长因子）
   - path: pattern_entry_mplus_growth_rank.csv
     label: M+前13成长因子排序
+  - path: pattern_entry_g_rank.csv
+    label: G·4+6增长因子排序
   - path: pattern_entry_mminus_rank.csv
     label: 观察池M-排名表
   - path: pattern_entry_kelly_positions.csv
@@ -139,13 +141,13 @@ steps:
   - --quantile
   - '0.10'
   - --variants
-  - A,B,Q,M+,M-
+  - A,B,Q,G,M+,M-
   - --skip-backtest
   - --skip-mx-push
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 暂跳过2+3回测；Q前13调用独立成长因子写 CSV（暂不推东财）；半凯利仍取 Q Top2
+  frequency_note: 页面「打开回测」默认关，关时带 --skip-backtest，因子只留 M加 / Q / G·4+6 / G·2+3；打开后才跑回测，并用未超过一个月的年化表为每池追加冠军因子
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）
@@ -162,6 +164,8 @@ steps:
     label: 2+3 池 Q 排名（取前13交成长因子）
   - path: vp_combo_23_q_growth_rank.csv
     label: Q前13成长因子排序
+  - path: vp_combo_23_g_rank.csv
+    label: G·2+3增长因子排序
   - path: vp_combo_23_valuation_rank.csv
     label: 2+3 池估值排名（仅排名，不推送）
   - path: vp_combo_23_kelly_positions.csv
@@ -173,7 +177,7 @@ steps:
   - path: market_neutral/output/combo23_latest/summary.md
     label: combo2+3 中性回测摘要
 - id: market_neutral
-  title: 市场中性 · 形态/PE/Q/MUD 个股多空
+  title: 市场中性 · 形态/PE/Q/G/MUD 个股多空
   type: script
   script: run_market_neutral.py
   args:
@@ -186,10 +190,10 @@ steps:
   - --quantile
   - '0.10'
   - --variants
-  - A,B,Q,M+,M-
+  - A,B,Q,G,M+,M-
   highlight: chain
   frequency: weekly
-  frequency_note: 观察池横截面前10%多/后10%空；A形态 B相对PE Q公司估值(月调) M+/M-动量反转；默认输出 EQ等权 vs ROT轮动(温度控仓)；含 Rank IC
+  frequency_note: 观察池横截面前10%多/后10%空；A形态 B相对PE Q公司估值(月调) G增长因子(月调，营收同比+净利润同比) M+/M-动量反转；EQ/ROT 仍只用 A,B,Q,M+,M-；含 Rank IC
   run_modes:
   - id: full
     label: 全因子周频+Q月调
@@ -203,7 +207,7 @@ steps:
     - --quantile
     - '0.10'
     - --variants
-    - A,B,Q,M+,M-
+    - A,B,Q,G,M+,M-
   - id: rotation
     label: 全因子+轮动EQ/ROT
     args:
@@ -216,7 +220,7 @@ steps:
     - --quantile
     - '0.10'
     - --variants
-    - A,B,Q,M+,M-
+    - A,B,Q,G,M+,M-
   - id: q_quarterly
     label: 全因子·Q季调
     args:
@@ -229,7 +233,7 @@ steps:
     - --quantile
     - '0.10'
     - --variants
-    - A,B,Q,M+,M-
+    - A,B,Q,G,M+,M-
   - id: mud_only
     label: 仅 M+/M-
     args:

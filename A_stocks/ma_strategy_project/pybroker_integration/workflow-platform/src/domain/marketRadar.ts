@@ -57,6 +57,8 @@ export interface RadarUniverse {
   hint: string | null
   count: number
   picks: RadarPick[]
+  groups: string[]
+  reportExpired: boolean
 }
 
 export interface RadarAlert {

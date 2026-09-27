@@ -59,11 +59,16 @@ _EM_HEADERS = {
 GROWTH_PICK_TABLES = (
     ("M加", _SCRIPT_DIR / "pattern_entry_mplus_growth_rank.csv"),
     ("Q", _SCRIPT_DIR / "vp_combo_23_q_growth_rank.csv"),
+    ("G·4+6", _SCRIPT_DIR / "pattern_entry_g_rank.csv"),
+    ("G·2+3", _SCRIPT_DIR / "vp_combo_23_g_rank.csv"),
 )
-GROWTH_GROUPS = ("M加", "Q")
+GROWTH_GROUPS = ("M加", "Q", "G·4+6", "G·2+3")
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "按成长因子排序 · M加/Q 各前3"
-GROWTH_FILES_LABEL = "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv"
+GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·4+6 / G·2+3 各前3"
+GROWTH_FILES_LABEL = (
+    "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv, "
+    "pattern_entry_g_rank.csv, vp_combo_23_g_rank.csv"
+)
 
 
 class MarketRadarError(RuntimeError):
@@ -301,8 +306,7 @@ def _picks_from_growth_table(
     return picks
 
 
-def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """工作流「按成长因子排序」的 M加 / Q 表：各组取前 N（组内去重，组间可重复）。不含量能。"""
+def _base_growth_picks(top_n: int) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     picks: list[dict[str, Any]] = []
     missing_groups: list[str] = []
     empty_groups: list[str] = []
@@ -315,31 +319,133 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
             empty_groups.append(group)
             continue
         picks.extend(group_picks)
-    hint = None
-    if not picks:
-        if missing_groups and len(missing_groups) == len(GROWTH_PICK_TABLES):
-            hint = "未找到 M加/Q 成长排序表，请先运行工作流「按成长因子排序」。"
-        else:
-            hint = "M加/Q 成长排序表中没有可用标的，请重新运行「按成长因子排序」。"
-    else:
-        bits: list[str] = []
-        if missing_groups:
-            bits.append(f"缺少文件：{'、'.join(missing_groups)}")
-        if empty_groups:
-            bits.append(f"表为空：{'、'.join(empty_groups)}")
-        if bits:
-            hint = "；".join(bits)
+    return picks, missing_groups, empty_groups
+
+
+def _picks_from_pattern_scan(path: Path, group: str, top_n: int) -> list[dict[str, Any]]:
+    """A 因子：形态建仓扫描上的状态序×1000 + score，与回测 A 的形态分同一公式。"""
+    df = _read_csv_flexible(path)
+    if df is None or df.empty or "symbol" not in df.columns:
+        return []
+    from market_neutral.portfolio.long_short_index import pattern_factor_score
+
+    work = df.copy()
+    work["_score"] = pattern_factor_score(work)
+    work = work.sort_values(["_score", "symbol"], ascending=[False, True])
+    picks: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    name_col = "stock_name" if "stock_name" in work.columns else None
+    for _, row in work.iterrows():
+        if len(picks) >= top_n:
+            break
+        sym = six_digit(row.get("symbol"))
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        picks.append(
+            {
+                "symbol": sym,
+                "name": str(row.get(name_col) or "").strip() if name_col else "",
+                "group": group,
+                "rank": len(picks) + 1,
+                "industry": "",
+            }
+        )
+    return picks
+
+
+def _extra_group_picks(pool: str, factor: str, group: str, top_n: int) -> list[dict[str, Any]]:
+    from annual_factor_route import extra_rank_path
+
+    path = extra_rank_path(pool, factor)
+    if path is None:
+        return []
+    if pool == "46" and factor == "A":
+        return _picks_from_pattern_scan(path, group, top_n)
+    return _picks_from_growth_table(path, group, top_n)
+
+
+def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
+    """M加/Q 来自四层成长排序；G·4+6、G·2+3 来自增长因子排序。各组取前 N。"""
+    picks, missing_groups, empty_groups = _base_growth_picks(top_n)
+    hint = _growth_hint(picks, missing_groups, empty_groups, base_only=True)
     return picks, hint
 
 
-def universe_payload(picks: list[dict[str, Any]], hint: str | None) -> dict[str, Any]:
+def load_radar_factor_picks(
+    top_n: int = GROWTH_TOP_N,
+) -> tuple[list[dict[str, Any]], str | None, dict[str, Any]]:
+    """雷达因子自选：现有四组，外加未过期且已打开回测时的年化冠军。"""
+    from annual_factor_route import expiry_hint, route_snapshot
+
+    snapshot = route_snapshot()
+    picks, missing_groups, empty_groups = _base_growth_picks(top_n)
+    if snapshot.get("append"):
+        for extra in snapshot.get("extras") or []:
+            group = str(extra.get("tab") or "")
+            group_picks = _extra_group_picks(
+                str(extra.get("pool") or ""),
+                str(extra.get("factor") or ""),
+                group,
+                top_n,
+            )
+            if not group_picks:
+                empty_groups.append(group)
+                continue
+            picks.extend(group_picks)
+    hint = _growth_hint(picks, missing_groups, empty_groups, base_only=not snapshot.get("append"))
+    expired = expiry_hint(snapshot)
+    if expired:
+        hint = expired if not hint else f"{expired} {hint}"
+    return picks, hint, snapshot
+
+
+def _growth_hint(
+    picks: list[dict[str, Any]],
+    missing_groups: list[str],
+    empty_groups: list[str],
+    *,
+    base_only: bool,
+) -> str | None:
+    if not picks:
+        if missing_groups and len(missing_groups) >= len(GROWTH_PICK_TABLES):
+            return (
+                "未找到因子自选表。M加与 Q 请先运行「按成长因子排序」；"
+                "G·4+6 请先运行「形态建仓」；G·2+3 请先运行「回测对比」。"
+            )
+        return "因子自选表中没有可用标的，请重新运行形态建仓、回测对比和按成长因子排序。"
+    bits: list[str] = []
+    if missing_groups:
+        bits.append(f"缺少文件：{'、'.join(missing_groups)}")
+    if empty_groups and not base_only:
+        bits.append(f"表为空：{'、'.join(empty_groups)}")
+    elif empty_groups:
+        base_empty = [g for g in empty_groups if g in GROWTH_GROUPS]
+        if base_empty:
+            bits.append(f"表为空：{'、'.join(base_empty)}")
+    return "；".join(bits) if bits else None
+
+
+def universe_payload(
+    picks: list[dict[str, Any]],
+    hint: str | None,
+    *,
+    groups: list[str] | None = None,
+    report_expired: bool = False,
+    report_generated_at: str | None = None,
+) -> dict[str, Any]:
+    names = list(groups or GROWTH_GROUPS)
+    label = "因子自选 · " + " / ".join(names) + " 各前3"
     return {
         "source": "growth_factor",
-        "label": GROWTH_UNIVERSE_LABEL,
+        "label": label,
         "file": GROWTH_FILES_LABEL,
         "hint": hint,
         "count": len(picks),
         "picks": picks,
+        "groups": names,
+        "report_expired": report_expired,
+        "report_generated_at": report_generated_at,
     }
 
 
@@ -1277,7 +1383,7 @@ def fetch_sector_quotes(
 def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     now = _cn_now()
     as_of = now.strftime("%Y-%m-%d %H:%M:%S")
-    picks, universe_hint = load_growth_factor_picks()
+    picks, universe_hint, radar_route = load_radar_factor_picks()
     requested = [six_digit(s) for s in (symbols or [])]
     requested = [s for s in requested if s]
     if requested:
@@ -1296,7 +1402,13 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
         if len(ordered) >= MAX_SYMBOLS:
             break
     uniq = ordered
-    universe = universe_payload(picks, universe_hint)
+    universe = universe_payload(
+        picks,
+        universe_hint,
+        groups=list(radar_route.get("groups") or GROWTH_GROUPS),
+        report_expired=bool(radar_route.get("expired")),
+        report_generated_at=radar_route.get("generated_at"),
+    )
 
     ts_mod, pro = get_tushare_bundle()
     session = session_state(pro, now)

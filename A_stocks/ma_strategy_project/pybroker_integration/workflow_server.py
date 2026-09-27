@@ -364,6 +364,13 @@ def run_one_step(
         if not isinstance(extra_args, list):
             raise HTTPException(status_code=400, detail="extra_args 须为列表。")
         args = args + [str(a) for a in extra_args]
+    if step_id == "vp_combo_23_long_compare":
+        from annual_factor_route import read_switch
+
+        if read_switch():
+            args = [a for a in args if str(a) != "--skip-backtest"]
+        elif "--skip-backtest" not in [str(a) for a in args]:
+            args = list(args) + ["--skip-backtest"]
 
     root = resolve_project_root(cfg)
     script_path = root / script_name
@@ -707,6 +714,41 @@ def api_workspace_column_text(
 class RunStepBody(BaseModel):
     extra_args: list[str] = []
     run_mode: str | None = None
+
+
+class BacktestSwitchBody(BaseModel):
+    enabled: bool = False
+
+
+@app.get("/api/backtest-compare-switch")
+def api_backtest_compare_switch() -> dict[str, Any]:
+    from annual_factor_route import read_switch, route_snapshot
+
+    snap = route_snapshot()
+    return {
+        "enabled": read_switch(),
+        "expired": bool(snap.get("expired")),
+        "append": bool(snap.get("append")),
+        "generated_at": snap.get("generated_at"),
+        "extras": snap.get("extras") or [],
+        "groups": snap.get("groups") or [],
+    }
+
+
+@app.post("/api/backtest-compare-switch")
+def api_set_backtest_compare_switch(body: BacktestSwitchBody) -> dict[str, Any]:
+    from annual_factor_route import route_snapshot, write_switch
+
+    write_switch(body.enabled)
+    snap = route_snapshot(switch_on=body.enabled)
+    return {
+        "enabled": body.enabled,
+        "expired": bool(snap.get("expired")),
+        "append": bool(snap.get("append")),
+        "generated_at": snap.get("generated_at"),
+        "extras": snap.get("extras") or [],
+        "groups": snap.get("groups") or [],
+    }
 
 
 _jobs_lock = threading.Lock()

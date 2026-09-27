@@ -328,6 +328,7 @@ def _render_summary_md(
         "B": "B 相对PE",
         "C": "C 形态+PE合成",
         "Q": "Q 公司估值(轻量)",
+        "G": "G 增长因子",
         "M+": "M+ 动量MUD",
         "M-": "M- 反转MUD",
         "EQ": "EQ 五因子等权",
@@ -336,6 +337,7 @@ def _render_summary_md(
         "B_L": "B_L 仅多头",
         "C_L": "C_L 仅多头",
         "Q_L": "Q_L 仅多头",
+        "G_L": "G_L 仅多头",
         "M+_L": "M+_L 仅多头",
         "M-_L": "M-_L 仅多头",
     }
@@ -506,6 +508,7 @@ def _render_summary_md(
     lines.append("## 因子说明")
     lines.append("- **B**：相对行业/池内 PE 的 upside（现有）")
     lines.append("- **Q**：0.4×ROE分位 + 0.3×OCF/营收分位 + 0.3×upside分位（公告日点-in-time）")
+    lines.append("- **G**：0.5×营收同比分位 + 0.5×净利润同比分位（公告日不晚于调仓日）；月调；前10%多/后10%空。四层稳健质量分不在此列")
     lines.append("- **M+**：波动调整60日动量 + 量比（动量MUD）")
     lines.append("- **M-**：−R20 分位（反转MUD，跌越多分越高）")
     lines.append("- 已取消空指数；对冲腿为同池因子后分位个股")
