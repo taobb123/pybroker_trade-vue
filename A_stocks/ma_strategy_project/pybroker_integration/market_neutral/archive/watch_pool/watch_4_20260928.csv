@@ -1,0 +1,5 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+000513,丽珠集团,2026-09-28,4,上涨放量突破,30.34,10.0073,27.9,30.34,30.34,279428.36,5.105,5.105,True,86.0,True,uptrend,
+002226,江南化工,2026-08-03,4,上涨放量突破,5.18,4.2254,5.01,5.21,5.18,331052.03,1.6811,1.6811,True,98.0,True,uptrend,
+002649,博彦科技,2026-07-31,4,上涨放量突破,9.17,5.0401,9.1,9.34,9.17,220427.65,1.7725,1.7725,True,98.0,True,uptrend,
+603099,长白山,2026-07-30,4,上涨放量突破,37.96,0.5297,38.0,39.05,37.96,90934.05,1.5725,1.5725,True,98.0,True,uptrend,
