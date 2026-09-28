@@ -13,9 +13,9 @@
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
   --combo-id 0 表示扫描全部已注册形态。
 
-跑完后：默认不推东财分组。M+ 动量前13 作为参数调用独立成长因子写 CSV；
-「Q」由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
-不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2。
+跑完后：默认不推东财分组。M+ 动量前13、G·4+6 增长分前13 分别调用独立成长因子写 CSV；
+「Q」与 G·2+3 由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
+不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2。观察池入池条件不变。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -73,6 +73,7 @@ DEFAULT_Q_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_q_rank.csv")
 DEFAULT_MPLUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_rank.csv")
 DEFAULT_MPLUS_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_growth_rank.csv")
 DEFAULT_G_RANK_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_g_rank.csv")
+DEFAULT_G_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_g_growth_rank.csv")
 DEFAULT_MMINUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mminus_rank.csv")
 DEFAULT_KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_kelly_positions.csv")
 
@@ -1966,7 +1967,7 @@ def main() -> None:
         "--qm-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="交给独立成长因子的 M+ 动量只数（默认 13；打分失败则中止推送）",
+        help="交给独立成长因子的 M+ 动量只数，以及 G·4+6 增长分只数（默认 13；打分失败则中止该组，不回退）",
     )
     args = parser.parse_args()
 
@@ -2099,7 +2100,7 @@ def main() -> None:
             top_n=int(args.qm_push_top_n),
             skip_push=True,
             skip_fina=bool(args.skip_qm_fina),
-            # M+ 动量前13 调用独立成长因子写 CSV；暂不推东财。Q 由 2+3 步骤同样只排序。
+            # M+ 动量前13 调用独立成长因子写 CSV；暂不推东财。Q 与 G·2+3 由 2+3 步骤同样只排序。
             push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
@@ -2107,6 +2108,7 @@ def main() -> None:
         qm_notes = ["已跳过 Q/M 排名（--skip-qm-rank）"]
 
     from market_neutral.factors.growth import write_yoy_rank_csv
+    from factor_growthT_indicator import rank_yoy_top_by_growth
 
     g_notes = write_yoy_rank_csv(
         pool_syms,
@@ -2115,6 +2117,14 @@ def main() -> None:
         group_name="G·4+6",
         name_map=name_map,
     )
+    _g_ranked, g_growth_notes = rank_yoy_top_by_growth(
+        DEFAULT_G_RANK_CSV,
+        group_name="G·4+6",
+        out_csv=DEFAULT_G_GROWTH_CSV,
+        top_n=int(args.qm_push_top_n),
+        name_map=name_map,
+    )
+    g_notes.extend(g_growth_notes)
 
     kelly_notes: List[str] = []
     kelly_rows, kn = build_pattern_kelly_rows(
@@ -2155,7 +2165,7 @@ def main() -> None:
         for pn in qm_notes:
             print(f"  {pn}")
     if g_notes:
-        print("【G·4+6】（观察池增长因子排序；不改入池，不推东财）")
+        print("【G·4+6】（增长因子全表保留；前13调用独立成长因子；不改入池，不推东财）")
         for pn in g_notes:
             print(f"  {pn}")
     if kelly_notes:

@@ -59,15 +59,15 @@ _EM_HEADERS = {
 GROWTH_PICK_TABLES = (
     ("M加", _SCRIPT_DIR / "pattern_entry_mplus_growth_rank.csv"),
     ("Q", _SCRIPT_DIR / "vp_combo_23_q_growth_rank.csv"),
-    ("G·4+6", _SCRIPT_DIR / "pattern_entry_g_rank.csv"),
-    ("G·2+3", _SCRIPT_DIR / "vp_combo_23_g_rank.csv"),
+    ("G·4+6", _SCRIPT_DIR / "pattern_entry_g_growth_rank.csv"),
+    ("G·2+3", _SCRIPT_DIR / "vp_combo_23_g_growth_rank.csv"),
 )
 GROWTH_GROUPS = ("M加", "Q", "G·4+6", "G·2+3")
 GROWTH_TOP_N = 3
 GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·4+6 / G·2+3 各前3"
 GROWTH_FILES_LABEL = (
     "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv, "
-    "pattern_entry_g_rank.csv, vp_combo_23_g_rank.csv"
+    "pattern_entry_g_growth_rank.csv, vp_combo_23_g_growth_rank.csv"
 )
 
 
@@ -366,7 +366,7 @@ def _extra_group_picks(pool: str, factor: str, group: str, top_n: int) -> list[d
 
 
 def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """M加/Q 来自四层成长排序；G·4+6、G·2+3 来自增长因子排序。各组取前 N。"""
+    """四组均来自各自前 13 的四层成长排序。G 的前 13 取自增长分。各组再取前 N。"""
     picks, missing_groups, empty_groups = _base_growth_picks(top_n)
     hint = _growth_hint(picks, missing_groups, empty_groups, base_only=True)
     return picks, hint
@@ -410,8 +410,8 @@ def _growth_hint(
     if not picks:
         if missing_groups and len(missing_groups) >= len(GROWTH_PICK_TABLES):
             return (
-                "未找到因子自选表。M加与 Q 请先运行「按成长因子排序」；"
-                "G·4+6 请先运行「形态建仓」；G·2+3 请先运行「回测对比」。"
+                "未找到因子自选表。请先运行「按成长因子排序」，"
+                "或分别运行「形态建仓」「回测对比」生成各组前13成长表。"
             )
         return "因子自选表中没有可用标的，请重新运行形态建仓、回测对比和按成长因子排序。"
     bits: list[str] = []

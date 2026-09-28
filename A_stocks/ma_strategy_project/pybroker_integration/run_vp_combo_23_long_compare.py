@@ -11,7 +11,8 @@
   4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
   5) 将 Q 观察池排名前13 作为参数调用独立成长因子写 CSV（暂不推东财）
-     不推估值因子 / 23M减
+     G·2+3 先写增长因子全表，再将增长分前13 调用同一套成长因子（打分失败不回退）
+     不推估值因子 / 23M减。回测组别 G 的月频同比截面不改。
   6) 半凯利仍取 Q 排名 Top2
 
 前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
@@ -63,6 +64,7 @@ VALUE_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_valuation_rank.csv")
 Q_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_rank.csv")
 Q_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_q_growth_rank.csv")
 G_RANK_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_g_rank.csv")
+G_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "vp_combo_23_g_growth_rank.csv")
 MX_MMINUS_GROUP = "23M减"
 MX_VALUE_GROUP = "估值因子"
 MX_Q_GROUP = "Q"
@@ -487,6 +489,7 @@ def write_compare_report(
             "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
             "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
             f"- 定向推送：Q 前{MX_PUSH_TOP_N_DEFAULT} 作为参数调用独立成长因子后写入「Q」（打分失败则中止推送）；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
+            f"- G·2+3：增长因子全表保留；增长分前{MX_PUSH_TOP_N_DEFAULT} 调用独立成长因子写入「G·2+3」（打分失败不回退增长分前三）。回测 G 月频同比不改。",
             "- 半凯利取 Q 排名 Top2，不跟东财推送名单。",
             "",
         ]
@@ -531,7 +534,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--mx-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="交给独立成长因子的 Q 只数（默认 13；打分失败则中止推送）",
+        help="交给独立成长因子的 Q 只数，以及 G·2+3 增长分只数（默认 13；打分失败则中止该组，不回退）",
     )
     p.add_argument(
         "--kelly-top-n",
@@ -680,6 +683,16 @@ def main(argv=None) -> int:
         group_name="G·2+3",
         name_map=pool_names,
     )
+    from factor_growthT_indicator import rank_yoy_top_by_growth
+
+    _g_ranked, g_growth_notes = rank_yoy_top_by_growth(
+        G_RANK_CSV,
+        group_name="G·2+3",
+        out_csv=G_GROWTH_CSV,
+        top_n=int(args.mx_push_top_n),
+        name_map=pool_names,
+    )
+    g_notes.extend(g_growth_notes)
     for note in g_notes:
         print(f"  {note}", flush=True)
 

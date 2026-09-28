@@ -121,7 +121,7 @@ def write_yoy_rank_csv(
     group_name: str,
     name_map: Optional[Dict[str, str]] = None,
 ) -> List[str]:
-    """观察池按增长因子排序写 CSV。列含分组/排名/代码，供市场雷达取前 3。"""
+    """观察池按增长因子排序写 CSV。前 13 再交四层成长因子；雷达前 3 读那张重排表。"""
     import os
 
     notes: List[str] = []

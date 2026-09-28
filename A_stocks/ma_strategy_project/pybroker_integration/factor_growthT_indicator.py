@@ -619,17 +619,34 @@ DEFAULT_Q_RANK_CSV = os.path.join(
 DEFAULT_Q_GROWTH_CSV = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "vp_combo_23_q_growth_rank.csv"
 )
+DEFAULT_G46_RANK_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "pattern_entry_g_rank.csv"
+)
+DEFAULT_G46_GROWTH_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "pattern_entry_g_growth_rank.csv"
+)
+DEFAULT_G23_RANK_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "vp_combo_23_g_rank.csv"
+)
+DEFAULT_G23_GROWTH_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "vp_combo_23_g_growth_rank.csv"
+)
 DEFAULT_COMBINED_GROWTH_CSV = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "factor_growth_ranking.csv"
 )
 UPSTREAM_GROWTH_SPECS = (
     ("M加", DEFAULT_MPLUS_RANK_CSV, DEFAULT_MPLUS_GROWTH_CSV),
     ("Q", DEFAULT_Q_RANK_CSV, DEFAULT_Q_GROWTH_CSV),
+    ("G·4+6", DEFAULT_G46_RANK_CSV, DEFAULT_G46_GROWTH_CSV),
+    ("G·2+3", DEFAULT_G23_RANK_CSV, DEFAULT_G23_GROWTH_CSV),
 )
 
 
 def _norm_code(raw) -> str:
-    s = "".join(ch for ch in str(raw) if ch.isdigit()).zfill(6)
+    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    if not digits:
+        return ""
+    s = digits.zfill(6)
     return s if len(s) == 6 else ""
 
 
@@ -657,20 +674,32 @@ def _read_csv_flexible(path: str) -> pd.DataFrame:
 
 
 def top_symbols_from_rank_csv(path: str, top_n: int = GROWTH_TOP_N_DEFAULT) -> List[str]:
+    """读上游排名表前 N。代码列兼容 symbol / 股票代码；有排名列时按排名升序。"""
     p = os.path.abspath(path)
     if not os.path.isfile(p):
         return []
     df = _read_csv_flexible(p)
-    if df is None or df.empty or "symbol" not in df.columns:
+    if df is None or df.empty:
         return []
+    cols = {str(c).strip(): c for c in df.columns}
+    code_col = cols.get("symbol") or cols.get("股票代码") or cols.get("代码")
+    if code_col is None:
+        return []
+    work = df.copy()
+    rank_col = cols.get("排名") or cols.get("rank")
+    if rank_col is not None:
+        work["_rank"] = pd.to_numeric(work[rank_col], errors="coerce")
+        work = work.sort_values("_rank", ascending=True, na_position="last", kind="mergesort")
     n = max(1, int(top_n))
     out: List[str] = []
     seen = set()
-    for raw in df["symbol"].head(n).tolist():
+    for raw in work[code_col].tolist():
         s = _norm_code(raw)
         if s and s not in seen:
             seen.add(s)
             out.append(s)
+        if len(out) >= n:
+            break
     return out
 
 
@@ -734,19 +763,51 @@ def rank_and_push_symbols(
     return ranked, notes, details or {}
 
 
+def rank_yoy_top_by_growth(
+    src_csv: str,
+    *,
+    group_name: str,
+    out_csv: str,
+    top_n: int = GROWTH_TOP_N_DEFAULT,
+    name_map: Optional[Dict[str, str]] = None,
+    skip_push: bool = True,
+) -> Tuple[Optional[List[str]], List[str]]:
+    """增长因子表前 N 交给四层成长因子。表空则跳过；打分失败不写成长表、不回退增长分前三。"""
+    notes: List[str] = []
+    g = str(group_name or "").strip() or "G"
+    current = top_symbols_from_rank_csv(src_csv, top_n)
+    if not current:
+        notes.append(f"「{g}」增长因子表为空，跳过成长因子排序")
+        return None, notes
+    notes.append(
+        f"「{g}」增长分前{len(current)} 只调用独立成长因子（仅排序，暂不推送东财）"
+    )
+    ranked, pn, _details = rank_and_push_symbols(
+        current,
+        group_name=g,
+        ranking_file=out_csv,
+        skip_push=skip_push,
+        name_map=name_map,
+    )
+    notes.extend(pn)
+    return ranked, notes
+
+
 def run_from_upstream_top13(
     *,
     top_n: int = GROWTH_TOP_N_DEFAULT,
     skip_push: bool = True,
     ranking_file: Optional[str] = None,
 ) -> int:
-    """单独点「成长因子」：用形态建仓 M+ 前N、回测对比 Q 前N，各组独立排序写 CSV。不排量能，暂不推东财。"""
+    """单独点「成长因子」：M+、Q、G·4+6、G·2+3 各取上游前 N，组内独立排序写 CSV。不排量能，暂不推东财。"""
     n = max(1, int(top_n))
     combined = ranking_file or DEFAULT_COMBINED_GROWTH_CSV
     print("=" * 80)
     print("成长因子排序 · 上游前13（不读东财导出 txt，不排量能，暂不推东财）")
-    print(f"M+ ← {os.path.basename(DEFAULT_MPLUS_RANK_CSV)}  Top{n} → 「M加」成长表")
-    print(f"Q  ← {os.path.basename(DEFAULT_Q_RANK_CSV)}  Top{n} → 「Q」成长表")
+    for group, src, out_csv in UPSTREAM_GROWTH_SPECS:
+        print(
+            f"{group} ← {os.path.basename(src)}  Top{n} → {os.path.basename(out_csv)}"
+        )
     print("=" * 80)
 
     all_rows: List[dict] = []
@@ -847,12 +908,12 @@ def run_mx_group_growth_rank(
 
 
 def main():
-    """默认：上游 M+/Q 前13 成长排序写 CSV。--symbols+--group 供形态建仓/回测对比调用。"""
+    """默认：上游 M+/Q/G 前13 成长排序写 CSV。--symbols+--group 供形态建仓/回测对比调用。"""
     parser = argparse.ArgumentParser(description="稳健高质量成长因子")
     parser.add_argument(
         "--from-upstream-top13",
         action="store_true",
-        help="从形态建仓 M+排名表、回测对比 Q排名表取前N只，各组独立成长排序写 CSV（不排量能，暂不推东财）",
+        help="从 M+、Q、G·4+6、G·2+3 上游排名表取前N只，各组独立成长排序写 CSV（不排量能，暂不推东财）",
     )
     parser.add_argument(
         "--symbols",
@@ -862,7 +923,7 @@ def main():
     parser.add_argument(
         "--group",
         default="",
-        help="分组标签（M加 或 Q，仅用于 CSV）",
+        help="分组标签（M加、Q、G·4+6 或 G·2+3，仅用于 CSV）",
     )
     parser.add_argument(
         "--ranking-file",
@@ -904,7 +965,7 @@ def main():
 
     if symbols or group:
         if not symbols or not group:
-            print("[fail] 指定 --symbols 时必须同时给 --group（M加 或 Q）")
+            print("[fail] 指定 --symbols 时必须同时给 --group（M加、Q、G·4+6 或 G·2+3）")
             raise SystemExit(2)
         ranked, notes, _details = rank_and_push_symbols(
             symbols,
@@ -918,7 +979,7 @@ def main():
 
     if not bool(args.backtest):
         if str(args.from_mx_groups or "").strip():
-            print("[warn] --from-mx-groups 已停用（量能已退出）。改走上游 M+/Q 前13。")
+            print("[warn] --from-mx-groups 已停用（量能已退出）。改走上游 M+/Q/G 前13。")
         raise SystemExit(
             run_from_upstream_top13(
                 top_n=int(args.top_n),

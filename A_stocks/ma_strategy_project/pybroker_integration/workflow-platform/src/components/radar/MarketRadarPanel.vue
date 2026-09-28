@@ -173,10 +173,14 @@ function openGrowthWorkflow() {
   void router.push({ path: '/workflows', query: { step: GROWTH_STEP_ID } })
 }
 
-/** 各组表格来源不同；空态不要把 G 也指到成长因子排序。 */
+/** 四组雷达名单都来自前 13 的成长因子排序；G 的前 13 来自增长分表。 */
 function emptyGroupHint(name: string) {
-  if (name.endsWith('·4+6') || name === 'G·4+6') return '请先运行「形态建仓」生成该组表格。'
-  if (name.endsWith('·2+3') || name === 'G·2+3') return '请先运行「回测对比」生成该组表格。'
+  if (name.endsWith('·4+6') || name === 'G·4+6') {
+    return '请先运行「形态建仓」或「按成长因子排序」生成该组表格。'
+  }
+  if (name.endsWith('·2+3') || name === 'G·2+3') {
+    return '请先运行「回测对比」或「按成长因子排序」生成该组表格。'
+  }
   return '请先运行「按成长因子排序」生成该组表格。'
 }
 
@@ -216,7 +220,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          M加 / Q 来自「按成长因子排序」，G·4+6 来自「形态建仓」，G·2+3 来自「回测对比」，各组前 3（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          M加、Q、G·4+6、G·2+3 均来自各组前 13 的成长因子排序（M加取动量前 13，Q 取公司质量前 13，G 取增长分前 13），再各取前 3（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -439,7 +443,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有因子自选名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          M加、Q 来自「按成长因子排序」，G·4+6 来自「形态建仓」，G·2+3 来自「回测对比」。各组取前三（不足则全列），不使用观察池、不含「量能」。
+          M加、Q、G·4+6、G·2+3 均来自各组前 13 的成长因子排序，再各取前三（不足则全列）。不使用观察池、不含「量能」。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序
