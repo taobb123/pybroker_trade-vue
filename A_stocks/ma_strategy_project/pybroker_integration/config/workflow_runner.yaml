@@ -125,6 +125,8 @@ steps:
     label: G·4+6增长因子排序（取前13交成长因子）
   - path: pattern_entry_g_growth_rank.csv
     label: G·4+6前13成长因子排序
+  - path: pattern_entry_volume_growth_rank.csv
+    label: 量能确认建仓成长因子排序
   - path: pattern_entry_mminus_rank.csv
     label: 观察池M-排名表
   - path: pattern_entry_kelly_positions.csv
@@ -319,7 +321,7 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 读取 M+动量前13、Q前13、G·4+6与G·2+3增长分前13，组内成长排序写 CSV；不排量能、暂不推东财
+  frequency_note: 读取 M+动量前13、Q前13、G·4+6与G·2+3增长分前13，以及形态建仓全部确认建仓；组内成长排序写 CSV；暂不推东财
   workspace_inputs:
   - path: pattern_entry_mplus_rank.csv
     label: 形态建仓 M+动量排名（取前13）
@@ -329,9 +331,11 @@ steps:
     label: G·4+6增长因子排序（取前13）
   - path: vp_combo_23_g_rank.csv
     label: G·2+3增长因子排序（取前13）
+  - path: pattern_entry_scan.csv
+    label: 形态建仓信号表（取确认建仓）
   workspace_outputs:
   - path: factor_growth_ranking.csv
-    label: 成长综合得分表（M加+Q+G）
+    label: 成长综合得分表（M加+Q+G+量能）
   - path: pattern_entry_mplus_growth_rank.csv
     label: M+前13成长因子排序
   - path: vp_combo_23_q_growth_rank.csv
@@ -340,6 +344,8 @@ steps:
     label: G·4+6前13成长因子排序
   - path: vp_combo_23_g_growth_rank.csv
     label: G·2+3前13成长因子排序
+  - path: pattern_entry_volume_growth_rank.csv
+    label: 量能确认建仓成长因子排序
 - id: compute_today
   title: 做 T 止盈止损
   type: script

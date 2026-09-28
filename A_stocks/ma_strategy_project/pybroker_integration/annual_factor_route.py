@@ -186,7 +186,7 @@ def route_snapshot(
         "append": append,
         "champions": champions,
         "extras": extras,
-        "groups": ["M加", "Q", "G·4+6", "G·2+3"] + [e["tab"] for e in extras],
+        "groups": ["M加", "Q", "G·4+6", "G·2+3", "量能"] + [e["tab"] for e in extras],
     }
 
 
@@ -196,7 +196,7 @@ def expiry_hint(snapshot: dict[str, Any]) -> Optional[str]:
     when = snapshot.get("generated_at") or "未知"
     return (
         f"回测对比报告已过期（生成于 {when}）。"
-        "年化追加已停用，因子自选只保留 M加 / Q / G·4+6 / G·2+3。"
+        "年化追加已停用，因子自选保留 M加 / Q / G·4+6 / G·2+3，以及量能全部确认建仓。"
         "请在「回测对比」打开回测并重新运行，生成新表后再恢复追加。"
     )
 

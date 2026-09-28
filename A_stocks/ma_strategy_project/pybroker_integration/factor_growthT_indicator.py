@@ -634,6 +634,25 @@ DEFAULT_G23_GROWTH_CSV = os.path.join(
 DEFAULT_COMBINED_GROWTH_CSV = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "factor_growth_ranking.csv"
 )
+DEFAULT_PATTERN_SCAN_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "pattern_entry_scan.csv"
+)
+DEFAULT_VOLUME_GROWTH_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "pattern_entry_volume_growth_rank.csv"
+)
+VOLUME_GROUP_NAME = "量能"
+_EMPTY_GROWTH_COLUMNS = (
+    "分组",
+    "排名",
+    "股票代码",
+    "股票名称",
+    "行业",
+    "总分",
+    "资产安全得分",
+    "现金流质量得分",
+    "盈利质量得分",
+    "运营效率得分",
+)
 UPSTREAM_GROWTH_SPECS = (
     ("M加", DEFAULT_MPLUS_RANK_CSV, DEFAULT_MPLUS_GROWTH_CSV),
     ("Q", DEFAULT_Q_RANK_CSV, DEFAULT_Q_GROWTH_CSV),
@@ -701,6 +720,110 @@ def top_symbols_from_rank_csv(path: str, top_n: int = GROWTH_TOP_N_DEFAULT) -> L
         if len(out) >= n:
             break
     return out
+
+
+def _entry_flag(raw) -> bool:
+    text = str(raw or "").strip().lower()
+    return text in {"1", "true", "yes", "y"}
+
+
+def load_confirmed_entry_symbols(path: str) -> Tuple[List[str], Dict[str, str], str]:
+    """
+    读形态建仓信号表里的确认建仓（state_code=entry / 待选后通过）。
+    返回 (代码, 名称, 状态)。状态为 missing / empty / ok。不截前 N。
+    """
+    p = os.path.abspath(path)
+    if not os.path.isfile(p):
+        return [], {}, "missing"
+    df = _read_csv_flexible(p)
+    if df is None or df.empty:
+        return [], {}, "empty"
+    cols = {str(c).strip(): c for c in df.columns}
+    code_col = cols.get("symbol") or cols.get("股票代码") or cols.get("代码")
+    if code_col is None:
+        return [], {}, "empty"
+    name_col = cols.get("stock_name") or cols.get("股票名称") or cols.get("名称")
+    state_code_col = cols.get("state_code")
+    select_col = cols.get("select_tag")
+    state_col = cols.get("state")
+    entry_col = cols.get("entry")
+    out: List[str] = []
+    names: Dict[str, str] = {}
+    seen = set()
+    for _, row in df.iterrows():
+        confirmed = False
+        if state_code_col is not None:
+            confirmed = str(row.get(state_code_col) or "").strip().lower() == "entry"
+        elif select_col is not None:
+            confirmed = str(row.get(select_col) or "").strip() == "待选后通过"
+        elif state_col is not None:
+            confirmed = str(row.get(state_col) or "").strip() == "建仓"
+        elif entry_col is not None:
+            confirmed = _entry_flag(row.get(entry_col))
+        if not confirmed:
+            continue
+        sym = _norm_code(row.get(code_col))
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        out.append(sym)
+        if name_col is not None:
+            nm = str(row.get(name_col) or "").strip()
+            if nm and nm.lower() not in {"nan", "none"}:
+                names[sym] = nm
+    return out, names, ("ok" if out else "empty")
+
+
+def _write_empty_growth_csv(path: str) -> None:
+    out = os.path.abspath(path)
+    ddir = os.path.dirname(out)
+    if ddir:
+        os.makedirs(ddir, exist_ok=True)
+    pd.DataFrame(columns=list(_EMPTY_GROWTH_COLUMNS)).to_csv(
+        out, index=False, encoding="utf-8-sig"
+    )
+    print(f"[ok] 空成长表已保存: {out}")
+
+
+def rank_volume_confirmed_entries(
+    symbols: Sequence[str],
+    *,
+    out_csv: str = DEFAULT_VOLUME_GROWTH_CSV,
+    name_map: Optional[Dict[str, str]] = None,
+    group_name: str = VOLUME_GROUP_NAME,
+) -> Tuple[Optional[List[str]], List[str], Dict[str, Dict]]:
+    """
+    确认建仓股全部做成长因子排序并写 CSV。不截前 13，不推东财。
+    名单为空时写空表，避免雷达沿用上一轮确认股。
+    """
+    notes: List[str] = []
+    g = str(group_name or VOLUME_GROUP_NAME).strip() or VOLUME_GROUP_NAME
+    current = []
+    seen = set()
+    for raw in symbols:
+        sym = _norm_code(raw)
+        if sym and sym not in seen:
+            seen.add(sym)
+            current.append(sym)
+    if not current:
+        try:
+            _write_empty_growth_csv(out_csv)
+            notes.append(f"「{g}」无确认建仓，已写空成长表（不截前13，暂不推东财）")
+        except Exception as exc:
+            notes.append(f"「{g}」空成长表写入失败（{exc}）")
+        return [], notes, {}
+    notes.append(
+        f"「{g}」确认建仓 {len(current)} 只调用独立成长因子（全部排序，不截前13，暂不推东财）"
+    )
+    ranked, pn, details = rank_and_push_symbols(
+        current,
+        group_name=g,
+        ranking_file=out_csv,
+        skip_push=True,
+        name_map=name_map,
+    )
+    notes.extend(pn)
+    return ranked, notes, details or {}
 
 
 def rank_and_push_symbols(
@@ -799,15 +922,19 @@ def run_from_upstream_top13(
     skip_push: bool = True,
     ranking_file: Optional[str] = None,
 ) -> int:
-    """单独点「成长因子」：M+、Q、G·4+6、G·2+3 各取上游前 N，组内独立排序写 CSV。不排量能，暂不推东财。"""
+    """单独点「成长因子」：M+、Q、G 各取上游前 N；量能取信号表全部确认建仓。组内独立排序写 CSV。暂不推东财。"""
     n = max(1, int(top_n))
     combined = ranking_file or DEFAULT_COMBINED_GROWTH_CSV
     print("=" * 80)
-    print("成长因子排序 · 上游前13（不读东财导出 txt，不排量能，暂不推东财）")
+    print("成长因子排序 · 上游前13 + 量能确认建仓全部（不读东财导出 txt，暂不推东财）")
     for group, src, out_csv in UPSTREAM_GROWTH_SPECS:
         print(
             f"{group} ← {os.path.basename(src)}  Top{n} → {os.path.basename(out_csv)}"
         )
+    print(
+        f"{VOLUME_GROUP_NAME} ← {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}  "
+        f"确认建仓全部 → {os.path.basename(DEFAULT_VOLUME_GROWTH_CSV)}"
+    )
     print("=" * 80)
 
     all_rows: List[dict] = []
@@ -834,6 +961,28 @@ def run_from_upstream_top13(
         industries = get_stock_industries(ranked)
         all_rows.extend(_ranking_rows(group, ranked, details, names, industries))
 
+    print("-" * 72)
+    vol_syms, vol_names, vol_status = load_confirmed_entry_symbols(DEFAULT_PATTERN_SCAN_CSV)
+    if vol_status == "missing":
+        print(
+            f"  跳过「{VOLUME_GROUP_NAME}」：无 {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}（请先跑形态建仓）"
+        )
+    else:
+        print(f"  信号表确认建仓 {len(vol_syms)} 只（不截前13）")
+        vol_ranked, vol_notes, vol_details = rank_volume_confirmed_entries(
+            vol_syms,
+            name_map=vol_names,
+        )
+        for line in vol_notes:
+            print(f"  {line}")
+        if vol_ranked:
+            any_ok = True
+            names = get_stock_names(vol_ranked)
+            industries = get_stock_industries(vol_ranked)
+            all_rows.extend(
+                _ranking_rows(VOLUME_GROUP_NAME, vol_ranked, vol_details, names, industries)
+            )
+
     if all_rows:
         try:
             _save_ranking_csv(all_rows, combined)
@@ -841,7 +990,7 @@ def run_from_upstream_top13(
             print(f"[warn] 保存合并成长表失败: {save_err}")
     else:
         _save_ranking_csv([], combined)
-        print("成长表为空（上游前13均不可用或打分失败）")
+        print("成长表为空（上游前13与量能确认建仓均不可用或打分失败）")
 
     return 0 if any_ok else 2
 
@@ -913,7 +1062,7 @@ def main():
     parser.add_argument(
         "--from-upstream-top13",
         action="store_true",
-        help="从 M+、Q、G·4+6、G·2+3 上游排名表取前N只，各组独立成长排序写 CSV（不排量能，暂不推东财）",
+        help="从 M+、Q、G·4+6、G·2+3 上游排名表取前N只，并排信号表全部确认建仓；各组独立成长排序写 CSV（暂不推东财）",
     )
     parser.add_argument(
         "--symbols",
@@ -979,7 +1128,7 @@ def main():
 
     if not bool(args.backtest):
         if str(args.from_mx_groups or "").strip():
-            print("[warn] --from-mx-groups 已停用（量能已退出）。改走上游 M+/Q/G 前13。")
+            print("[warn] --from-mx-groups 已停用。改走上游 M+/Q/G 前13，量能改读信号表确认建仓。")
         raise SystemExit(
             run_from_upstream_top13(
                 top_n=int(args.top_n),

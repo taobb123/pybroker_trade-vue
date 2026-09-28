@@ -62,12 +62,15 @@ GROWTH_PICK_TABLES = (
     ("G·4+6", _SCRIPT_DIR / "pattern_entry_g_growth_rank.csv"),
     ("G·2+3", _SCRIPT_DIR / "vp_combo_23_g_growth_rank.csv"),
 )
-GROWTH_GROUPS = ("M加", "Q", "G·4+6", "G·2+3")
+VOLUME_GROUP = "量能"
+VOLUME_GROWTH_CSV = _SCRIPT_DIR / "pattern_entry_volume_growth_rank.csv"
+GROWTH_GROUPS = ("M加", "Q", "G·4+6", "G·2+3", VOLUME_GROUP)
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·4+6 / G·2+3 各前3"
+GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·4+6 / G·2+3 各前3 · 量能全部确认建仓"
 GROWTH_FILES_LABEL = (
     "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv, "
-    "pattern_entry_g_growth_rank.csv, vp_combo_23_g_growth_rank.csv"
+    "pattern_entry_g_growth_rank.csv, vp_combo_23_g_growth_rank.csv, "
+    "pattern_entry_volume_growth_rank.csv"
 )
 
 
@@ -251,6 +254,8 @@ def growth_ranking_mtime() -> str:
     for _group, path in GROWTH_PICK_TABLES:
         if path.is_file():
             times.append(int(path.stat().st_mtime))
+    if VOLUME_GROWTH_CSV.is_file():
+        times.append(int(VOLUME_GROWTH_CSV.stat().st_mtime))
     if times:
         return str(max(times))
     return "missing"
@@ -259,7 +264,7 @@ def growth_ranking_mtime() -> str:
 def _picks_from_growth_table(
     path: Path,
     group: str,
-    top_n: int,
+    top_n: Optional[int],
 ) -> list[dict[str, Any]]:
     df = _read_csv_flexible(path)
     if df is None or df.empty:
@@ -283,7 +288,7 @@ def _picks_from_growth_table(
     picks: list[dict[str, Any]] = []
     seen_in_group: set[str] = set()
     for _, row in work.iterrows():
-        if len(picks) >= top_n:
+        if top_n is not None and len(picks) >= top_n:
             break
         sym = six_digit(row.get(code_col))
         if not sym or sym in seen_in_group:
@@ -365,8 +370,18 @@ def _extra_group_picks(pool: str, factor: str, group: str, top_n: int) -> list[d
     return _picks_from_growth_table(path, group, top_n)
 
 
+def _volume_growth_picks() -> tuple[list[dict[str, Any]], bool, bool]:
+    """量能：确认建仓的成长排序全部入雷达，不截前 3。返回 (名单, 缺文件, 表空)。"""
+    if not VOLUME_GROWTH_CSV.is_file():
+        return [], True, False
+    picks = _picks_from_growth_table(VOLUME_GROWTH_CSV, VOLUME_GROUP, None)
+    if not picks:
+        return [], False, True
+    return picks, False, False
+
+
 def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, Any]], str | None]:
-    """四组均来自各自前 13 的四层成长排序。G 的前 13 取自增长分。各组再取前 N。"""
+    """四组均来自各自前 13 的四层成长排序。G 的前 13 取自增长分。各组再取前 N。不含雷达「量能」。"""
     picks, missing_groups, empty_groups = _base_growth_picks(top_n)
     hint = _growth_hint(picks, missing_groups, empty_groups, base_only=True)
     return picks, hint
@@ -375,11 +390,18 @@ def load_growth_factor_picks(top_n: int = GROWTH_TOP_N) -> tuple[list[dict[str, 
 def load_radar_factor_picks(
     top_n: int = GROWTH_TOP_N,
 ) -> tuple[list[dict[str, Any]], str | None, dict[str, Any]]:
-    """雷达因子自选：现有四组，外加未过期且已打开回测时的年化冠军。"""
+    """雷达因子自选：四组各前 N，量能为全部确认建仓，外加未过期且已打开回测时的年化冠军。"""
     from annual_factor_route import expiry_hint, route_snapshot
 
     snapshot = route_snapshot()
     picks, missing_groups, empty_groups = _base_growth_picks(top_n)
+    vol_picks, vol_missing, vol_empty = _volume_growth_picks()
+    if vol_missing:
+        missing_groups.append(VOLUME_GROUP)
+    elif vol_empty:
+        empty_groups.append(VOLUME_GROUP)
+    else:
+        picks.extend(vol_picks)
     if snapshot.get("append"):
         for extra in snapshot.get("extras") or []:
             group = str(extra.get("tab") or "")
@@ -411,7 +433,7 @@ def _growth_hint(
         if missing_groups and len(missing_groups) >= len(GROWTH_PICK_TABLES):
             return (
                 "未找到因子自选表。请先运行「按成长因子排序」，"
-                "或分别运行「形态建仓」「回测对比」生成各组前13成长表。"
+                "或分别运行「形态建仓」「回测对比」生成各组前13成长表和量能确认建仓成长表。"
             )
         return "因子自选表中没有可用标的，请重新运行形态建仓、回测对比和按成长因子排序。"
     bits: list[str] = []
@@ -435,7 +457,13 @@ def universe_payload(
     report_generated_at: str | None = None,
 ) -> dict[str, Any]:
     names = list(groups or GROWTH_GROUPS)
-    label = "因子自选 · " + " / ".join(names) + " 各前3"
+    capped = [n for n in names if n != VOLUME_GROUP]
+    bits: list[str] = []
+    if capped:
+        bits.append(" / ".join(capped) + " 各前3")
+    if VOLUME_GROUP in names:
+        bits.append("量能全部确认建仓")
+    label = "因子自选 · " + " · ".join(bits or ["各前3"])
     return {
         "source": "growth_factor",
         "label": label,

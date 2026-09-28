@@ -18,8 +18,8 @@ import {
 } from '@/domain/marketRadar'
 
 const GROWTH_STEP_ID = 'growth_factor'
-/** 现有四组；年化追加的 Tab 由接口 groups 接在后面 */
-const BASE_GROUPS = ['M加', 'Q', 'G·4+6', 'G·2+3'] as const
+/** 四组各前 3，量能为全部确认建仓；年化追加的 Tab 由接口 groups 接在后面 */
+const BASE_GROUPS = ['M加', 'Q', 'G·4+6', 'G·2+3', '量能'] as const
 const HIGHLIGHT_MS = 2500
 
 const props = defineProps<{
@@ -173,8 +173,11 @@ function openGrowthWorkflow() {
   void router.push({ path: '/workflows', query: { step: GROWTH_STEP_ID } })
 }
 
-/** 四组雷达名单都来自前 13 的成长因子排序；G 的前 13 来自增长分表。 */
+/** 四组来自前 13 的成长因子排序后再取前 3；量能是确认建仓全部。 */
 function emptyGroupHint(name: string) {
+  if (name === '量能') {
+    return '请先运行「形态建仓」或「按成长因子排序」，对确认建仓股做成长排序。'
+  }
   if (name.endsWith('·4+6') || name === 'G·4+6') {
     return '请先运行「形态建仓」或「按成长因子排序」生成该组表格。'
   }
@@ -220,7 +223,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          M加、Q、G·4+6、G·2+3 均来自各组前 13 的成长因子排序（M加取动量前 13，Q 取公司质量前 13，G 取增长分前 13），再各取前 3（不足则全列）→ 申万行业分类 → 沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          M加、Q、G·4+6、G·2+3 来自各组前 13 的成长因子排序（M加取动量前 13，Q 取公司质量前 13，G 取增长分前 13），再各取前 3。量能取形态建仓里全部确认建仓股，按成长因子排序后整组进入，不截前 13、不截前 3。随后映射申万行业，对照沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -342,7 +345,7 @@ defineExpose({ refresh: load })
           v-else
           class="rounded-lg border border-dashed bg-background/60 px-3 py-6 text-center text-sm text-muted-foreground"
         >
-          <p v-if="emptyUniverse">请先运行「按成长因子排序」「形态建仓」「回测对比」，生成 M加 / Q / G 名单。</p>
+          <p v-if="emptyUniverse">请先运行「按成长因子排序」「形态建仓」「回测对比」，生成 M加 / Q / G / 量能名单。</p>
           <p v-else-if="loading">正在映射申万行业…</p>
           <p v-else>暂无板块数据</p>
           <Button
@@ -371,7 +374,7 @@ defineExpose({ refresh: load })
           </p>
         </div>
         <span class="shrink-0 text-[11px] text-muted-foreground">
-          {{ payload?.stocks.length ?? 0 }} 只 · M加/Q/G·4+6/G·2+3 各前3
+          {{ payload?.stocks.length ?? 0 }} 只 · {{ payload?.universe?.label || '因子自选' }}
         </span>
       </div>
       <Tabs v-if="payload?.stocks.length" v-model="activeGroup" class="w-full">
@@ -443,7 +446,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有因子自选名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          M加、Q、G·4+6、G·2+3 均来自各组前 13 的成长因子排序，再各取前三（不足则全列）。不使用观察池、不含「量能」。
+          M加、Q、G·4+6、G·2+3 来自各组前 13 的成长因子排序，再各取前三。量能是确认建仓股按成长因子排序后的全部。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

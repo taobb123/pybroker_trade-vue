@@ -169,6 +169,7 @@ const MOCK_STEPS: WorkflowStep[] = [
       { path: 'pattern_entry_mplus_growth_rank.csv', label: 'M+前13成长因子排序' },
       { path: 'pattern_entry_g_rank.csv', label: 'G·4+6增长因子排序（取前13交成长因子）' },
       { path: 'pattern_entry_g_growth_rank.csv', label: 'G·4+6前13成长因子排序' },
+      { path: 'pattern_entry_volume_growth_rank.csv', label: '量能确认建仓成长因子排序' },
       { path: 'pattern_entry_mminus_rank.csv', label: '观察池M-排名表' },
     ],
   }),

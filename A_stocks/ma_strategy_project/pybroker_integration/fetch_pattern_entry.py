@@ -14,8 +14,9 @@
   --combo-id 0 表示扫描全部已注册形态。
 
 跑完后：默认不推东财分组。M+ 动量前13、G·4+6 增长分前13 分别调用独立成长因子写 CSV；
+确认建仓（待选后通过）全部再做一组成长排序，不截前13，写入量能成长表。
 「Q」与 G·2+3 由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
-不推 M减 / 估值因子 / 量能。半凯利仍取 M+ 排名 Top2。观察池入池条件不变。
+不推 M减 / 估值因子，也不按成长分重推东财「量能」。半凯利仍取 M+ 排名 Top2。观察池入池条件不变。
 
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
@@ -74,6 +75,7 @@ DEFAULT_MPLUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_rank.csv"
 DEFAULT_MPLUS_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mplus_growth_rank.csv")
 DEFAULT_G_RANK_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_g_rank.csv")
 DEFAULT_G_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_g_growth_rank.csv")
+DEFAULT_VOLUME_GROWTH_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_volume_growth_rank.csv")
 DEFAULT_MMINUS_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_mminus_rank.csv")
 DEFAULT_KELLY_OUT_CSV = os.path.join(_SCRIPT_DIR, "pattern_entry_kelly_positions.csv")
 
@@ -2126,6 +2128,27 @@ def main() -> None:
     )
     g_notes.extend(g_growth_notes)
 
+    entry_syms: List[str] = []
+    entry_names: Dict[str, str] = {}
+    seen_entry = set()
+    for r in results:
+        if str(getattr(r, "state", "") or "") != "entry":
+            continue
+        s = _norm_symbol(r.symbol)
+        if len(s) != 6 or s in seen_entry:
+            continue
+        seen_entry.add(s)
+        entry_syms.append(s)
+        if r.stock_name:
+            entry_names[s] = str(r.stock_name)
+    from factor_growthT_indicator import rank_volume_confirmed_entries
+
+    _vol_ranked, volume_notes, _vol_details = rank_volume_confirmed_entries(
+        entry_syms,
+        out_csv=DEFAULT_VOLUME_GROWTH_CSV,
+        name_map=entry_names,
+    )
+
     kelly_notes: List[str] = []
     kelly_rows, kn = build_pattern_kelly_rows(
         results,
@@ -2167,6 +2190,10 @@ def main() -> None:
     if g_notes:
         print("【G·4+6】（增长因子全表保留；前13调用独立成长因子；不改入池，不推东财）")
         for pn in g_notes:
+            print(f"  {pn}")
+    if volume_notes:
+        print("【量能】（确认建仓全部调用独立成长因子；不截前13，不推东财）")
+        for pn in volume_notes:
             print(f"  {pn}")
     if kelly_notes:
         print("【凯利仓位·M加】")
