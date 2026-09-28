@@ -52,10 +52,3 @@
 600718,东软集团,volume_dump_reversal,6,下跌放量,观察,watch,,False,0.0,False,False,0.0,2026-09-28,2026-09-17,8.42,8.42,8.42,56849.3,7.71,7.84,0,6,False,False,False,False,
 600869,远东股份,volume_dump_reversal,6,下跌放量,观察,watch,,False,0.0,False,False,0.0,2026-09-28,2026-07-31,30.49,30.49,30.49,1102867.69,13.07,18.09,0,40,False,False,False,False,
 601607,上海医药,volume_dump_reversal,6,下跌放量,观察,watch,,False,0.0,False,False,0.0,2026-09-28,2026-09-28,16.58,16.58,15.89,88359.84,15.83,15.89,0,0,False,False,False,False,下跌放量当日，只观察不买
-000628,高新发展,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,True,True,5.0,2026-09-07,2026-08-03,50.05,57.97,54.01,245264.36,36.5,53.38,2,39,True,True,False,False,止跌缩量候选；放量突破压力50.05·试仓20%；缩量回踩不破压力·加仓至60%；再突破超时(确认后>10日)；MA5强承接
-002149,西部材料,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,50.44,50.44,50.44,313662.66,31.83,31.55,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(31.2800<31.8300)
-002266,浙富控股,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,5.82,5.82,5.82,823589.5,4.57,4.53,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(4.4800<4.5700)
-600392,盛和资源,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,29.88,29.88,29.88,719890.98,20.5,20.13,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(20.0100<20.5000)
-600459,贵研铂业,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,27.65,27.65,27.65,237719.58,18.24,17.9,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(17.7800<18.2400)
-600531,豫光金铅,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,15.89,15.89,15.89,463099.59,11.51,11.03,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(10.9600<11.5100)
-600961,株冶集团,volume_dump_reversal,6,下跌放量,作废,invalid,,False,0.0,False,False,5.0,2026-09-28,2026-07-31,32.77,32.77,32.77,515788.34,22.36,22.31,0,40,False,False,False,False,止跌缩量候选；再创恐慌新低(22.0600<22.3600)
