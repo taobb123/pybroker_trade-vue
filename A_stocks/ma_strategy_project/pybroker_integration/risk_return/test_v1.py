@@ -26,7 +26,25 @@ from risk_return.engine import report_from_samples, run_mplus_t3
 from risk_return.io import read_bars_csv, write_json
 from risk_return.monte_carlo import kelly_raw, simulate_wealth
 from risk_return.samples import forward_return_exact
-from risk_return.service import latest_payload, run_payload
+from risk_return.correlation import TOP_LEVEL_KEYS as CORR_KEYS
+from risk_return.regime import TOP_LEVEL_KEYS as REGIME_KEYS
+from risk_return.regime import build_regime_report
+from risk_return.budget import TOP_LEVEL_KEYS as BUDGET_KEYS
+from risk_return.budget import build_budget_report
+from risk_return.budget import estimate_quarter_kelly
+from risk_return.copula import TOP_LEVEL_KEYS as COPULA_KEYS
+from risk_return.copula import build_copula_report, norm_ppf
+from risk_return.service import (
+    budget_payload,
+    copula_payload,
+    correlation_payload,
+    latest_payload,
+    regime_payload,
+    run_payload,
+    walkforward_payload,
+)
+from risk_return.walkforward import TOP_LEVEL_KEYS as WF_KEYS
+from risk_return.walkforward import build_walkforward_report
 from risk_return.system_samples import samples_from_mplus_panel
 from risk_return_api import router
 
@@ -283,6 +301,275 @@ class ApiTests(unittest.TestCase):
         body = response.json()
         self.assertIn("empty", body)
         self.assertIn("report", body)
+
+    def test_correlation_route_exists(self) -> None:
+        paths = [getattr(route, "path", "") for route in router.routes]
+        self.assertIn("/api/risk-return/correlation", paths)
+        self.assertIn("/api/risk-return/regime", paths)
+        self.assertIn("/api/risk-return/budget", paths)
+        self.assertIn("/api/risk-return/walkforward", paths)
+        self.assertIn("/api/risk-return/copula", paths)
+
+
+class CorrelationTests(unittest.TestCase):
+    def _write_pair(self, root: Path, values: list[float]) -> tuple[Path, Path]:
+        dates = pd.bdate_range("2024-01-02", periods=len(values))
+        group = root / "group_returns.csv"
+        sleeve = root / "sleeve_returns.csv"
+        pd.DataFrame(
+            {"date": dates, "W2+W3": values, "W4+W6": values}
+        ).to_csv(group, index=False)
+        pd.DataFrame(
+            {"date": dates, "M+": values, "Q": values, "G": values}
+        ).to_csv(sleeve, index=False)
+        return group, sleeve
+
+    def test_coupled_sleeves_fail_together(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            values = [-0.08, 0.02] * 20
+            group, sleeve = self._write_pair(root, values)
+            before_group = group.read_bytes()
+            before_sleeve = sleeve.read_bytes()
+            payload = correlation_payload(
+                n_paths=4000,
+                horizon_days=10,
+                seed=7,
+                group_path=group,
+                sleeve_path=sleeve,
+                output_path=root / "risk_return" / "output" / "correlation_v2.json",
+            )
+            self.assertTrue(payload["ok"], payload.get("error"))
+            report = payload["report"]
+            self.assertEqual(tuple(report.keys()), CORR_KEYS)
+            self.assertEqual(report["sleeves"], ["W2+W3", "W4+W6", "M+", "Q", "G"])
+            self.assertAlmostEqual(report["correlation"][0][1], 1.0, places=6)
+            self.assertAlmostEqual(report["historical_all_negative"], 0.5, places=6)
+            self.assertAlmostEqual(report["joint_all_negative"], 0.5, delta=0.04)
+            self.assertLess(report["independent_all_negative"], 0.08)
+            self.assertGreater(report["joint_all_negative"], report["independent_all_negative"])
+            self.assertGreaterEqual(report["joint_prob_dd_gt_20"], 0.0)
+            self.assertLessEqual(report["independent_prob_dd_gt_20"], 1.0)
+            self.assertEqual(group.read_bytes(), before_group)
+            self.assertEqual(sleeve.read_bytes(), before_sleeve)
+
+    def test_missing_return_table(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing.csv"
+            payload = correlation_payload(
+                group_path=missing,
+                sleeve_path=missing,
+                output_path=Path(tmp) / "risk_return" / "output" / "correlation_v2.json",
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("缺少已有收益表", payload["message"])
+
+
+class RegimeTests(unittest.TestCase):
+    def test_return_day_uses_earlier_temperature_only(self) -> None:
+        aligned = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-03", "2024-01-04"]),
+                "W2+W3": [0.01, -0.02],
+                "W4+W6": [0.01, -0.02],
+                "M+": [0.01, -0.02],
+                "Q": [0.01, -0.02],
+                "G": [0.01, -0.02],
+            }
+        )
+        temperature = pd.DataFrame(
+            {
+                "temp_date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
+                "position_label": ["轻仓 20%", "满仓 100%"],
+                "position_pct": [20.0, 100.0],
+                "total_score": [30.0, 90.0],
+            }
+        )
+        report = build_regime_report(aligned, temperature)
+        self.assertEqual(tuple(report.keys()), REGIME_KEYS)
+        by_label = {row["label"]: row for row in report["states"]}
+        self.assertEqual(list(by_label), ["轻仓 20%", "满仓 100%"])
+        self.assertEqual(by_label["轻仓 20%"]["n_days"], 1)
+        self.assertAlmostEqual(by_label["轻仓 20%"]["means"]["M+"], 0.01)
+        self.assertEqual(by_label["满仓 100%"]["n_days"], 1)
+        self.assertAlmostEqual(by_label["满仓 100%"]["means"]["M+"], -0.02)
+        self.assertTrue(by_label["轻仓 20%"]["small_sample"])
+
+    def test_missing_temperature_does_not_write_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dates = pd.bdate_range("2024-01-02", periods=4)
+            values = [0.01, -0.02, 0.01, -0.02]
+            group = root / "group_returns.csv"
+            sleeve = root / "sleeve_returns.csv"
+            pd.DataFrame({"date": dates, "W2+W3": values, "W4+W6": values}).to_csv(group, index=False)
+            pd.DataFrame({"date": dates, "M+": values, "Q": values, "G": values}).to_csv(sleeve, index=False)
+            before_group = group.read_bytes()
+            before_sleeve = sleeve.read_bytes()
+            payload = regime_payload(
+                group_path=group,
+                sleeve_path=sleeve,
+                temperature_path=root / "missing_temperature.csv",
+                output_path=root / "risk_return" / "output" / "regime_v3.json",
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("市场温度", payload["message"])
+            self.assertEqual(group.read_bytes(), before_group)
+            self.assertEqual(sleeve.read_bytes(), before_sleeve)
+
+
+class BudgetTests(unittest.TestCase):
+    def test_tighter_budget_uses_prior_temperature(self) -> None:
+        aligned = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-03", "2024-01-04"]),
+                "W2+W3": [0.10, -0.20],
+                "W4+W6": [0.10, -0.20],
+                "M+": [0.10, -0.20],
+                "Q": [0.10, -0.20],
+                "G": [0.10, -0.20],
+            }
+        )
+        temperature = pd.DataFrame(
+            {
+                "temp_date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
+                "position_label": ["轻仓 20%", "满仓 100%"],
+                "position_pct": [20.0, 100.0],
+                "total_score": [30.0, 90.0],
+            }
+        )
+        report = build_budget_report(aligned, temperature)
+        self.assertEqual(tuple(report.keys()), BUDGET_KEYS)
+        by_name = {row["name"]: row for row in report["budgets"]}
+        self.assertAlmostEqual(by_name["温度仓位"]["average_position"], 0.6)
+        self.assertLessEqual(
+            by_name["取更小"]["average_position"],
+            by_name["温度仓位"]["average_position"] + 1e-12,
+        )
+        self.assertLessEqual(
+            by_name["取更小"]["average_position"],
+            by_name["四分之一凯利"]["average_position"] + 1e-12,
+        )
+        self.assertAlmostEqual(by_name["始终满仓"]["terminal_wealth"], 0.88)
+
+    def test_missing_temperature_leaves_returns_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dates = pd.bdate_range("2024-01-02", periods=4)
+            values = [0.01, -0.02, 0.01, -0.02]
+            group = root / "group_returns.csv"
+            sleeve = root / "sleeve_returns.csv"
+            pd.DataFrame({"date": dates, "W2+W3": values, "W4+W6": values}).to_csv(group, index=False)
+            pd.DataFrame({"date": dates, "M+": values, "Q": values, "G": values}).to_csv(sleeve, index=False)
+            before_group = group.read_bytes()
+            payload = budget_payload(
+                group_path=group,
+                sleeve_path=sleeve,
+                temperature_path=root / "missing_temperature.csv",
+                output_path=root / "risk_return" / "output" / "budget_v4.json",
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("市场温度", payload["message"])
+            self.assertEqual(group.read_bytes(), before_group)
+
+
+class WalkForwardTests(unittest.TestCase):
+    def test_test_window_does_not_change_train_position(self) -> None:
+        values = [0.02, -0.01, 0.02, -0.01, 0.50, 0.50, -0.04, 0.01, -0.04, 0.01, -0.02, -0.02]
+        dates = pd.bdate_range("2024-01-02", periods=len(values))
+        aligned = pd.DataFrame(
+            {
+                "date": dates,
+                "W2+W3": values,
+                "W4+W6": values,
+                "M+": values,
+                "Q": values,
+                "G": values,
+            }
+        )
+        temperature = pd.DataFrame(
+            {
+                "temp_date": pd.to_datetime(["2023-12-29", *dates.strftime("%Y-%m-%d")]),
+                "position_label": ["中仓 40%"] * (len(values) + 1),
+                "position_pct": [40.0] * (len(values) + 1),
+                "total_score": [50.0] * (len(values) + 1),
+            }
+        )
+        report = build_walkforward_report(
+            aligned,
+            temperature,
+            train_days=4,
+            test_days=2,
+            step_days=4,
+        )
+        self.assertEqual(tuple(report.keys()), WF_KEYS)
+        expected = estimate_quarter_kelly(np.array([0.02, -0.01, 0.02, -0.01]))
+        self.assertAlmostEqual(report["folds"][0]["position"], expected["quarter_position"])
+        self.assertEqual(report["folds"][0]["test_start"], "2024-01-08")
+        later = estimate_quarter_kelly(np.array([0.50, 0.50, -0.04, 0.01]))
+        self.assertAlmostEqual(report["folds"][1]["position"], later["quarter_position"] )
+        self.assertNotAlmostEqual(report["folds"][0]["position"], report["folds"][1]["position"])
+        by_fraction = {row["fraction"]: row for row in report["perturbations"]}
+        self.assertLess(by_fraction[0.15]["total_return"], by_fraction[0.35]["total_return"])
+
+    def test_missing_temperature_leaves_returns_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dates = pd.bdate_range("2024-01-02", periods=8)
+            values = [0.01, -0.02, 0.01, -0.02, 0.01, -0.02, 0.01, -0.02]
+            group = root / "group_returns.csv"
+            sleeve = root / "sleeve_returns.csv"
+            pd.DataFrame({"date": dates, "W2+W3": values, "W4+W6": values}).to_csv(group, index=False)
+            pd.DataFrame({"date": dates, "M+": values, "Q": values, "G": values}).to_csv(sleeve, index=False)
+            before_group = group.read_bytes()
+            payload = walkforward_payload(
+                group_path=group,
+                sleeve_path=sleeve,
+                temperature_path=root / "missing_temperature.csv",
+                output_path=root / "risk_return" / "output" / "walkforward_v5.json",
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("市场温度", payload["message"])
+            self.assertEqual(group.read_bytes(), before_group)
+
+
+class CopulaTests(unittest.TestCase):
+    def test_norm_ppf_known_value(self) -> None:
+        self.assertAlmostEqual(float(norm_ppf(np.array([0.975]))[0]), 1.959964, places=4)
+        self.assertAlmostEqual(float(norm_ppf(np.array([0.5]))[0]), 0.0, places=6)
+
+    def test_locked_series_exceeds_independence(self) -> None:
+        values = [0.02 if i % 2 == 0 else -0.01 for i in range(40)]
+        dates = pd.bdate_range("2024-01-02", periods=len(values))
+        aligned = pd.DataFrame(
+            {
+                "date": dates,
+                "W2+W3": values,
+                "W4+W6": values,
+                "M+": values,
+                "Q": values,
+                "G": values,
+            }
+        )
+        report = build_copula_report(aligned, n_paths=4000, seed=7)
+        self.assertEqual(tuple(report.keys()), COPULA_KEYS)
+        self.assertAlmostEqual(report["historical_all_negative"], 0.5, places=6)
+        self.assertLess(report["independent_all_negative"], 0.05)
+        self.assertGreater(report["gaussian_all_negative"], 0.35)
+        self.assertGreater(report["historical_all_negative"], report["independent_all_negative"])
+
+    def test_missing_return_table_leaves_nothing_written(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = root / "missing.csv"
+            payload = copula_payload(
+                group_path=missing,
+                sleeve_path=missing,
+                output_path=root / "risk_return" / "output" / "copula_v6.json",
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("缺少已有收益表", payload["message"])
+            self.assertFalse((root / "risk_return" / "output" / "copula_v6.json").exists())
 
 
 if __name__ == "__main__":

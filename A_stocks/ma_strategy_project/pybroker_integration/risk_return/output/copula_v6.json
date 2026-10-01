@@ -1,0 +1,89 @@
+{
+  "schema_version": "gaussian_copula_v6",
+  "sleeves": [
+    "W2+W3",
+    "W4+W6",
+    "M+",
+    "Q",
+    "G"
+  ],
+  "n_days": 261,
+  "sample_start": "2025-07-07",
+  "sample_end": "2026-07-31",
+  "n_paths": 10000,
+  "seed": 20261001,
+  "tail_q": 0.1,
+  "historical_all_negative": 0.2222222222222222,
+  "gaussian_all_negative": 0.1976,
+  "independent_all_negative": 0.021482103801979423,
+  "pairs": [
+    {
+      "left": "M+",
+      "right": "G",
+      "historical": 0.07279693486590039,
+      "gaussian": 0.0444
+    },
+    {
+      "left": "W2+W3",
+      "right": "M+",
+      "historical": 0.06130268199233716,
+      "gaussian": 0.0428
+    },
+    {
+      "left": "M+",
+      "right": "Q",
+      "historical": 0.04597701149425287,
+      "gaussian": 0.0279
+    },
+    {
+      "left": "W2+W3",
+      "right": "Q",
+      "historical": 0.06130268199233716,
+      "gaussian": 0.046
+    },
+    {
+      "left": "W4+W6",
+      "right": "M+",
+      "historical": 0.04980842911877394,
+      "gaussian": 0.0355
+    },
+    {
+      "left": "W2+W3",
+      "right": "G",
+      "historical": 0.06513409961685823,
+      "gaussian": 0.0541
+    },
+    {
+      "left": "Q",
+      "right": "G",
+      "historical": 0.04980842911877394,
+      "gaussian": 0.0392
+    },
+    {
+      "left": "W2+W3",
+      "right": "W4+W6",
+      "historical": 0.06130268199233716,
+      "gaussian": 0.0529
+    },
+    {
+      "left": "W4+W6",
+      "right": "G",
+      "historical": 0.06130268199233716,
+      "gaussian": 0.0574
+    },
+    {
+      "left": "W4+W6",
+      "right": "Q",
+      "historical": 0.05747126436781609,
+      "gaussian": 0.0544
+    }
+  ],
+  "boundary": "五组同日为负，历史 22.2%，正态相关 19.8%，互相独立 2.1%；底部同时落到超出正态相关最多的是 M+ 与 G，历史 7.3%，正态相关 4.4%。",
+  "notes": [
+    "正态相关保留每个信号组自己的历史盈亏分布，只把它们按正态方式绑在一起。",
+    "互相独立是各信号组单独抽取，同一天不再绑在一起。",
+    "底部 10% 是每个信号组自己最差的一成日子。",
+    "这里不产生新的选股分数，也不改日常链路。"
+  ],
+  "created_at": "2026-10-01T19:34:57"
+}

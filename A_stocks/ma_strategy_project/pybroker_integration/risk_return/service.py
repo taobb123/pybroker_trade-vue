@@ -9,6 +9,16 @@ import pandas as pd
 
 from risk_return.contract import SNAPSHOT_RELATIVE
 from risk_return.engine import report_from_samples
+from risk_return.correlation import (
+    GROUP_RETURNS,
+    SLEEVE_RETURNS,
+    build_correlation_report,
+    load_aligned,
+)
+from risk_return.budget import build_budget_report
+from risk_return.copula import build_copula_report
+from risk_return.walkforward import build_walkforward_report
+from risk_return.regime import TEMPERATURE_CSV, build_regime_report, load_temperature
 from risk_return.io import DEFAULT_OUTPUT_PATH, read_json, write_json
 from risk_return.system_samples import (
     DEFAULT_SNAPSHOT_PATH,
@@ -103,6 +113,193 @@ def run_payload(
             sample_source=source_label,
         )
         write_json(report, dest)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+CORRELATION_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "correlation_v2.json"
+
+
+def correlation_payload(
+    *,
+    n_paths: int = 10_000,
+    horizon_days: int = 60,
+    seed: int = 20261001,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    output_path: Path | None = None,
+) -> dict:
+    dest = output_path or CORRELATION_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        report = build_correlation_report(
+            aligned,
+            n_paths=n_paths,
+            horizon_days=horizon_days,
+            seed=seed,
+            group_path=group_path or GROUP_RETURNS,
+            sleeve_path=sleeve_path or SLEEVE_RETURNS,
+        )
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+REGIME_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "regime_v3.json"
+
+
+def regime_payload(
+    *,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    temperature_path: Path | None = None,
+    output_path: Path | None = None,
+) -> dict:
+    dest = output_path or REGIME_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        temperature = load_temperature(temperature_path or TEMPERATURE_CSV)
+        report = build_regime_report(
+            aligned,
+            temperature,
+            temperature_path=temperature_path or TEMPERATURE_CSV,
+        )
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+BUDGET_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "budget_v4.json"
+
+
+def budget_payload(
+    *,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    temperature_path: Path | None = None,
+    output_path: Path | None = None,
+) -> dict:
+    dest = output_path or BUDGET_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        temperature = load_temperature(temperature_path or TEMPERATURE_CSV)
+        report = build_budget_report(aligned, temperature)
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+WALKFORWARD_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "walkforward_v5.json"
+
+
+def walkforward_payload(
+    *,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    temperature_path: Path | None = None,
+    output_path: Path | None = None,
+) -> dict:
+    dest = output_path or WALKFORWARD_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        temperature = load_temperature(temperature_path or TEMPERATURE_CSV)
+        report = build_walkforward_report(aligned, temperature)
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+COPULA_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "copula_v6.json"
+
+
+def copula_payload(
+    *,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    output_path: Path | None = None,
+    n_paths: int = 10_000,
+    seed: int = 20261001,
+) -> dict:
+    dest = output_path or COPULA_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        report = build_copula_report(aligned, n_paths=n_paths, seed=seed)
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
     except Exception as exc:
         return {
             "ok": False,

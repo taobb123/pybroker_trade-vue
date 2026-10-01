@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -12,18 +13,53 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  fetchRiskBudget,
+  fetchRiskCopula,
+  fetchRiskCorrelation,
+  fetchRiskWalkForward,
+  fetchRiskRegime,
   fetchRiskReturnLatest,
   runRiskReturn,
+  type RiskBudget,
+  type RiskCopula,
+  type RiskCorrelation,
   type RiskDecile,
+  type RiskRegime,
   type RiskReport,
+  type RiskWalkForward,
 } from '@/api/riskReturn'
 
 const report = ref<RiskReport | null>(null)
+const correlation = ref<RiskCorrelation | null>(null)
+const correlationMessage = ref('')
+const correlationError = ref('')
+const regime = ref<RiskRegime | null>(null)
+const regimeMessage = ref('')
+const regimeError = ref('')
+const budget = ref<RiskBudget | null>(null)
+const budgetMessage = ref('')
+const budgetError = ref('')
+const walk = ref<RiskWalkForward | null>(null)
+const walkMessage = ref('')
+const walkError = ref('')
+const copula = ref<RiskCopula | null>(null)
+const copulaMessage = ref('')
+const copulaError = ref('')
 const message = ref('')
 const error = ref('')
 const loading = ref(false)
 const running = ref(false)
 const selectedDecile = ref(10)
+const moduleTab = ref('correlation')
+const moduleTabs = [
+  { id: 'correlation', label: '五个信号组的相关性' },
+  { id: 'regime', label: '按温度仓位档看收益' },
+  { id: 'budget', label: '风险预算' },
+  { id: 'walk', label: '参数扰动与滚动检验' },
+  { id: 'copula', label: '正态相关下的同亏' },
+  { id: 'mplus', label: 'M+ 十分位' },
+  { id: 'kelly', label: 'Kelly 对照' },
+]
 
 const selected = computed(() => {
   return report.value?.deciles.find((row) => row.decile === selectedDecile.value) ?? null
@@ -32,6 +68,11 @@ const selected = computed(() => {
 const histMax = computed(() => {
   const counts = selected.value?.histogram.map((bin) => bin.count) ?? []
   return Math.max(1, ...counts)
+})
+
+const kellyMaxP20 = computed(() => {
+  const values = selected.value?.scenarios.map((row) => row.probDdGt20).filter((value): value is number => value != null) ?? []
+  return values.length ? Math.max(...values) : null
 })
 
 function pct(value: number | null, digits = 2): string {
@@ -63,6 +104,81 @@ function applyResponse(emptyMessage: string | null, next: RiskReport | null, err
     return
   }
   message.value = emptyMessage || '还没有研究结果。'
+}
+
+async function loadCorrelation() {
+  correlationError.value = ''
+  try {
+    const payload = await fetchRiskCorrelation()
+    if (!payload.ok) {
+      correlationError.value = payload.error || '读取相关性失败'
+      return
+    }
+    correlation.value = payload.report
+    correlationMessage.value = payload.report ? '' : payload.message || '还没有信号组收益表。'
+  } catch (err) {
+    correlationError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function loadRegime() {
+  regimeError.value = ''
+  try {
+    const payload = await fetchRiskRegime()
+    if (!payload.ok) {
+      regimeError.value = payload.error || '读取温度档失败'
+      return
+    }
+    regime.value = payload.report
+    regimeMessage.value = payload.report ? '' : payload.message || '还没有温度档结果。'
+  } catch (err) {
+    regimeError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function loadBudget() {
+  budgetError.value = ''
+  try {
+    const payload = await fetchRiskBudget()
+    if (!payload.ok) {
+      budgetError.value = payload.error || '读取风险预算失败'
+      return
+    }
+    budget.value = payload.report
+    budgetMessage.value = payload.report ? '' : payload.message || '还没有风险预算。'
+  } catch (err) {
+    budgetError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function loadWalk() {
+  walkError.value = ''
+  try {
+    const payload = await fetchRiskWalkForward()
+    if (!payload.ok) {
+      walkError.value = payload.error || '读取滚动检验失败'
+      return
+    }
+    walk.value = payload.report
+    walkMessage.value = payload.report ? '' : payload.message || '还没有滚动检验。'
+  } catch (err) {
+    walkError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function loadCopula() {
+  copulaError.value = ''
+  try {
+    const payload = await fetchRiskCopula()
+    if (!payload.ok) {
+      copulaError.value = payload.error || '读取正态相关失败'
+      return
+    }
+    copula.value = payload.report
+    copulaMessage.value = payload.report ? '' : payload.message || '还没有正态相关结果。'
+  } catch (err) {
+    copulaError.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 async function loadLatest() {
@@ -109,6 +225,11 @@ function selectRow(row: RiskDecile) {
 
 onMounted(() => {
   void loadLatest()
+  void loadCorrelation()
+  void loadRegime()
+  void loadBudget()
+  void loadWalk()
+  void loadCopula()
 })
 </script>
 
@@ -126,6 +247,301 @@ onMounted(() => {
       </Button>
     </div>
 
+    <Tabs v-model="moduleTab" class="w-full">
+      <TabsList class="flex h-auto w-full max-w-none flex-wrap justify-start gap-1">
+        <TabsTrigger
+          v-for="tab in moduleTabs"
+          :key="tab.id"
+          :value="tab.id"
+          class="px-2.5 text-xs"
+        >
+          {{ tab.label }}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="correlation" class="space-y-3">
+    <p v-if="correlationError" class="text-xs text-destructive">{{ correlationError }}</p>
+    <p v-else-if="correlationMessage && !correlation" class="text-xs text-muted-foreground">
+      {{ correlationMessage }}
+    </p>
+
+    <Card v-if="correlation" class="shadow-none">
+      <CardHeader class="pb-2">
+        <CardTitle class="text-sm font-semibold">五个信号组的相关性</CardTitle>
+        <p class="text-sm">
+          五个信号组同日一起亏的边界是会一起跌：历史五组同日为负 {{ pct(correlation.historicalAllNegative, 1) }}，若互相独立约为 {{ pct(correlation.independentAllNegative, 1) }}。
+        </p>
+        <CardDescription>
+          {{ correlation.sampleStart }} 至 {{ correlation.sampleEnd }}，重叠 {{ correlation.nDays }} 个交易日。
+          五组同日为负：历史 {{ pct(correlation.historicalAllNegative, 1) }}，
+          若互相独立约为 {{ pct(correlation.independentAllNegative, 1) }}。
+          W2+W3 是「底部放量上涨」并上「上涨缩量整理」，W4+W6 是「上涨放量突破」并上「下跌放量」；近 6 个交易日每票只留最新分类，组内股票等权。
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4 px-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>信号组</TableHead>
+              <TableHead v-for="name in correlation.sleeves" :key="name" class="text-right">{{ name }}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="(name, rowIndex) in correlation.sleeves" :key="name">
+              <TableCell class="font-medium">{{ name }}</TableCell>
+              <TableCell
+                v-for="(value, colIndex) in correlation.correlation[rowIndex]"
+                :key="`${name}-${colIndex}`"
+                class="text-right tabular-nums"
+              >
+                {{ num(value, 2) }}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div class="grid gap-2 px-4 text-xs text-muted-foreground sm:grid-cols-2">
+          <p>至少四组同日为负 {{ pct(correlation.historicalAtLeastFourNegative, 1) }}</p>
+          <p>联合抽样同日为负 {{ pct(correlation.jointAllNegative, 1) }}</p>
+          <p>
+            等权持有 {{ correlation.horizonDays }} 日，回撤中位：
+            联合 {{ pct(correlation.jointMedianMaxDrawdown, 1) }}，
+            独立 {{ pct(correlation.independentMedianMaxDrawdown, 1) }}
+          </p>
+          <p>
+            回撤超过 20%：联合 {{ pct(correlation.jointProbDdGt20, 1) }}，
+            独立 {{ pct(correlation.independentProbDdGt20, 1) }}
+          </p>
+        </div>
+        <ul class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in correlation.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
+
+      <TabsContent value="regime" class="space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>按温度仓位档看收益</CardTitle>
+        <p v-if="regime" class="text-sm">
+          五组日收益均值一起为正的边界在温度分 67–75，低于约 37 时五组日收益均值一起为负。
+        </p>
+        <CardDescription v-if="regime">
+          {{ regime.sampleStart }} 至 {{ regime.sampleEnd }}，{{ regime.nDays }} 个交易日。
+          收益日只用严格早于该日的温度计仓位档。表内是各信号组的日收益均值。
+        </CardDescription>
+        <CardDescription v-else>读取温度档…</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <p v-if="regimeError" class="text-xs text-destructive">{{ regimeError }}</p>
+        <p v-else-if="regimeMessage" class="text-xs text-muted-foreground">{{ regimeMessage }}</p>
+        <Table v-if="regime">
+          <TableHeader>
+            <TableRow>
+              <TableHead>仓位档</TableHead>
+              <TableHead class="text-right">天数</TableHead>
+              <TableHead class="text-right">温度分</TableHead>
+              <TableHead v-for="name in regime.sleeves" :key="name" class="text-right">
+                {{ name }}
+              </TableHead>
+              <TableHead class="text-right">五组同日为负</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="state in regime.states" :key="state.label">
+              <TableCell>{{ state.label }}</TableCell>
+              <TableCell class="text-right">
+                {{ state.nDays }}
+                <span v-if="state.smallSample" class="text-muted-foreground">样本少</span>
+              </TableCell>
+              <TableCell class="text-right">{{ num(state.meanScore, 1) }}</TableCell>
+              <TableCell
+                v-for="name in regime.sleeves"
+                :key="`${state.label}-${name}`"
+                class="text-right"
+              >
+                {{ pct(state.means[name] ?? null, 2) }}
+              </TableCell>
+              <TableCell class="text-right">{{ pct(state.allNegative, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <ul v-if="regime" class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in regime.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
+
+      <TabsContent value="budget" class="space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>风险预算</CardTitle>
+        <p v-if="budget" class="text-sm">
+          这条等权日收益能撑住的仓位边界大约是 {{ pct(budget.kellyRaw, 1) }}，温度计离开空仓后的最小档是 20%，已经在这条边界外面。
+        </p>
+        <CardDescription v-if="budget">
+          {{ budget.sampleStart }} 至 {{ budget.sampleEnd }}，{{ budget.nDays }} 个交易日。
+          同一条五组等权日收益，分别用满仓、温度仓位、四分之一凯利，以及两者中较小的仓位走一遍。
+          后验胜率 {{ pct(budget.posteriorWinRate, 1) }}，赔率 {{ num(budget.payoffB, 2) }}，
+          研究凯利 {{ pct(budget.kellyRaw, 1) }}，四分之一为 {{ pct(budget.quarterPosition, 1) }}。
+        </CardDescription>
+        <CardDescription v-else>读取风险预算…</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <p v-if="budgetError" class="text-xs text-destructive">{{ budgetError }}</p>
+        <p v-else-if="budgetMessage" class="text-xs text-muted-foreground">{{ budgetMessage }}</p>
+        <Table v-if="budget">
+          <TableHeader>
+            <TableRow>
+              <TableHead>预算</TableHead>
+              <TableHead class="text-right">平均仓位</TableHead>
+              <TableHead class="text-right">期末资金</TableHead>
+              <TableHead class="text-right">累计收益</TableHead>
+              <TableHead class="text-right">最大回撤</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="row in budget.budgets" :key="row.name">
+              <TableCell>{{ row.name }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.averagePosition, 1) }}</TableCell>
+              <TableCell class="text-right">{{ num(row.terminalWealth, 3) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.totalReturn, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.maxDrawdown, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <ul v-if="budget" class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in budget.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
+
+      <TabsContent value="walk" class="space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>参数扰动与滚动检验</CardTitle>
+        <p v-if="walk" class="text-sm">{{ walk.boundary }}</p>
+        <CardDescription v-if="walk">
+          测试段 {{ walk.oosStart }} 至 {{ walk.oosEnd }}，{{ walk.nFolds }} 轮。
+          每轮用过去 {{ walk.trainDays }} 个交易日估计，后面 {{ walk.testDays }} 个交易日才记账。
+          下表仓位是 0.25 倍研究凯利。
+        </CardDescription>
+        <CardDescription v-else>读取滚动检验…</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <p v-if="walkError" class="text-xs text-destructive">{{ walkError }}</p>
+        <p v-else-if="walkMessage" class="text-xs text-muted-foreground">{{ walkMessage }}</p>
+        <Table v-if="walk">
+          <TableHeader>
+            <TableRow>
+              <TableHead>分数</TableHead>
+              <TableHead class="text-right">期末资金</TableHead>
+              <TableHead class="text-right">测试期累计</TableHead>
+              <TableHead class="text-right">最大回撤</TableHead>
+              <TableHead class="text-right">最差一轮</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="row in walk.perturbations" :key="row.fraction">
+              <TableCell>{{ num(row.fraction, 2) }}</TableCell>
+              <TableCell class="text-right">{{ num(row.terminalWealth, 3) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.totalReturn, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.maxDrawdown, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.worstFoldReturn, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <Table v-if="walk">
+          <TableHeader>
+            <TableRow>
+              <TableHead>测试段</TableHead>
+              <TableHead class="text-right">预测亏损</TableHead>
+              <TableHead class="text-right">实际亏损</TableHead>
+              <TableHead class="text-right">仓位</TableHead>
+              <TableHead class="text-right">测试收益</TableHead>
+              <TableHead class="text-right">温度仓位收益</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="fold in walk.folds" :key="fold.testStart">
+              <TableCell>{{ fold.testStart }}</TableCell>
+              <TableCell class="text-right">{{ pct(fold.predictedLossProb, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(fold.realizedLossRate, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(fold.position, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(fold.testReturn, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(fold.temperatureReturn, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <ul v-if="walk" class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in walk.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
+
+      <TabsContent value="copula" class="space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>正态相关下的同亏</CardTitle>
+        <p v-if="copula" class="text-sm">{{ copula.boundary }}</p>
+        <CardDescription v-if="copula">
+          {{ copula.sampleStart }} 至 {{ copula.sampleEnd }}，{{ copula.nDays }} 个交易日。
+          底部 {{ pct(copula.tailQ, 0) }} 是每个信号组自己最差的一成日子。
+        </CardDescription>
+        <CardDescription v-else>读取正态相关…</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <p v-if="copulaError" class="text-xs text-destructive">{{ copulaError }}</p>
+        <p v-else-if="copulaMessage" class="text-xs text-muted-foreground">{{ copulaMessage }}</p>
+        <Table v-if="copula">
+          <TableHeader>
+            <TableRow>
+              <TableHead>对照</TableHead>
+              <TableHead class="text-right">五组同日为负</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>历史</TableCell>
+              <TableCell class="text-right">{{ pct(copula.historicalAllNegative, 1) }}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>正态相关</TableCell>
+              <TableCell class="text-right">{{ pct(copula.gaussianAllNegative, 1) }}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>互相独立</TableCell>
+              <TableCell class="text-right">{{ pct(copula.independentAllNegative, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <Table v-if="copula">
+          <TableHeader>
+            <TableRow>
+              <TableHead>一对</TableHead>
+              <TableHead class="text-right">底部同时出现</TableHead>
+              <TableHead class="text-right">正态相关</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="pair in copula.pairs" :key="`${pair.left}-${pair.right}`">
+              <TableCell>{{ pair.left }} · {{ pair.right }}</TableCell>
+              <TableCell class="text-right">{{ pct(pair.historical, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(pair.gaussian, 1) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <ul v-if="copula" class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in copula.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
+
+      <TabsContent value="mplus" class="space-y-3">
     <p v-if="loading" class="text-xs text-muted-foreground">正在读取上次结果…</p>
     <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
     <p v-else-if="message && !report" class="text-xs text-muted-foreground">{{ message }}</p>
@@ -145,7 +561,10 @@ onMounted(() => {
       <Card class="shadow-none">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm font-semibold">M+ 十分位</CardTitle>
-          <CardDescription>Q1 为最低，Q10 为最高。点一行查看该分位的分布和 Kelly 对照。</CardDescription>
+          <p class="text-sm">
+            M+ 从低到高没有把 T+3 分布变好，边界在 Q8：胜率从这里跌破 50%，到 Q10 时 VaR 95% 为 -11.9%、CVaR 95% 为 -15.4%。
+          </p>
+          <CardDescription>Q1 为最低，Q10 为最高。点一行查看该分位的 T+3 分布。</CardDescription>
         </CardHeader>
         <CardContent class="px-0">
           <Table>
@@ -188,8 +607,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <div v-if="selected" class="grid gap-4 lg:grid-cols-2">
-        <Card class="shadow-none">
+      <Card v-if="selected" class="shadow-none">
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-semibold">{{ selected.label }} 的 T+3 收益分布</CardTitle>
             <CardDescription>
@@ -220,9 +638,35 @@ onMounted(() => {
           </CardContent>
         </Card>
 
-        <Card class="shadow-none">
+      <ul class="space-y-1 text-xs text-muted-foreground">
+        <li v-for="note in report.notes" :key="note">{{ note }}</li>
+        <li>结果时间 {{ report.createdAt }}</li>
+      </ul>
+    </template>
+      </TabsContent>
+
+      <TabsContent value="kelly" class="space-y-3">
+    <p v-if="loading" class="text-xs text-muted-foreground">正在读取上次结果…</p>
+    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    <p v-else-if="message && !report" class="text-xs text-muted-foreground">{{ message }}</p>
+    <template v-if="report">
+      <div class="flex flex-wrap gap-1">
+        <Button
+          v-for="row in report.deciles"
+          :key="row.decile"
+          size="sm"
+          :variant="row.decile === selectedDecile ? 'default' : 'outline'"
+          @click="selectRow(row)"
+        >
+          {{ row.label }}
+        </Button>
+      </div>
+      <Card v-if="selected" class="shadow-none">
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-semibold">Kelly 对照</CardTitle>
+            <p v-if="selected.scenarios.length" class="text-sm">
+              {{ selected.label }} 的分数凯利边界在终值而不在 20% 回撤：满凯利仓位 {{ pct(selected.scenarios[0].position, 1) }}、终值中位 {{ num(selected.scenarios[0].medianTerminalWealth, 3) }}、回撤中位 {{ pct(selected.scenarios[0].medianMaxDrawdown, 1) }}，降到四分之一后终值中位 {{ num(selected.scenarios[3].medianTerminalWealth, 3) }}、回撤中位 {{ pct(selected.scenarios[3].medianMaxDrawdown, 1) }}，四档回撤超过 20% 的路径最高 {{ pct(kellyMaxP20, 1) }}。
+            </p>
             <CardDescription>
               后验胜率 {{ pct(selected.posteriorWinRate, 1) }} · 盈亏比 {{ num(selected.payoffB) }} ·
               满 Kelly {{ pct(selected.kellyFull, 1) }}。初始资金记为 1。
@@ -260,12 +704,8 @@ onMounted(() => {
             </Table>
           </CardContent>
         </Card>
-      </div>
-
-      <ul class="space-y-1 text-xs text-muted-foreground">
-        <li v-for="note in report.notes" :key="note">{{ note }}</li>
-        <li>结果时间 {{ report.createdAt }}</li>
-      </ul>
     </template>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

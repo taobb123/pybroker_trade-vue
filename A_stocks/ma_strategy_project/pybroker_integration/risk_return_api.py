@@ -6,7 +6,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from risk_return.contract import DEFAULT_N_PATHS, DEFAULT_N_TRADES, DEFAULT_SEED
-from risk_return.service import latest_payload, run_payload
+from risk_return.service import (
+    budget_payload,
+    correlation_payload,
+    copula_payload,
+    walkforward_payload,
+    latest_payload,
+    regime_payload,
+    run_payload,
+)
 
 router = APIRouter(prefix="/api/risk-return", tags=["risk-return"])
 
@@ -20,6 +28,31 @@ class RunBody(BaseModel):
 @router.get("/latest")
 def latest() -> dict:
     return latest_payload()
+
+
+@router.get("/correlation")
+def correlation() -> dict:
+    return correlation_payload()
+
+
+@router.get("/regime")
+def regime() -> dict:
+    return regime_payload()
+
+
+@router.get("/budget")
+def budget() -> dict:
+    return budget_payload()
+
+
+@router.get("/walkforward")
+def walkforward() -> dict:
+    return walkforward_payload()
+
+
+@router.get("/copula")
+def copula() -> dict:
+    return copula_payload()
 
 
 @router.post("/run")

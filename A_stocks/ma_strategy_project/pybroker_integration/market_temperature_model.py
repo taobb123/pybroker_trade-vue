@@ -381,13 +381,36 @@ def build_plain_diagnosis(result: TemperatureResult) -> PlainDiagnosis:
     )
 
 
-def _get_tushare_token() -> str:
+def _token_from_settings_file(path: str) -> str:
+    """按文件路径读 DATA_CONFIG，避免 import config 命中本目录的 config 包。"""
+    if not path or not os.path.isfile(path):
+        return ""
     try:
-        from config.settings import DATA_CONFIG
+        import importlib.util
 
-        return (DATA_CONFIG or {}).get("tushare_token", "") or ""
+        spec = importlib.util.spec_from_file_location("_temperature_settings", path)
+        if spec is None or spec.loader is None:
+            return ""
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        cfg = getattr(mod, "DATA_CONFIG", None) or {}
+        return str(cfg.get("tushare_token") or "").strip()
     except Exception:
-        return os.environ.get("TUSHARE_TOKEN", "")
+        return ""
+
+
+def _get_tushare_token() -> str:
+    env = (os.environ.get("TUSHARE_TOKEN") or "").strip()
+    if env:
+        return env
+    for path in (
+        os.path.join(_PROJECT_ROOT, "config", "settings.py"),
+        os.path.join(_SCRIPT_DIR, "config", "settings.py"),
+    ):
+        token = _token_from_settings_file(path)
+        if token:
+            return token
+    return ""
 
 
 _PROXY_BYPASS_DONE = False
@@ -1653,7 +1676,10 @@ def main() -> None:
     args = parser.parse_args()
 
     if not _get_tushare_token():
-        print("未配置 TuShare token。请设置 config.settings.DATA_CONFIG['tushare_token'] 或环境变量 TUSHARE_TOKEN")
+        print(
+            "未配置 TuShare token。请在 ma_strategy_project/config/settings.py 的 "
+            "DATA_CONFIG['tushare_token'] 填写，或设置环境变量 TUSHARE_TOKEN"
+        )
         return
 
     if args.rebuild_cache and os.path.isfile(METRICS_CACHE_PATH):
