@@ -1,0 +1,1401 @@
+{
+  "schema_version": "mplus_t3_v1",
+  "factor": "M+",
+  "factor_field": "mud_plus",
+  "factor_note": "现有 mud_plus：0.7×(60日收益/20日波动)的截面分位 + 0.3×量比截面分位",
+  "hold_trading_days": 3,
+  "sample_step_trading_days": null,
+  "sample_source": "market_neutral/output/latest/factor_snapshot.csv",
+  "sample_end": "2026-09-24",
+  "n_rows": 13715,
+  "n_signal_dates": 73,
+  "n_paths": 10000,
+  "n_trades": 100,
+  "seed": 20261001,
+  "seed_rule": "base+decile",
+  "prior_alpha": 1.0,
+  "prior_beta": 1.0,
+  "small_sample_n": 30,
+  "wealth_start": 1.0,
+  "deciles": [
+    {
+      "decile": 1,
+      "label": "Q1",
+      "n": 1301,
+      "small_sample": false,
+      "mean": 0.005608720695189519,
+      "median": 0.0026899798251514007,
+      "win_rate": 0.528055342044581,
+      "posterior_win_rate": 0.5280122793553338,
+      "prob_win_rate_gt_half": 0.978632051828888,
+      "prob_loss": 0.4719446579554189,
+      "std": 0.04271401511827122,
+      "skew": 0.8274427860225568,
+      "excess_kurtosis": 12.390901891819004,
+      "var_95": -0.04748908296943233,
+      "cvar_95": -0.08085925289367298,
+      "payoff_b": 1.293870074933203,
+      "kelly_raw": 0.1632247092671757,
+      "kelly_full": 0.1632247092671757,
+      "histogram": [
+        {
+          "left": -0.2701149425287356,
+          "right": -0.21959117958751118,
+          "count": 3
+        },
+        {
+          "left": -0.21959117958751118,
+          "right": -0.16906741664628677,
+          "count": 0
+        },
+        {
+          "left": -0.16906741664628677,
+          "right": -0.11854365370506234,
+          "count": 5
+        },
+        {
+          "left": -0.11854365370506234,
+          "right": -0.06801989076383794,
+          "count": 21
+        },
+        {
+          "left": -0.06801989076383794,
+          "right": -0.017496127822613505,
+          "count": 266
+        },
+        {
+          "left": -0.017496127822613505,
+          "right": 0.0330276351186109,
+          "count": 766
+        },
+        {
+          "left": 0.0330276351186109,
+          "right": 0.0835513980598353,
+          "count": 195
+        },
+        {
+          "left": 0.0835513980598353,
+          "right": 0.1340751610010597,
+          "count": 32
+        },
+        {
+          "left": 0.1340751610010597,
+          "right": 0.1845989239422841,
+          "count": 8
+        },
+        {
+          "left": 0.1845989239422841,
+          "right": 0.23512268688350857,
+          "count": 1
+        },
+        {
+          "left": 0.23512268688350857,
+          "right": 0.285646449824733,
+          "count": 1
+        },
+        {
+          "left": 0.285646449824733,
+          "right": 0.3361702127659574,
+          "count": 3
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.1632247092671757,
+          "median_terminal_wealth": 1.0908958862907183,
+          "p05_terminal_wealth": 0.9749356707327241,
+          "p25_terminal_wealth": 1.0419747855031618,
+          "p75_terminal_wealth": 1.144323689237754,
+          "p95_terminal_wealth": 1.2256054527150517,
+          "median_max_drawdown": 0.041678597061932166,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.12241853195038177,
+          "median_terminal_wealth": 1.0679456686406135,
+          "p05_terminal_wealth": 0.9817698665188413,
+          "p25_terminal_wealth": 1.031757278757219,
+          "p75_terminal_wealth": 1.1068245291874899,
+          "p95_terminal_wealth": 1.1652238313088061,
+          "median_max_drawdown": 0.03137534359303129,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.08161235463358785,
+          "median_terminal_wealth": 1.0451223992360679,
+          "p05_terminal_wealth": 0.9882133749257109,
+          "p25_terminal_wealth": 1.0214053252199973,
+          "p75_terminal_wealth": 1.0702469300248567,
+          "p95_terminal_wealth": 1.1077390821039135,
+          "median_max_drawdown": 0.020976797095891453,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.04080617731679392,
+          "median_terminal_wealth": 1.0224657634959935,
+          "p05_terminal_wealth": 0.9942452840753212,
+          "p25_terminal_wealth": 1.0107896809846875,
+          "p75_terminal_wealth": 1.0346897812800198,
+          "p95_terminal_wealth": 1.0526661817005238,
+          "median_max_drawdown": 0.010527574635523673,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 2,
+      "label": "Q2",
+      "n": 1384,
+      "small_sample": false,
+      "mean": 0.00560569947963112,
+      "median": 0.0018416456104054513,
+      "win_rate": 0.5158959537572254,
+      "posterior_win_rate": 0.5158730158730159,
+      "prob_win_rate_gt_half": 0.8815748526889546,
+      "prob_loss": 0.4841040462427746,
+      "std": 0.04247652990736033,
+      "skew": 1.4136342120855543,
+      "excess_kurtosis": 7.0655984694027865,
+      "var_95": -0.05402331532556148,
+      "cvar_95": -0.07450186881308382,
+      "payoff_b": 1.3402532145699266,
+      "kelly_raw": 0.15465248018317213,
+      "kelly_full": 0.15465248018317213,
+      "histogram": [
+        {
+          "left": -0.16684549356223177,
+          "right": -0.125163924654268,
+          "count": 3
+        },
+        {
+          "left": -0.125163924654268,
+          "right": -0.08348235574630423,
+          "count": 8
+        },
+        {
+          "left": -0.08348235574630423,
+          "right": -0.04180078683834046,
+          "count": 105
+        },
+        {
+          "left": -0.04180078683834046,
+          "right": -0.00011921793037669715,
+          "count": 527
+        },
+        {
+          "left": -0.00011921793037669715,
+          "right": 0.041562350977587065,
+          "count": 564
+        },
+        {
+          "left": 0.041562350977587065,
+          "right": 0.08324391988555085,
+          "count": 112
+        },
+        {
+          "left": 0.08324391988555085,
+          "right": 0.12492548879351462,
+          "count": 37
+        },
+        {
+          "left": 0.12492548879351462,
+          "right": 0.16660705770147838,
+          "count": 21
+        },
+        {
+          "left": 0.16660705770147838,
+          "right": 0.20828862660944214,
+          "count": 2
+        },
+        {
+          "left": 0.20828862660944214,
+          "right": 0.2499701955174059,
+          "count": 3
+        },
+        {
+          "left": 0.2499701955174059,
+          "right": 0.29165176442536966,
+          "count": 1
+        },
+        {
+          "left": 0.29165176442536966,
+          "right": 0.3333333333333335,
+          "count": 1
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.15465248018317213,
+          "median_terminal_wealth": 1.0868172546291408,
+          "p05_terminal_wealth": 0.9786545272697678,
+          "p25_terminal_wealth": 1.0414300265872107,
+          "p75_terminal_wealth": 1.1346017914350597,
+          "p95_terminal_wealth": 1.2164524002350172,
+          "median_max_drawdown": 0.038459617974201166,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.1159893601373791,
+          "median_terminal_wealth": 1.064896323235994,
+          "p05_terminal_wealth": 0.9842486595442504,
+          "p25_terminal_wealth": 1.0312886535451211,
+          "p75_terminal_wealth": 1.0999095409011908,
+          "p95_terminal_wealth": 1.158956949338197,
+          "median_max_drawdown": 0.028929818365478477,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.07732624009158606,
+          "median_terminal_wealth": 1.0430999499199356,
+          "p05_terminal_wealth": 0.9897001380668453,
+          "p25_terminal_wealth": 1.0209539002608858,
+          "p75_terminal_wealth": 1.0659147378039449,
+          "p95_terminal_wealth": 1.1038012783554714,
+          "median_max_drawdown": 0.019348341360591215,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.03866312004579303,
+          "median_terminal_wealth": 1.0214402746570421,
+          "p05_terminal_wealth": 0.9949281217431317,
+          "p25_terminal_wealth": 1.0105436639533423,
+          "p75_terminal_wealth": 1.0325923427666532,
+          "p95_terminal_wealth": 1.0508103813056777,
+          "median_max_drawdown": 0.009706157949314842,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 3,
+      "label": "Q3",
+      "n": 1385,
+      "small_sample": false,
+      "mean": 0.005429174953607698,
+      "median": 0.0019775873434408897,
+      "win_rate": 0.5205776173285198,
+      "posterior_win_rate": 0.5205479452054794,
+      "prob_win_rate_gt_half": 0.9372829123761695,
+      "prob_loss": 0.47942238267148013,
+      "std": 0.04659129669776943,
+      "skew": 1.390958272963064,
+      "excess_kurtosis": 7.999064628950332,
+      "var_95": -0.05565217391304356,
+      "cvar_95": -0.08358410362289372,
+      "payoff_b": 1.259664422423923,
+      "kelly_raw": 0.13992907063892646,
+      "kelly_full": 0.13992907063892646,
+      "histogram": [
+        {
+          "left": -0.24505928853754944,
+          "right": -0.19695288339094053,
+          "count": 1
+        },
+        {
+          "left": -0.19695288339094053,
+          "right": -0.14884647824433161,
+          "count": 0
+        },
+        {
+          "left": -0.14884647824433161,
+          "right": -0.10074007309772273,
+          "count": 16
+        },
+        {
+          "left": -0.10074007309772273,
+          "right": -0.05263366795111382,
+          "count": 63
+        },
+        {
+          "left": -0.05263366795111382,
+          "right": -0.004527262804504911,
+          "count": 497
+        },
+        {
+          "left": -0.004527262804504911,
+          "right": 0.04357914234210397,
+          "count": 615
+        },
+        {
+          "left": 0.04357914234210397,
+          "right": 0.09168554748871288,
+          "count": 143
+        },
+        {
+          "left": 0.09168554748871288,
+          "right": 0.1397919526353218,
+          "count": 30
+        },
+        {
+          "left": 0.1397919526353218,
+          "right": 0.1878983577819307,
+          "count": 8
+        },
+        {
+          "left": 0.1878983577819307,
+          "right": 0.2360047629285396,
+          "count": 5
+        },
+        {
+          "left": 0.2360047629285396,
+          "right": 0.28411116807514847,
+          "count": 5
+        },
+        {
+          "left": 0.28411116807514847,
+          "right": 0.3322175732217574,
+          "count": 2
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.13992907063892646,
+          "median_terminal_wealth": 1.0741866341253496,
+          "p05_terminal_wealth": 0.967739027699927,
+          "p25_terminal_wealth": 1.0294151960907256,
+          "p75_terminal_wealth": 1.123624251353841,
+          "p95_terminal_wealth": 1.2006510246076683,
+          "median_max_drawdown": 0.04009532899636614,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.10494680297919484,
+          "median_terminal_wealth": 1.0555079067253974,
+          "p05_terminal_wealth": 0.9760038180994445,
+          "p25_terminal_wealth": 1.0223308209319242,
+          "p75_terminal_wealth": 1.0919042462697965,
+          "p95_terminal_wealth": 1.1475682401656815,
+          "median_max_drawdown": 0.03015686050681682,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.06996453531946323,
+          "median_terminal_wealth": 1.0369073909345934,
+          "p05_terminal_wealth": 0.9841810425036412,
+          "p25_terminal_wealth": 1.0150484643642006,
+          "p75_terminal_wealth": 1.0606848847006785,
+          "p95_terminal_wealth": 1.0964746480163452,
+          "median_max_drawdown": 0.02016884031570565,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.034982267659731614,
+          "median_terminal_wealth": 1.0184063334571396,
+          "p05_terminal_wealth": 0.992143002315072,
+          "p25_terminal_wealth": 1.0076139519957727,
+          "p75_terminal_wealth": 1.0300463985761432,
+          "p95_terminal_wealth": 1.0473031489985671,
+          "median_max_drawdown": 0.01011197993632329,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 4,
+      "label": "Q4",
+      "n": 1376,
+      "small_sample": false,
+      "mean": 0.007034618941825165,
+      "median": 0.001644079153562683,
+      "win_rate": 0.5145348837209303,
+      "posterior_win_rate": 0.5145137880986937,
+      "prob_win_rate_gt_half": 0.859570181654455,
+      "prob_loss": 0.48546511627906974,
+      "std": 0.04500390857749201,
+      "skew": 1.0682693596090196,
+      "excess_kurtosis": 3.8734657370098624,
+      "var_95": -0.05654761904761907,
+      "cvar_95": -0.07789564125094756,
+      "payoff_b": 1.4233982101329812,
+      "kelly_raw": 0.17343831923467878,
+      "kelly_full": 0.17343831923467878,
+      "histogram": [
+        {
+          "left": -0.1428571428571428,
+          "right": -0.10980810234541571,
+          "count": 6
+        },
+        {
+          "left": -0.10980810234541571,
+          "right": -0.07675906183368864,
+          "count": 20
+        },
+        {
+          "left": -0.07675906183368864,
+          "right": -0.043710021321961556,
+          "count": 100
+        },
+        {
+          "left": -0.043710021321961556,
+          "right": -0.010660980810234477,
+          "count": 313
+        },
+        {
+          "left": -0.010660980810234477,
+          "right": 0.022388059701492602,
+          "count": 552
+        },
+        {
+          "left": 0.022388059701492602,
+          "right": 0.05543710021321968,
+          "count": 234
+        },
+        {
+          "left": 0.05543710021321968,
+          "right": 0.08848614072494676,
+          "count": 88
+        },
+        {
+          "left": 0.08848614072494676,
+          "right": 0.12153518123667384,
+          "count": 29
+        },
+        {
+          "left": 0.12153518123667384,
+          "right": 0.15458422174840092,
+          "count": 16
+        },
+        {
+          "left": 0.15458422174840092,
+          "right": 0.187633262260128,
+          "count": 10
+        },
+        {
+          "left": 0.187633262260128,
+          "right": 0.22068230277185508,
+          "count": 5
+        },
+        {
+          "left": 0.22068230277185508,
+          "right": 0.25373134328358216,
+          "count": 3
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.17343831923467878,
+          "median_terminal_wealth": 1.1238610306976786,
+          "p05_terminal_wealth": 0.9931873274139895,
+          "p25_terminal_wealth": 1.0677386839742136,
+          "p75_terminal_wealth": 1.185422947947092,
+          "p95_terminal_wealth": 1.279727656722431,
+          "median_max_drawdown": 0.043322177330754164,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.1300787394260091,
+          "median_terminal_wealth": 1.092200084353662,
+          "p05_terminal_wealth": 0.9952905822903504,
+          "p25_terminal_wealth": 1.0509476316130195,
+          "p75_terminal_wealth": 1.136770494584002,
+          "p95_terminal_wealth": 1.2041749980326875,
+          "median_max_drawdown": 0.032609425665885095,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.08671915961733939,
+          "median_terminal_wealth": 1.0609717723498067,
+          "p05_terminal_wealth": 0.9971171962651555,
+          "p25_terminal_wealth": 1.0340250975390255,
+          "p75_terminal_wealth": 1.0896431331684713,
+          "p95_terminal_wealth": 1.132465031159623,
+          "median_max_drawdown": 0.02181034996666048,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.043359579808669696,
+          "median_terminal_wealth": 1.0302249348494468,
+          "p05_terminal_wealth": 0.9987002838630971,
+          "p25_terminal_wealth": 1.017058888467191,
+          "p75_terminal_wealth": 1.0440793639275054,
+          "p95_terminal_wealth": 1.0644004936286862,
+          "median_max_drawdown": 0.010943109963183373,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 5,
+      "label": "Q5",
+      "n": 1391,
+      "small_sample": false,
+      "mean": 0.006930867455853087,
+      "median": 0.0024390243902441266,
+      "win_rate": 0.5204888569374551,
+      "posterior_win_rate": 0.5204594400574301,
+      "prob_win_rate_gt_half": 0.9368728082300062,
+      "prob_loss": 0.47951114306254494,
+      "std": 0.047784002863721864,
+      "skew": 1.197471035078348,
+      "excess_kurtosis": 5.593682045667261,
+      "var_95": -0.06160458452722073,
+      "cvar_95": -0.08414974514797058,
+      "payoff_b": 1.3506062801976573,
+      "kelly_raw": 0.16540366475599239,
+      "kelly_full": 0.16540366475599239,
+      "histogram": [
+        {
+          "left": -0.16602473140077023,
+          "right": -0.12409944947692328,
+          "count": 4
+        },
+        {
+          "left": -0.12409944947692328,
+          "right": -0.08217416755307633,
+          "count": 27
+        },
+        {
+          "left": -0.08217416755307633,
+          "right": -0.040248885629229375,
+          "count": 130
+        },
+        {
+          "left": -0.040248885629229375,
+          "right": 0.001676396294617577,
+          "count": 526
+        },
+        {
+          "left": 0.001676396294617577,
+          "right": 0.04360167821846453,
+          "count": 477
+        },
+        {
+          "left": 0.04360167821846453,
+          "right": 0.08552696014231148,
+          "count": 153
+        },
+        {
+          "left": 0.08552696014231148,
+          "right": 0.12745224206615846,
+          "count": 49
+        },
+        {
+          "left": 0.12745224206615846,
+          "right": 0.16937752399000539,
+          "count": 11
+        },
+        {
+          "left": 0.16937752399000539,
+          "right": 0.2113028059138523,
+          "count": 9
+        },
+        {
+          "left": 0.2113028059138523,
+          "right": 0.2532280878376993,
+          "count": 2
+        },
+        {
+          "left": 0.2532280878376993,
+          "right": 0.29515336976154627,
+          "count": 1
+        },
+        {
+          "left": 0.29515336976154627,
+          "right": 0.3370786516853932,
+          "count": 2
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.16540366475599239,
+          "median_terminal_wealth": 1.1174834921067236,
+          "p05_terminal_wealth": 0.98588785214275,
+          "p25_terminal_wealth": 1.0606595460663946,
+          "p75_terminal_wealth": 1.1790610286190217,
+          "p95_terminal_wealth": 1.27434005902626,
+          "median_max_drawdown": 0.04552061077357644,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.12405274856699429,
+          "median_terminal_wealth": 1.0875301829896569,
+          "p05_terminal_wealth": 0.9898363021369107,
+          "p25_terminal_wealth": 1.0456993631970137,
+          "p75_terminal_wealth": 1.1322330118995514,
+          "p95_terminal_wealth": 1.2003437861728037,
+          "median_max_drawdown": 0.03425502170038719,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.08270183237799619,
+          "median_terminal_wealth": 1.0579424315288466,
+          "p05_terminal_wealth": 0.9935103762627293,
+          "p25_terminal_wealth": 1.0306241642419032,
+          "p75_terminal_wealth": 1.0868871332023256,
+          "p95_terminal_wealth": 1.1300326863062289,
+          "median_max_drawdown": 0.022913039006112024,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.041350916188998096,
+          "median_terminal_wealth": 1.0287879395196327,
+          "p05_terminal_wealth": 0.9969225923601591,
+          "p25_terminal_wealth": 1.0153888492060772,
+          "p75_terminal_wealth": 1.0427876996864467,
+          "p95_terminal_wealth": 1.0633118749829238,
+          "median_max_drawdown": 0.011495249766817928,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 6,
+      "label": "Q6",
+      "n": 1362,
+      "small_sample": false,
+      "mean": 0.008373580560753081,
+      "median": 0.003663446054750441,
+      "win_rate": 0.5345080763582967,
+      "posterior_win_rate": 0.5344574780058651,
+      "prob_win_rate_gt_half": 0.9946476438213607,
+      "prob_loss": 0.4654919236417034,
+      "std": 0.05069973371904261,
+      "skew": 0.9725029524210527,
+      "excess_kurtosis": 5.699292862604484,
+      "var_95": -0.06050029086678321,
+      "cvar_95": -0.0924018958916202,
+      "payoff_b": 1.3806035354851889,
+      "kelly_raw": 0.1972552979241458,
+      "kelly_full": 0.1972552979241458,
+      "histogram": [
+        {
+          "left": -0.2709235209235209,
+          "right": -0.2206939081939082,
+          "count": 1
+        },
+        {
+          "left": -0.2206939081939082,
+          "right": -0.17046429546429548,
+          "count": 0
+        },
+        {
+          "left": -0.17046429546429548,
+          "right": -0.12023468273468277,
+          "count": 11
+        },
+        {
+          "left": -0.12023468273468277,
+          "right": -0.07000507000507006,
+          "count": 43
+        },
+        {
+          "left": -0.07000507000507006,
+          "right": -0.019775457275457375,
+          "count": 274
+        },
+        {
+          "left": -0.019775457275457375,
+          "right": 0.030454155454155363,
+          "count": 691
+        },
+        {
+          "left": 0.030454155454155363,
+          "right": 0.0806837681837681,
+          "count": 245
+        },
+        {
+          "left": 0.0806837681837681,
+          "right": 0.13091338091338078,
+          "count": 66
+        },
+        {
+          "left": 0.13091338091338078,
+          "right": 0.18114299364299347,
+          "count": 22
+        },
+        {
+          "left": 0.18114299364299347,
+          "right": 0.23137260637260615,
+          "count": 4
+        },
+        {
+          "left": 0.23137260637260615,
+          "right": 0.28160221910221894,
+          "count": 1
+        },
+        {
+          "left": 0.28160221910221894,
+          "right": 0.3318318318318316,
+          "count": 4
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.1972552979241458,
+          "median_terminal_wealth": 1.1732550395966241,
+          "p05_terminal_wealth": 1.0036124004624292,
+          "p25_terminal_wealth": 1.0975331735264078,
+          "p75_terminal_wealth": 1.2529644503446922,
+          "p95_terminal_wealth": 1.3875067934202847,
+          "median_max_drawdown": 0.053771240463167114,
+          "prob_dd_gt_20": 0.0001,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.14794147344310937,
+          "median_terminal_wealth": 1.1283938851462618,
+          "p05_terminal_wealth": 1.0035504248432587,
+          "p25_terminal_wealth": 1.0732065909454693,
+          "p75_terminal_wealth": 1.185341833518959,
+          "p95_terminal_wealth": 1.279951076941703,
+          "median_max_drawdown": 0.0404531583792026,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.0986276489620729,
+          "median_terminal_wealth": 1.08462149537177,
+          "p05_terminal_wealth": 1.0029109883908065,
+          "p25_terminal_wealth": 1.0488252152212352,
+          "p75_terminal_wealth": 1.1208669808874085,
+          "p95_terminal_wealth": 1.1796440667992607,
+          "median_max_drawdown": 0.027073273249231866,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.04931382448103645,
+          "median_terminal_wealth": 1.0417602970192648,
+          "p05_terminal_wealth": 1.0017015246955479,
+          "p25_terminal_wealth": 1.0243710184367731,
+          "p75_terminal_wealth": 1.0590679067577422,
+          "p95_terminal_wealth": 1.0865478921459157,
+          "median_max_drawdown": 0.013588182818969674,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 7,
+      "label": "Q7",
+      "n": 1373,
+      "small_sample": false,
+      "mean": 0.007198415188150044,
+      "median": 0.0026490066225166586,
+      "win_rate": 0.5229424617625638,
+      "posterior_win_rate": 0.5229090909090909,
+      "prob_win_rate_gt_half": 0.9555649383111431,
+      "prob_loss": 0.4770575382374363,
+      "std": 0.05661670599114475,
+      "skew": 1.3040102847773538,
+      "excess_kurtosis": 6.526198003888825,
+      "var_95": -0.07163489312536098,
+      "cvar_95": -0.10281018504064354,
+      "payoff_b": 1.290113710881452,
+      "kelly_raw": 0.1531037744731129,
+      "kelly_full": 0.1531037744731129,
+      "histogram": [
+        {
+          "left": -0.21569839307787397,
+          "right": -0.16994574921027336,
+          "count": 3
+        },
+        {
+          "left": -0.16994574921027336,
+          "right": -0.12419310534267274,
+          "count": 9
+        },
+        {
+          "left": -0.12419310534267274,
+          "right": -0.07844046147507211,
+          "count": 48
+        },
+        {
+          "left": -0.07844046147507211,
+          "right": -0.0326878176074715,
+          "count": 186
+        },
+        {
+          "left": -0.0326878176074715,
+          "right": 0.013064826260129114,
+          "count": 584
+        },
+        {
+          "left": 0.013064826260129114,
+          "right": 0.058817470127729754,
+          "count": 372
+        },
+        {
+          "left": 0.058817470127729754,
+          "right": 0.10457011399533034,
+          "count": 111
+        },
+        {
+          "left": 0.10457011399533034,
+          "right": 0.15032275786293098,
+          "count": 36
+        },
+        {
+          "left": 0.15032275786293098,
+          "right": 0.19607540173053162,
+          "count": 8
+        },
+        {
+          "left": 0.19607540173053162,
+          "right": 0.2418280455981322,
+          "count": 5
+        },
+        {
+          "left": 0.2418280455981322,
+          "right": 0.2875806894657328,
+          "count": 4
+        },
+        {
+          "left": 0.2875806894657328,
+          "right": 0.3333333333333335,
+          "count": 7
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.1531037744731129,
+          "median_terminal_wealth": 1.1105666803429592,
+          "p05_terminal_wealth": 0.9659650921897194,
+          "p25_terminal_wealth": 1.0474126023547126,
+          "p75_terminal_wealth": 1.1774737862055724,
+          "p95_terminal_wealth": 1.286896687440945,
+          "median_max_drawdown": 0.05172133749998775,
+          "prob_dd_gt_20": 0.0001,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.11482783085483468,
+          "median_terminal_wealth": 1.0825645388887652,
+          "p05_terminal_wealth": 0.9749662968199795,
+          "p25_terminal_wealth": 1.0360520318077553,
+          "p75_terminal_wealth": 1.131416314945989,
+          "p95_terminal_wealth": 1.2094246142829104,
+          "median_max_drawdown": 0.03895357411122857,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.07655188723655645,
+          "median_terminal_wealth": 1.054824352716778,
+          "p05_terminal_wealth": 0.9836259380459097,
+          "p25_terminal_wealth": 1.0243039667674176,
+          "p75_terminal_wealth": 1.0863165291093742,
+          "p95_terminal_wealth": 1.1357504411635022,
+          "median_max_drawdown": 0.02607466308944112,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.03827594361827823,
+          "median_terminal_wealth": 1.027299473100812,
+          "p05_terminal_wealth": 0.9919394910146307,
+          "p25_terminal_wealth": 1.0122674381749572,
+          "p75_terminal_wealth": 1.042520794699933,
+          "p95_terminal_wealth": 1.066029512109705,
+          "median_max_drawdown": 0.013086017788059012,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 8,
+      "label": "Q8",
+      "n": 1381,
+      "small_sample": false,
+      "mean": 0.007293512195702682,
+      "median": 0.0,
+      "win_rate": 0.49746560463432293,
+      "posterior_win_rate": 0.49746926970354305,
+      "prob_win_rate_gt_half": 0.4253208874628662,
+      "prob_loss": 0.502534395365677,
+      "std": 0.06236738950007672,
+      "skew": 1.3633300068706051,
+      "excess_kurtosis": 4.906695996343402,
+      "var_95": -0.07474429583005515,
+      "cvar_95": -0.10317633963700251,
+      "payoff_b": 1.3972759775816024,
+      "kelly_raw": 0.13781896556947038,
+      "kelly_full": 0.13781896556947038,
+      "histogram": [
+        {
+          "left": -0.20028818443804042,
+          "right": -0.15595522597877282,
+          "count": 2
+        },
+        {
+          "left": -0.15595522597877282,
+          "right": -0.11162226751950521,
+          "count": 15
+        },
+        {
+          "left": -0.11162226751950521,
+          "right": -0.06728930906023761,
+          "count": 80
+        },
+        {
+          "left": -0.06728930906023761,
+          "right": -0.02295635060097001,
+          "count": 290
+        },
+        {
+          "left": -0.02295635060097001,
+          "right": 0.02137660785829759,
+          "count": 552
+        },
+        {
+          "left": 0.02137660785829759,
+          "right": 0.0657095663175652,
+          "count": 277
+        },
+        {
+          "left": 0.0657095663175652,
+          "right": 0.1100425247768328,
+          "count": 85
+        },
+        {
+          "left": 0.1100425247768328,
+          "right": 0.1543754832361004,
+          "count": 36
+        },
+        {
+          "left": 0.1543754832361004,
+          "right": 0.198708441695368,
+          "count": 24
+        },
+        {
+          "left": 0.198708441695368,
+          "right": 0.2430414001546356,
+          "count": 7
+        },
+        {
+          "left": 0.2430414001546356,
+          "right": 0.2873743586139032,
+          "count": 5
+        },
+        {
+          "left": 0.2873743586139032,
+          "right": 0.3317073170731708,
+          "count": 8
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.13781896556947038,
+          "median_terminal_wealth": 1.0996748050272656,
+          "p05_terminal_wealth": 0.9602736892327265,
+          "p25_terminal_wealth": 1.0406769799299962,
+          "p75_terminal_wealth": 1.1668788213193404,
+          "p95_terminal_wealth": 1.2707113965940453,
+          "median_max_drawdown": 0.05300520853675755,
+          "prob_dd_gt_20": 0.0001,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.10336422417710278,
+          "median_terminal_wealth": 1.0745511210895855,
+          "p05_terminal_wealth": 0.9705631514887612,
+          "p25_terminal_wealth": 1.0309324142538696,
+          "p75_terminal_wealth": 1.1236646014577467,
+          "p95_terminal_wealth": 1.1978543214194342,
+          "median_max_drawdown": 0.039945016375296294,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.06890948278473519,
+          "median_terminal_wealth": 1.0495388977396654,
+          "p05_terminal_wealth": 0.9806442967786039,
+          "p25_terminal_wealth": 1.0209822438785534,
+          "p75_terminal_wealth": 1.0813876335358463,
+          "p95_terminal_wealth": 1.128533696393606,
+          "median_max_drawdown": 0.026745944526068766,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.034454741392367594,
+          "median_terminal_wealth": 1.0247030443744356,
+          "p05_terminal_wealth": 0.9905073383271785,
+          "p25_terminal_wealth": 1.0106248581303714,
+          "p75_terminal_wealth": 1.0401551918141165,
+          "p95_terminal_wealth": 1.062629174659396,
+          "median_max_drawdown": 0.013434873494386268,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 9,
+      "label": "Q9",
+      "n": 1387,
+      "small_sample": false,
+      "mean": 0.006668707288116307,
+      "median": -0.0006968641114982743,
+      "win_rate": 0.48666186012977647,
+      "posterior_win_rate": 0.4866810655147588,
+      "prob_win_rate_gt_half": 0.16023699484627155,
+      "prob_loss": 0.5133381398702235,
+      "std": 0.06843252245643368,
+      "skew": 1.0388189978385023,
+      "excess_kurtosis": 3.587057050629234,
+      "var_95": -0.09142857142857141,
+      "cvar_95": -0.12407048639367653,
+      "payoff_b": 1.3698159940628942,
+      "kelly_raw": 0.11194538078769584,
+      "kelly_full": 0.11194538078769584,
+      "histogram": [
+        {
+          "left": -0.2683930300096805,
+          "right": -0.2183983088287843,
+          "count": 1
+        },
+        {
+          "left": -0.2183983088287843,
+          "right": -0.1684035876478881,
+          "count": 5
+        },
+        {
+          "left": -0.1684035876478881,
+          "right": -0.11840886646699192,
+          "count": 25
+        },
+        {
+          "left": -0.11840886646699192,
+          "right": -0.06841414528609571,
+          "count": 85
+        },
+        {
+          "left": -0.06841414528609571,
+          "right": -0.018419424105199506,
+          "count": 352
+        },
+        {
+          "left": -0.018419424105199506,
+          "right": 0.03157529707569667,
+          "count": 555
+        },
+        {
+          "left": 0.03157529707569667,
+          "right": 0.08157001825659288,
+          "count": 209
+        },
+        {
+          "left": 0.08157001825659288,
+          "right": 0.1315647394374891,
+          "count": 91
+        },
+        {
+          "left": 0.1315647394374891,
+          "right": 0.1815594606183853,
+          "count": 35
+        },
+        {
+          "left": 0.1815594606183853,
+          "right": 0.2315541817992815,
+          "count": 12
+        },
+        {
+          "left": 0.2315541817992815,
+          "right": 0.28154890298017765,
+          "count": 10
+        },
+        {
+          "left": 0.28154890298017765,
+          "right": 0.33154362416107386,
+          "count": 7
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.11194538078769584,
+          "median_terminal_wealth": 1.0724552560049192,
+          "p05_terminal_wealth": 0.9503567513383503,
+          "p25_terminal_wealth": 1.0194948839542883,
+          "p75_terminal_wealth": 1.1303031418221838,
+          "p95_terminal_wealth": 1.220993545417473,
+          "median_max_drawdown": 0.051670078380269324,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.08395903559077188,
+          "median_terminal_wealth": 1.0544402022035864,
+          "p05_terminal_wealth": 0.9629986014563449,
+          "p25_terminal_wealth": 1.0151129401711474,
+          "p75_terminal_wealth": 1.0968046489479213,
+          "p95_terminal_wealth": 1.1623741369861027,
+          "median_max_drawdown": 0.038920970541560074,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.05597269039384792,
+          "median_terminal_wealth": 1.0363796383789778,
+          "p05_terminal_wealth": 0.9755296797827518,
+          "p25_terminal_wealth": 1.0103752781694633,
+          "p75_terminal_wealth": 1.0639570877004816,
+          "p95_terminal_wealth": 1.1060076001483303,
+          "median_max_drawdown": 0.026058780226768052,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.02798634519692396,
+          "median_terminal_wealth": 1.018214925891621,
+          "p05_terminal_wealth": 0.9878568448096934,
+          "p25_terminal_wealth": 1.0053495161991903,
+          "p75_terminal_wealth": 1.0316764088771742,
+          "p95_terminal_wealth": 1.0518957905050756,
+          "median_max_drawdown": 0.013076886916013608,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    },
+    {
+      "decile": 10,
+      "label": "Q10",
+      "n": 1375,
+      "small_sample": false,
+      "mean": 0.005768766671905739,
+      "median": -0.002596952908587191,
+      "win_rate": 0.46763636363636363,
+      "posterior_win_rate": 0.46768336964415397,
+      "prob_win_rate_gt_half": 0.008101607025409357,
+      "prob_loss": 0.5323636363636364,
+      "std": 0.08332766097724865,
+      "skew": 0.8697024489290398,
+      "excess_kurtosis": 2.533228636500958,
+      "var_95": -0.11874533233756535,
+      "cvar_95": -0.15435968871581612,
+      "payoff_b": 1.3594097884634169,
+      "kelly_raw": 0.07610414542984256,
+      "kelly_full": 0.07610414542984256,
+      "histogram": [
+        {
+          "left": -0.25970149253731345,
+          "right": -0.21036584449354437,
+          "count": 5
+        },
+        {
+          "left": -0.21036584449354437,
+          "right": -0.1610301964497753,
+          "count": 15
+        },
+        {
+          "left": -0.1610301964497753,
+          "right": -0.1116945484060062,
+          "count": 56
+        },
+        {
+          "left": -0.1116945484060062,
+          "right": -0.062358900362237124,
+          "count": 139
+        },
+        {
+          "left": -0.062358900362237124,
+          "right": -0.013023252318468043,
+          "count": 380
+        },
+        {
+          "left": -0.013023252318468043,
+          "right": 0.03631239572530104,
+          "count": 414
+        },
+        {
+          "left": 0.03631239572530104,
+          "right": 0.08564804376907009,
+          "count": 181
+        },
+        {
+          "left": 0.08564804376907009,
+          "right": 0.1349836918128392,
+          "count": 91
+        },
+        {
+          "left": 0.1349836918128392,
+          "right": 0.1843193398566083,
+          "count": 48
+        },
+        {
+          "left": 0.1843193398566083,
+          "right": 0.23365498790037736,
+          "count": 20
+        },
+        {
+          "left": 0.23365498790037736,
+          "right": 0.2829906359441464,
+          "count": 10
+        },
+        {
+          "left": 0.2829906359441464,
+          "right": 0.3323262839879155,
+          "count": 16
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "100% Kelly",
+          "fraction_of_kelly": 1.0,
+          "position": 0.07610414542984256,
+          "median_terminal_wealth": 1.0423151780889524,
+          "p05_terminal_wealth": 0.941462012914576,
+          "p25_terminal_wealth": 0.9999885235162852,
+          "p75_terminal_wealth": 1.0875654980298413,
+          "p95_terminal_wealth": 1.1581978635077224,
+          "median_max_drawdown": 0.04789159587034347,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "75% Kelly",
+          "fraction_of_kelly": 0.75,
+          "position": 0.05707810907238192,
+          "median_terminal_wealth": 1.031940216981595,
+          "p05_terminal_wealth": 0.9561376539484107,
+          "p25_terminal_wealth": 1.0003394035024238,
+          "p75_terminal_wealth": 1.0654266889074457,
+          "p95_terminal_wealth": 1.1169793131504608,
+          "median_max_drawdown": 0.0360678624384938,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "50% Kelly",
+          "fraction_of_kelly": 0.5,
+          "position": 0.03805207271492128,
+          "median_terminal_wealth": 1.0214053929391493,
+          "p05_terminal_wealth": 0.9708006284922621,
+          "p25_terminal_wealth": 1.0004534666319012,
+          "p75_terminal_wealth": 1.0434429398951064,
+          "p95_terminal_wealth": 1.0768874261752988,
+          "median_max_drawdown": 0.024141350841156484,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        },
+        {
+          "name": "25% Kelly",
+          "fraction_of_kelly": 0.25,
+          "position": 0.01902603635746064,
+          "median_terminal_wealth": 1.0107984440600883,
+          "p05_terminal_wealth": 0.9853901331165136,
+          "p25_terminal_wealth": 1.0003205846165724,
+          "p75_terminal_wealth": 1.0216215798836141,
+          "p95_terminal_wealth": 1.037885893442165,
+          "median_max_drawdown": 0.01211278402853494,
+          "prob_dd_gt_20": 0.0,
+          "prob_dd_gt_30": 0.0
+        }
+      ],
+      "note": null
+    }
+  ],
+  "notes": [
+    "条件因子仅为现有 M+（mud_plus）。",
+    "持有期为信号日收盘到其后第 3 个交易日收盘。",
+    "信号日与 mud_plus 来自市场中性截面 factor_snapshot，不另行重算 M+。",
+    "胜率后验使用 Beta(1,1) 先验；收益大于 0 记为胜，其余记为负。",
+    "盈亏比与 Kelly 使用后验胜率；蒙特卡洛从该分位历史 T+3 收益中有放回抽样。",
+    "Kelly 四档只作研究对照，不写凯利仓位表。"
+  ],
+  "created_at": "2026-10-01T14:12:46"
+}

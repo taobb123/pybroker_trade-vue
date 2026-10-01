@@ -8,6 +8,7 @@ import {
   Workflow,
   History,
   FileBarChart2,
+  LineChart,
   Activity,
   Shield,
 } from '@lucide/vue'
@@ -44,6 +45,7 @@ const nav = computed(() => {
     { to: '/workflows', label: '工作流', icon: Workflow },
     { to: '/runs', label: '运行记录', icon: History },
     { to: '/reports', label: '报告', icon: FileBarChart2 },
+    { to: '/risk-return', label: '风险收益', icon: LineChart },
   ]
   if (auth.user?.role === 'admin') {
     base.push(
@@ -63,6 +65,7 @@ const pageTitle = computed(() => {
 
 const isNarrow = computed(() => route.path === '/account')
 const contentMax = computed(() => {
+  if (route.path === '/risk-return') return 'max-w-6xl'
   if (route.path.startsWith('/billing') || route.path === '/usage' || route.path === '/admin') {
     return 'max-w-5xl'
   }
