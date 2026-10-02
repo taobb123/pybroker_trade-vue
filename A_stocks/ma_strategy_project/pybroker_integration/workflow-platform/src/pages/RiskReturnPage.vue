@@ -16,6 +16,7 @@ import {
   fetchRiskBudget,
   fetchRiskCopula,
   fetchRiskCorrelation,
+  fetchRiskDecision,
   fetchRiskWalkForward,
   fetchRiskRegime,
   fetchRiskReturnLatest,
@@ -23,6 +24,7 @@ import {
   type RiskBudget,
   type RiskCopula,
   type RiskCorrelation,
+  type RiskDecision,
   type RiskDecile,
   type RiskRegime,
   type RiskReport,
@@ -45,13 +47,17 @@ const walkError = ref('')
 const copula = ref<RiskCopula | null>(null)
 const copulaMessage = ref('')
 const copulaError = ref('')
+const decision = ref<RiskDecision | null>(null)
+const decisionMessage = ref('')
+const decisionError = ref('')
 const message = ref('')
 const error = ref('')
 const loading = ref(false)
 const running = ref(false)
 const selectedDecile = ref(10)
-const moduleTab = ref('correlation')
+const moduleTab = ref('decision')
 const moduleTabs = [
+  { id: 'decision', label: '决策中心' },
   { id: 'correlation', label: '五个信号组的相关性' },
   { id: 'regime', label: '按温度仓位档看收益' },
   { id: 'budget', label: '风险预算' },
@@ -104,6 +110,21 @@ function applyResponse(emptyMessage: string | null, next: RiskReport | null, err
     return
   }
   message.value = emptyMessage || '还没有研究结果。'
+}
+
+async function loadDecision() {
+  decisionError.value = ''
+  try {
+    const payload = await fetchRiskDecision()
+    if (!payload.ok) {
+      decisionError.value = payload.error || '读取决策中心失败'
+      return
+    }
+    decision.value = payload.report
+    decisionMessage.value = payload.report ? '' : payload.message || '还没有决策账。'
+  } catch (err) {
+    decisionError.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 async function loadCorrelation() {
@@ -225,6 +246,7 @@ function selectRow(row: RiskDecile) {
 
 onMounted(() => {
   void loadLatest()
+  void loadDecision()
   void loadCorrelation()
   void loadRegime()
   void loadBudget()
@@ -239,7 +261,7 @@ onMounted(() => {
       <div class="min-w-0">
         <h2 class="text-base font-semibold tracking-tight">风险收益 · M+ / T+3</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          样本用市场中性截面里已经算好的 M+，T+3 用系统日线补上。结果写在 risk_return/output/latest.json。日常的东财概念扫描、量价六组合、形态建仓和回测对比保持原样。
+          样本用市场中性截面里已经算好的 M+，T+3 用系统日线补上。结果写在 risk_return/output/latest.json。决策中心另读五组等权日收益和温度档，不随「运行研究」改写。日常的东财概念扫描、量价六组合、形态建仓和回测对比保持原样。
         </p>
       </div>
       <Button :disabled="running" @click="runJob">
@@ -258,6 +280,133 @@ onMounted(() => {
           {{ tab.label }}
         </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="decision" class="space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>决策中心</CardTitle>
+        <p v-if="decision" class="text-sm">{{ decision.boundary }}</p>
+        <CardDescription v-if="decision">
+          {{ decision.sampleStart }} 至 {{ decision.sampleEnd }}，{{ decision.nDays }} 个交易日。
+          状态是早于当天的温度档。候选是空仓、当时同档的四分之一凯利、温度计自己的仓位。
+          效用是持有 {{ decision.horizonDays }} 日的终值收益均值，减去 {{ num(decision.lambdaTail, 0) }} 倍终值亏损的 95% CVaR。
+          账上期末资金 {{ num(decision.terminalWealth, 3) }}，累计 {{ pct(decision.totalReturn, 1) }}，最大回撤 {{ pct(decision.maxDrawdown, 1) }}。
+        </CardDescription>
+        <CardDescription v-else>读取决策中心…</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <p v-if="decisionError" class="text-xs text-destructive">{{ decisionError }}</p>
+        <p v-else-if="decisionMessage" class="text-xs text-muted-foreground">{{ decisionMessage }}</p>
+        <div v-if="decision?.nextAction" class="space-y-2 px-4 text-sm">
+          <p>
+            市场数据：五个信号组与温度档，用到 {{ decision.nextAction.asOf }}。
+          </p>
+          <p>
+            市场状态：{{ decision.nextAction.state }}，温度分 {{ num(decision.nextAction.score, 0) }}，
+            温度计仓位 {{ pct(decision.nextAction.temperaturePosition, 0) }}，同档已有 {{ decision.nextAction.nPrior }} 天。
+          </p>
+          <p v-if="decision.nextAction.estimate">
+            估计器：后验胜率 {{ pct(decision.nextAction.estimate.posteriorWinRate, 1) }}，
+            赔率 {{ num(decision.nextAction.estimate.payoffB, 2) }}，
+            研究凯利 {{ pct(decision.nextAction.estimate.kellyRaw, 1) }}。
+            同档等权日收益均值 {{ pct(decision.nextAction.estimate.pdfMean, 2) }}，
+            95% VaR {{ pct(decision.nextAction.estimate.pdfVar95, 2) }}，
+            95% CVaR {{ pct(decision.nextAction.estimate.pdfCvar95, 2) }}。
+            相关最高是 {{ decision.nextAction.estimate.maxPair || '—' }}
+            {{ num(decision.nextAction.estimate.maxCorrelation, 2) }}。
+            五组同日为负：历史 {{ pct(decision.nextAction.estimate.historicalAllNegative, 1) }}，
+            互相独立 {{ pct(decision.nextAction.estimate.independentAllNegative, 1) }}，
+            正态相关 {{ pct(decision.nextAction.estimate.gaussianAllNegative, 1) }}。
+            {{ decision.nextAction.estimate.sampler }}。
+          </p>
+          <p>
+            组间轮动：
+            <span v-for="(weight, name) in decision.nextAction.weights" :key="name">
+              {{ name }} {{ pct(weight, 0) }}
+            </span>
+            。条件均值为负的组权重为 0，后验只缩小仍为正的组。
+            动态决策在这个权重上比较三个总仓位，当前动作是 {{ decision.nextAction.action }}，
+            总仓位 {{ pct(decision.nextAction.position, 1) }}。
+          </p>
+          <p v-if="decision.nextAction.feedback">
+            反馈：{{ decision.nextAction.feedback.date }} 处于{{ decision.nextAction.feedback.state }}，
+            动作 {{ decision.nextAction.feedback.action }}，当日结果 {{ pct(decision.nextAction.feedback.realized, 2) }}。
+            下一日状态更新为{{ decision.nextAction.feedback.nextState }}。
+          </p>
+        </div>
+        <Table v-if="decision?.nextAction">
+          <TableHeader>
+            <TableRow>
+              <TableHead>候选</TableHead>
+              <TableHead class="text-right">仓位</TableHead>
+              <TableHead class="text-right">终值收益均值</TableHead>
+              <TableHead class="text-right">95% CVaR</TableHead>
+              <TableHead class="text-right">效用</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="row in decision.nextAction.candidates" :key="row.name">
+              <TableCell>
+                {{ row.name }}
+                <span v-if="row.chosen"> · 选中</span>
+              </TableCell>
+              <TableCell class="text-right">{{ pct(row.position, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.expectedReturn, 2) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.cvar95, 2) }}</TableCell>
+              <TableCell class="text-right">{{ pct(row.utility, 2) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <Table v-if="decision">
+          <TableHeader>
+            <TableRow>
+              <TableHead>温度档</TableHead>
+              <TableHead class="text-right">天数</TableHead>
+              <TableHead class="text-right">平均仓位</TableHead>
+              <TableHead class="text-right">当日结果均值</TableHead>
+              <TableHead>最近动作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="state in decision.states" :key="state.label">
+              <TableCell>{{ state.label }}</TableCell>
+              <TableCell class="text-right">{{ state.nDays }}</TableCell>
+              <TableCell class="text-right">{{ pct(state.meanPosition, 1) }}</TableCell>
+              <TableCell class="text-right">{{ pct(state.meanRealized, 2) }}</TableCell>
+              <TableCell>{{ state.lastAction }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div v-if="decision" class="max-h-96 overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>日期</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>动作</TableHead>
+                <TableHead class="text-right">仓位</TableHead>
+                <TableHead class="text-right">当日结果</TableHead>
+                <TableHead class="text-right">当时样本</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="row in decision.ledger" :key="row.date">
+                <TableCell>{{ row.date }}</TableCell>
+                <TableCell>{{ row.state }}</TableCell>
+                <TableCell>{{ row.action }}</TableCell>
+                <TableCell class="text-right">{{ pct(row.position, 1) }}</TableCell>
+                <TableCell class="text-right">{{ pct(row.realized, 2) }}</TableCell>
+                <TableCell class="text-right">{{ row.nPrior }}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+        <ul v-if="decision" class="space-y-1 px-4 text-xs text-muted-foreground">
+          <li v-for="note in decision.notes" :key="note">{{ note }}</li>
+        </ul>
+      </CardContent>
+    </Card>
+      </TabsContent>
 
       <TabsContent value="correlation" class="space-y-3">
     <p v-if="correlationError" class="text-xs text-destructive">{{ correlationError }}</p>

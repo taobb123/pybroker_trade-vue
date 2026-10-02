@@ -1,0 +1,4312 @@
+{
+  "schema_version": "decision_center_v2",
+  "sleeves": [
+    "W2+W3",
+    "W4+W6",
+    "M+",
+    "Q",
+    "G"
+  ],
+  "n_days": 261,
+  "sample_start": "2025-07-07",
+  "sample_end": "2026-07-31",
+  "lambda_tail": 1.0,
+  "horizon_days": 20,
+  "n_paths": 4000,
+  "min_prior": 30,
+  "seed": 20261001,
+  "next_action": {
+    "as_of": "2026-07-31",
+    "state": "重仓 70%",
+    "score": 21.6,
+    "temperature_position": 0.7,
+    "action": "空仓",
+    "position": 0.0,
+    "weights": {
+      "W2+W3": 0.0,
+      "W4+W6": 0.0,
+      "M+": 0.0,
+      "Q": 0.0,
+      "G": 0.0
+    },
+    "n_prior": 60,
+    "estimate": {
+      "posterior_win_rate": null,
+      "payoff_b": null,
+      "kelly_raw": null,
+      "pdf_mean": 0.0,
+      "pdf_var_95": 0.0,
+      "pdf_cvar_95": 0.0,
+      "max_correlation": 0.8931070899029747,
+      "max_pair": "W4+W6 与 G",
+      "historical_all_negative": 0.2833333333333333,
+      "independent_all_negative": 0.022398919753086423,
+      "gaussian_all_negative": 0.2325,
+      "sampler": "历史同日与正态相关取更差"
+    },
+    "candidates": [
+      {
+        "name": "空仓",
+        "position": 0.0,
+        "expected_return": 0.0,
+        "cvar_95": 0.0,
+        "utility": 0.0,
+        "chosen": true
+      },
+      {
+        "name": "温度档",
+        "position": 0.7,
+        "expected_return": 0.0,
+        "cvar_95": 0.0,
+        "utility": 0.0,
+        "chosen": false
+      }
+    ],
+    "feedback": {
+      "date": "2026-07-31",
+      "state": "重仓 70%",
+      "action": "空仓",
+      "realized": 0.0,
+      "next_state": "重仓 70%"
+    }
+  },
+  "states": [
+    {
+      "label": "空仓",
+      "n_days": 41,
+      "mean_position": 0.0,
+      "mean_realized": 0.0,
+      "last_action": "空仓",
+      "last_date": "2026-06-25"
+    },
+    {
+      "label": "轻仓 20%",
+      "n_days": 56,
+      "mean_position": 0.0642857142857143,
+      "mean_realized": -4.981874903654981e-05,
+      "last_action": "温度档",
+      "last_date": "2026-06-23"
+    },
+    {
+      "label": "中仓 40%",
+      "n_days": 52,
+      "mean_position": 0.16923076923076924,
+      "mean_realized": 0.0008238406874144324,
+      "last_action": "温度档",
+      "last_date": "2026-07-02"
+    },
+    {
+      "label": "重仓 70%",
+      "n_days": 60,
+      "mean_position": 0.0,
+      "mean_realized": 0.0,
+      "last_action": "空仓",
+      "last_date": "2026-07-31"
+    },
+    {
+      "label": "满仓 100%",
+      "n_days": 52,
+      "mean_position": 0.0,
+      "mean_realized": 0.0,
+      "last_action": "空仓",
+      "last_date": "2026-07-30"
+    }
+  ],
+  "ledger": [
+    {
+      "date": "2025-07-07",
+      "state": "空仓",
+      "score": 64.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 0
+    },
+    {
+      "date": "2025-07-08",
+      "state": "中仓 40%",
+      "score": 69.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 0
+    },
+    {
+      "date": "2025-07-09",
+      "state": "轻仓 20%",
+      "score": 80.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 0
+    },
+    {
+      "date": "2025-07-10",
+      "state": "中仓 40%",
+      "score": 68.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 1
+    },
+    {
+      "date": "2025-07-11",
+      "state": "轻仓 20%",
+      "score": 76.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 1
+    },
+    {
+      "date": "2025-07-14",
+      "state": "轻仓 20%",
+      "score": 79.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 2
+    },
+    {
+      "date": "2025-07-15",
+      "state": "轻仓 20%",
+      "score": 77.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 3
+    },
+    {
+      "date": "2025-07-16",
+      "state": "空仓",
+      "score": 67.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 1
+    },
+    {
+      "date": "2025-07-17",
+      "state": "轻仓 20%",
+      "score": 77.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 4
+    },
+    {
+      "date": "2025-07-18",
+      "state": "轻仓 20%",
+      "score": 78.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 5
+    },
+    {
+      "date": "2025-07-21",
+      "state": "中仓 40%",
+      "score": 71.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 2
+    },
+    {
+      "date": "2025-07-22",
+      "state": "轻仓 20%",
+      "score": 82.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 6
+    },
+    {
+      "date": "2025-07-23",
+      "state": "轻仓 20%",
+      "score": 76.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 7
+    },
+    {
+      "date": "2025-07-24",
+      "state": "中仓 40%",
+      "score": 70.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 3
+    },
+    {
+      "date": "2025-07-25",
+      "state": "轻仓 20%",
+      "score": 84.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 8
+    },
+    {
+      "date": "2025-07-28",
+      "state": "中仓 40%",
+      "score": 73.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 4
+    },
+    {
+      "date": "2025-07-29",
+      "state": "中仓 40%",
+      "score": 74.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 5
+    },
+    {
+      "date": "2025-07-30",
+      "state": "中仓 40%",
+      "score": 71.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 6
+    },
+    {
+      "date": "2025-07-31",
+      "state": "空仓",
+      "score": 66.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 2
+    },
+    {
+      "date": "2025-08-01",
+      "state": "空仓",
+      "score": 65.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 3
+    },
+    {
+      "date": "2025-08-04",
+      "state": "轻仓 20%",
+      "score": 75.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 9
+    },
+    {
+      "date": "2025-08-05",
+      "state": "轻仓 20%",
+      "score": 77.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 10
+    },
+    {
+      "date": "2025-08-06",
+      "state": "轻仓 20%",
+      "score": 77.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 11
+    },
+    {
+      "date": "2025-08-07",
+      "state": "中仓 40%",
+      "score": 74.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 7
+    },
+    {
+      "date": "2025-08-08",
+      "state": "中仓 40%",
+      "score": 70.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 8
+    },
+    {
+      "date": "2025-08-11",
+      "state": "中仓 40%",
+      "score": 71.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 9
+    },
+    {
+      "date": "2025-08-12",
+      "state": "轻仓 20%",
+      "score": 82.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 12
+    },
+    {
+      "date": "2025-08-13",
+      "state": "中仓 40%",
+      "score": 73.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 10
+    },
+    {
+      "date": "2025-08-14",
+      "state": "轻仓 20%",
+      "score": 78.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 13
+    },
+    {
+      "date": "2025-08-15",
+      "state": "空仓",
+      "score": 59.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 4
+    },
+    {
+      "date": "2025-08-18",
+      "state": "轻仓 20%",
+      "score": 85.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 14
+    },
+    {
+      "date": "2025-08-19",
+      "state": "轻仓 20%",
+      "score": 85.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 15
+    },
+    {
+      "date": "2025-08-20",
+      "state": "中仓 40%",
+      "score": 68.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 11
+    },
+    {
+      "date": "2025-08-21",
+      "state": "轻仓 20%",
+      "score": 80.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 16
+    },
+    {
+      "date": "2025-08-22",
+      "state": "空仓",
+      "score": 62.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 5
+    },
+    {
+      "date": "2025-08-25",
+      "state": "中仓 40%",
+      "score": 73.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 12
+    },
+    {
+      "date": "2025-08-26",
+      "state": "轻仓 20%",
+      "score": 80.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 17
+    },
+    {
+      "date": "2025-08-27",
+      "state": "空仓",
+      "score": 62.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 6
+    },
+    {
+      "date": "2025-08-28",
+      "state": "满仓 100%",
+      "score": 46.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 0
+    },
+    {
+      "date": "2025-08-29",
+      "state": "中仓 40%",
+      "score": 72.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 13
+    },
+    {
+      "date": "2025-09-01",
+      "state": "空仓",
+      "score": 66.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 7
+    },
+    {
+      "date": "2025-09-02",
+      "state": "中仓 40%",
+      "score": 70.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 14
+    },
+    {
+      "date": "2025-09-03",
+      "state": "满仓 100%",
+      "score": 42.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 1
+    },
+    {
+      "date": "2025-09-04",
+      "state": "重仓 70%",
+      "score": 33.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 0
+    },
+    {
+      "date": "2025-09-05",
+      "state": "重仓 70%",
+      "score": 24.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 1
+    },
+    {
+      "date": "2025-09-08",
+      "state": "轻仓 20%",
+      "score": 78.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 18
+    },
+    {
+      "date": "2025-09-09",
+      "state": "轻仓 20%",
+      "score": 75.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 19
+    },
+    {
+      "date": "2025-09-10",
+      "state": "空仓",
+      "score": 62.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 8
+    },
+    {
+      "date": "2025-09-11",
+      "state": "中仓 40%",
+      "score": 68.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 15
+    },
+    {
+      "date": "2025-09-12",
+      "state": "轻仓 20%",
+      "score": 79.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 20
+    },
+    {
+      "date": "2025-09-15",
+      "state": "空仓",
+      "score": 59.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 9
+    },
+    {
+      "date": "2025-09-16",
+      "state": "中仓 40%",
+      "score": 68.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 16
+    },
+    {
+      "date": "2025-09-17",
+      "state": "轻仓 20%",
+      "score": 79.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 21
+    },
+    {
+      "date": "2025-09-18",
+      "state": "中仓 40%",
+      "score": 74.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 17
+    },
+    {
+      "date": "2025-09-19",
+      "state": "空仓",
+      "score": 58.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 10
+    },
+    {
+      "date": "2025-09-22",
+      "state": "满仓 100%",
+      "score": 37.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 2
+    },
+    {
+      "date": "2025-09-23",
+      "state": "空仓",
+      "score": 58.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 11
+    },
+    {
+      "date": "2025-09-24",
+      "state": "满仓 100%",
+      "score": 53.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 3
+    },
+    {
+      "date": "2025-09-25",
+      "state": "轻仓 20%",
+      "score": 78.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 22
+    },
+    {
+      "date": "2025-09-26",
+      "state": "空仓",
+      "score": 62.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 12
+    },
+    {
+      "date": "2025-09-29",
+      "state": "重仓 70%",
+      "score": 21.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 2
+    },
+    {
+      "date": "2025-09-30",
+      "state": "轻仓 20%",
+      "score": 75.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 23
+    },
+    {
+      "date": "2025-10-09",
+      "state": "中仓 40%",
+      "score": 67.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 18
+    },
+    {
+      "date": "2025-10-10",
+      "state": "轻仓 20%",
+      "score": 75.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 24
+    },
+    {
+      "date": "2025-10-13",
+      "state": "中仓 40%",
+      "score": 74.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 19
+    },
+    {
+      "date": "2025-10-14",
+      "state": "空仓",
+      "score": 65.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 13
+    },
+    {
+      "date": "2025-10-15",
+      "state": "满仓 100%",
+      "score": 54.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 4
+    },
+    {
+      "date": "2025-10-16",
+      "state": "中仓 40%",
+      "score": 75.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 20
+    },
+    {
+      "date": "2025-10-17",
+      "state": "满仓 100%",
+      "score": 56.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 5
+    },
+    {
+      "date": "2025-10-20",
+      "state": "重仓 70%",
+      "score": 9.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 3
+    },
+    {
+      "date": "2025-10-21",
+      "state": "满仓 100%",
+      "score": 56.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 6
+    },
+    {
+      "date": "2025-10-22",
+      "state": "中仓 40%",
+      "score": 67.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 21
+    },
+    {
+      "date": "2025-10-23",
+      "state": "空仓",
+      "score": 57.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 14
+    },
+    {
+      "date": "2025-10-24",
+      "state": "空仓",
+      "score": 62.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 15
+    },
+    {
+      "date": "2025-10-27",
+      "state": "中仓 40%",
+      "score": 74.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 22
+    },
+    {
+      "date": "2025-10-28",
+      "state": "轻仓 20%",
+      "score": 78.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 25
+    },
+    {
+      "date": "2025-10-29",
+      "state": "中仓 40%",
+      "score": 70.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 23
+    },
+    {
+      "date": "2025-10-30",
+      "state": "中仓 40%",
+      "score": 75.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 24
+    },
+    {
+      "date": "2025-10-31",
+      "state": "中仓 40%",
+      "score": 68.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 25
+    },
+    {
+      "date": "2025-11-03",
+      "state": "轻仓 20%",
+      "score": 81.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 26
+    },
+    {
+      "date": "2025-11-04",
+      "state": "轻仓 20%",
+      "score": 78.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 27
+    },
+    {
+      "date": "2025-11-05",
+      "state": "空仓",
+      "score": 63.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 16
+    },
+    {
+      "date": "2025-11-06",
+      "state": "中仓 40%",
+      "score": 71.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 26
+    },
+    {
+      "date": "2025-11-07",
+      "state": "中仓 40%",
+      "score": 72.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 27
+    },
+    {
+      "date": "2025-11-10",
+      "state": "中仓 40%",
+      "score": 68.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 28
+    },
+    {
+      "date": "2025-11-11",
+      "state": "轻仓 20%",
+      "score": 77.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 28
+    },
+    {
+      "date": "2025-11-12",
+      "state": "中仓 40%",
+      "score": 68.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 29
+    },
+    {
+      "date": "2025-11-13",
+      "state": "空仓",
+      "score": 59.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 17
+    },
+    {
+      "date": "2025-11-14",
+      "state": "轻仓 20%",
+      "score": 81.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 29
+    },
+    {
+      "date": "2025-11-17",
+      "state": "空仓",
+      "score": 63.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 18
+    },
+    {
+      "date": "2025-11-18",
+      "state": "满仓 100%",
+      "score": 51.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 7
+    },
+    {
+      "date": "2025-11-19",
+      "state": "重仓 70%",
+      "score": 25.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 4
+    },
+    {
+      "date": "2025-11-20",
+      "state": "重仓 70%",
+      "score": 36.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 5
+    },
+    {
+      "date": "2025-11-21",
+      "state": "重仓 70%",
+      "score": 35.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 6
+    },
+    {
+      "date": "2025-11-24",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 7
+    },
+    {
+      "date": "2025-11-25",
+      "state": "重仓 70%",
+      "score": 24.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 8
+    },
+    {
+      "date": "2025-11-26",
+      "state": "满仓 100%",
+      "score": 36.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 8
+    },
+    {
+      "date": "2025-11-27",
+      "state": "重仓 70%",
+      "score": 25.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 9
+    },
+    {
+      "date": "2025-11-28",
+      "state": "重仓 70%",
+      "score": 31.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 10
+    },
+    {
+      "date": "2025-12-01",
+      "state": "重仓 70%",
+      "score": 36.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 11
+    },
+    {
+      "date": "2025-12-02",
+      "state": "空仓",
+      "score": 66.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 19
+    },
+    {
+      "date": "2025-12-03",
+      "state": "重仓 70%",
+      "score": 25.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 12
+    },
+    {
+      "date": "2025-12-04",
+      "state": "重仓 70%",
+      "score": 25.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 13
+    },
+    {
+      "date": "2025-12-05",
+      "state": "重仓 70%",
+      "score": 4.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 14
+    },
+    {
+      "date": "2025-12-08",
+      "state": "满仓 100%",
+      "score": 56.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 9
+    },
+    {
+      "date": "2025-12-09",
+      "state": "轻仓 20%",
+      "score": 79.8,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.13719151431127413,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.7205550149417973,
+        "G": 0.14225347074692854
+      },
+      "realized": -0.0024046336129133115,
+      "n_prior": 30
+    },
+    {
+      "date": "2025-12-10",
+      "state": "满仓 100%",
+      "score": 57.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 10
+    },
+    {
+      "date": "2025-12-11",
+      "state": "满仓 100%",
+      "score": 47.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 11
+    },
+    {
+      "date": "2025-12-12",
+      "state": "重仓 70%",
+      "score": 8.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 15
+    },
+    {
+      "date": "2025-12-15",
+      "state": "满仓 100%",
+      "score": 51.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 12
+    },
+    {
+      "date": "2025-12-16",
+      "state": "满仓 100%",
+      "score": 42.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 13
+    },
+    {
+      "date": "2025-12-17",
+      "state": "重仓 70%",
+      "score": 3.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 16
+    },
+    {
+      "date": "2025-12-18",
+      "state": "满仓 100%",
+      "score": 45.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 14
+    },
+    {
+      "date": "2025-12-19",
+      "state": "满仓 100%",
+      "score": 39.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 15
+    },
+    {
+      "date": "2025-12-22",
+      "state": "空仓",
+      "score": 63.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 20
+    },
+    {
+      "date": "2025-12-23",
+      "state": "轻仓 20%",
+      "score": 75.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.5822137742846939,
+        "G": 0.41778622571530605
+      },
+      "realized": -0.0,
+      "n_prior": 31
+    },
+    {
+      "date": "2025-12-24",
+      "state": "中仓 40%",
+      "score": 69.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.951015438685632,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.048984561314368
+      },
+      "realized": 0.0014743165816692206,
+      "n_prior": 30
+    },
+    {
+      "date": "2025-12-25",
+      "state": "轻仓 20%",
+      "score": 79.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.49794460297287824,
+        "G": 0.5020553970271219
+      },
+      "realized": 0.0,
+      "n_prior": 32
+    },
+    {
+      "date": "2025-12-26",
+      "state": "轻仓 20%",
+      "score": 80.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.2807122033251891,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.44439729477760886,
+        "G": 0.27489050189720204
+      },
+      "realized": 0.0,
+      "n_prior": 33
+    },
+    {
+      "date": "2025-12-29",
+      "state": "中仓 40%",
+      "score": 70.4,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.905390415485957,
+        "W4+W6": 0.0204594196323218,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.07415016488172124
+      },
+      "realized": -0.0010651640321960414,
+      "n_prior": 31
+    },
+    {
+      "date": "2025-12-30",
+      "state": "中仓 40%",
+      "score": 70.4,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 1.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": -0.00229721693312068,
+      "n_prior": 32
+    },
+    {
+      "date": "2025-12-31",
+      "state": "中仓 40%",
+      "score": 70.6,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 1.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": -0.00043419472925476004,
+      "n_prior": 33
+    },
+    {
+      "date": "2026-01-05",
+      "state": "中仓 40%",
+      "score": 70.0,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8207524915905522,
+        "W4+W6": 0.012272640900032043,
+        "M+": 0.022061028242270835,
+        "Q": 0.0,
+        "G": 0.14491383926714504
+      },
+      "realized": 0.005659256844279495,
+      "n_prior": 34
+    },
+    {
+      "date": "2026-01-06",
+      "state": "轻仓 20%",
+      "score": 82.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.2469549539183244,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.4237896658353899,
+        "G": 0.3292553802462857
+      },
+      "realized": 0.0,
+      "n_prior": 34
+    },
+    {
+      "date": "2026-01-07",
+      "state": "轻仓 20%",
+      "score": 85.1,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.3627690864402502,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3802766957671399,
+        "G": 0.2569542177926099
+      },
+      "realized": -0.0002480222217534829,
+      "n_prior": 35
+    },
+    {
+      "date": "2026-01-08",
+      "state": "中仓 40%",
+      "score": 73.5,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8038293902334351,
+        "W4+W6": 0.06189004485653872,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.13428056491002605
+      },
+      "realized": 0.006132809342995791,
+      "n_prior": 35
+    },
+    {
+      "date": "2026-01-09",
+      "state": "轻仓 20%",
+      "score": 82.6,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.4425178503588906,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.15247215219827032,
+        "G": 0.40500999744283905
+      },
+      "realized": 0.002757646018422269,
+      "n_prior": 36
+    },
+    {
+      "date": "2026-01-12",
+      "state": "轻仓 20%",
+      "score": 85.5,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.473000209724074,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.17345993731406867,
+        "G": 0.3535398529618574
+      },
+      "realized": 0.0030577434947291564,
+      "n_prior": 37
+    },
+    {
+      "date": "2026-01-13",
+      "state": "轻仓 20%",
+      "score": 87.0,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.49653294243743584,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.20054767214801364,
+        "G": 0.30291938541455055
+      },
+      "realized": -0.001287148810489045,
+      "n_prior": 38
+    },
+    {
+      "date": "2026-01-14",
+      "state": "满仓 100%",
+      "score": 43.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 16
+    },
+    {
+      "date": "2026-01-15",
+      "state": "中仓 40%",
+      "score": 67.4,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.7933965411994524,
+        "W4+W6": 0.08029260627122956,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.12631085252931817
+      },
+      "realized": -0.0003744105456390457,
+      "n_prior": 36
+    },
+    {
+      "date": "2026-01-16",
+      "state": "满仓 100%",
+      "score": 43.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 17
+    },
+    {
+      "date": "2026-01-19",
+      "state": "满仓 100%",
+      "score": 39.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 18
+    },
+    {
+      "date": "2026-01-20",
+      "state": "满仓 100%",
+      "score": 56.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 19
+    },
+    {
+      "date": "2026-01-21",
+      "state": "满仓 100%",
+      "score": 50.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 20
+    },
+    {
+      "date": "2026-01-22",
+      "state": "中仓 40%",
+      "score": 68.6,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9010518294887029,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.09894817051129712
+      },
+      "realized": 0.005832482091215969,
+      "n_prior": 37
+    },
+    {
+      "date": "2026-01-23",
+      "state": "中仓 40%",
+      "score": 73.9,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9074718106696551,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.09252818933034486
+      },
+      "realized": 0.00585290244707105,
+      "n_prior": 38
+    },
+    {
+      "date": "2026-01-26",
+      "state": "轻仓 20%",
+      "score": 78.6,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.5193503131112557,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.2163290807891755,
+        "G": 0.26432060609956887
+      },
+      "realized": -0.0011343434275220274,
+      "n_prior": 39
+    },
+    {
+      "date": "2026-01-27",
+      "state": "满仓 100%",
+      "score": 48.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 21
+    },
+    {
+      "date": "2026-01-28",
+      "state": "空仓",
+      "score": 65.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 21
+    },
+    {
+      "date": "2026-01-29",
+      "state": "空仓",
+      "score": 57.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 22
+    },
+    {
+      "date": "2026-01-30",
+      "state": "空仓",
+      "score": 64.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 23
+    },
+    {
+      "date": "2026-02-02",
+      "state": "重仓 70%",
+      "score": 36.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 17
+    },
+    {
+      "date": "2026-02-03",
+      "state": "重仓 70%",
+      "score": 14.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 18
+    },
+    {
+      "date": "2026-02-04",
+      "state": "空仓",
+      "score": 61.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 24
+    },
+    {
+      "date": "2026-02-05",
+      "state": "满仓 100%",
+      "score": 55.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 22
+    },
+    {
+      "date": "2026-02-06",
+      "state": "重仓 70%",
+      "score": 25.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 19
+    },
+    {
+      "date": "2026-02-09",
+      "state": "满仓 100%",
+      "score": 52.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 23
+    },
+    {
+      "date": "2026-02-10",
+      "state": "轻仓 20%",
+      "score": 78.0,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.32842344708169785,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.24993535966214414,
+        "G": 0.421641193256158
+      },
+      "realized": 0.00017393357068508895,
+      "n_prior": 40
+    },
+    {
+      "date": "2026-02-11",
+      "state": "中仓 40%",
+      "score": 68.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9142246517789522,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.08577534822104782
+      },
+      "realized": -0.0008596173792051022,
+      "n_prior": 39
+    },
+    {
+      "date": "2026-02-12",
+      "state": "空仓",
+      "score": 57.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 25
+    },
+    {
+      "date": "2026-02-13",
+      "state": "空仓",
+      "score": 66.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 26
+    },
+    {
+      "date": "2026-02-24",
+      "state": "重仓 70%",
+      "score": 21.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 20
+    },
+    {
+      "date": "2026-02-25",
+      "state": "轻仓 20%",
+      "score": 78.6,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.3693420589790782,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.15503919404571026,
+        "G": 0.47561874697521145
+      },
+      "realized": 0.0027192904641910143,
+      "n_prior": 41
+    },
+    {
+      "date": "2026-02-26",
+      "state": "轻仓 20%",
+      "score": 82.6,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.38727901533224784,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.15866896910320566,
+        "G": 0.45405201556454655
+      },
+      "realized": 0.0002210699246200156,
+      "n_prior": 42
+    },
+    {
+      "date": "2026-02-27",
+      "state": "中仓 40%",
+      "score": 73.6,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9233756392703352,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.07662436072966479
+      },
+      "realized": 0.006136450516043533,
+      "n_prior": 40
+    },
+    {
+      "date": "2026-03-02",
+      "state": "轻仓 20%",
+      "score": 75.7,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.4190917708393468,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.19059876100529613,
+        "G": 0.39030946815535716
+      },
+      "realized": -0.002133676468815819,
+      "n_prior": 43
+    },
+    {
+      "date": "2026-03-03",
+      "state": "空仓",
+      "score": 58.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 27
+    },
+    {
+      "date": "2026-03-04",
+      "state": "重仓 70%",
+      "score": 26.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 21
+    },
+    {
+      "date": "2026-03-05",
+      "state": "重仓 70%",
+      "score": 33.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 22
+    },
+    {
+      "date": "2026-03-06",
+      "state": "满仓 100%",
+      "score": 57.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 24
+    },
+    {
+      "date": "2026-03-09",
+      "state": "空仓",
+      "score": 66.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 28
+    },
+    {
+      "date": "2026-03-10",
+      "state": "满仓 100%",
+      "score": 39.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 25
+    },
+    {
+      "date": "2026-03-11",
+      "state": "轻仓 20%",
+      "score": 75.5,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.38642814286302113,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.2966007115200482,
+        "G": 0.3169711456169306
+      },
+      "realized": -0.0001552219194434699,
+      "n_prior": 44
+    },
+    {
+      "date": "2026-03-12",
+      "state": "中仓 40%",
+      "score": 67.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.919372836903921,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.08062716309607891
+      },
+      "realized": -0.003681271489542396,
+      "n_prior": 41
+    },
+    {
+      "date": "2026-03-13",
+      "state": "空仓",
+      "score": 64.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 29
+    },
+    {
+      "date": "2026-03-16",
+      "state": "满仓 100%",
+      "score": 55.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 26
+    },
+    {
+      "date": "2026-03-17",
+      "state": "空仓",
+      "score": 60.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 30
+    },
+    {
+      "date": "2026-03-18",
+      "state": "重仓 70%",
+      "score": 1.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 23
+    },
+    {
+      "date": "2026-03-19",
+      "state": "满仓 100%",
+      "score": 49.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 27
+    },
+    {
+      "date": "2026-03-20",
+      "state": "重仓 70%",
+      "score": 6.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 24
+    },
+    {
+      "date": "2026-03-23",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 25
+    },
+    {
+      "date": "2026-03-24",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 26
+    },
+    {
+      "date": "2026-03-25",
+      "state": "重仓 70%",
+      "score": 34.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 27
+    },
+    {
+      "date": "2026-03-26",
+      "state": "满仓 100%",
+      "score": 44.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 28
+    },
+    {
+      "date": "2026-03-27",
+      "state": "重仓 70%",
+      "score": 12.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 28
+    },
+    {
+      "date": "2026-03-30",
+      "state": "满仓 100%",
+      "score": 41.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 29
+    },
+    {
+      "date": "2026-03-31",
+      "state": "重仓 70%",
+      "score": 30.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 29
+    },
+    {
+      "date": "2026-04-01",
+      "state": "重仓 70%",
+      "score": 21.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0028672327374917378,
+        "M+": 0.4089039539992881,
+        "Q": 0.0,
+        "G": 0.5882288132632202
+      },
+      "realized": 0.0,
+      "n_prior": 30
+    },
+    {
+      "date": "2026-04-02",
+      "state": "重仓 70%",
+      "score": 35.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.08597625835906265,
+        "M+": 0.26062514480777416,
+        "Q": 0.0,
+        "G": 0.6533985968331631
+      },
+      "realized": -0.0,
+      "n_prior": 31
+    },
+    {
+      "date": "2026-04-03",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.2473465584280284,
+        "Q": 0.0,
+        "G": 0.7526534415719716
+      },
+      "realized": -0.0,
+      "n_prior": 32
+    },
+    {
+      "date": "2026-04-07",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.32413772227091725,
+        "Q": 0.0,
+        "G": 0.6758622777290827
+      },
+      "realized": 0.0,
+      "n_prior": 33
+    },
+    {
+      "date": "2026-04-08",
+      "state": "满仓 100%",
+      "score": 37.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.6296882942051439,
+        "M+": 0.2761630027394873,
+        "Q": 0.0,
+        "G": 0.09414870305536878
+      },
+      "realized": 0.0,
+      "n_prior": 30
+    },
+    {
+      "date": "2026-04-09",
+      "state": "空仓",
+      "score": 66.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 31
+    },
+    {
+      "date": "2026-04-10",
+      "state": "满仓 100%",
+      "score": 49.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.6907948155788955,
+        "M+": 0.20863594089591073,
+        "Q": 0.0,
+        "G": 0.10056924352519361
+      },
+      "realized": 0.0,
+      "n_prior": 31
+    },
+    {
+      "date": "2026-04-13",
+      "state": "中仓 40%",
+      "score": 70.8,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.7978960220146757,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.09173726514253001,
+        "G": 0.11036671284279419
+      },
+      "realized": 0.001004129628052684,
+      "n_prior": 42
+    },
+    {
+      "date": "2026-04-14",
+      "state": "空仓",
+      "score": 58.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 32
+    },
+    {
+      "date": "2026-04-15",
+      "state": "中仓 40%",
+      "score": 70.7,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.818769315879973,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.181230684120027
+      },
+      "realized": 0.0004728958364029166,
+      "n_prior": 43
+    },
+    {
+      "date": "2026-04-16",
+      "state": "空仓",
+      "score": 59.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 33
+    },
+    {
+      "date": "2026-04-17",
+      "state": "中仓 40%",
+      "score": 69.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8933652448770788,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.10663475512292123
+      },
+      "realized": 0.003417769256926474,
+      "n_prior": 44
+    },
+    {
+      "date": "2026-04-20",
+      "state": "空仓",
+      "score": 58.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 34
+    },
+    {
+      "date": "2026-04-21",
+      "state": "轻仓 20%",
+      "score": 79.9,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.36421639853527443,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3455038377301164,
+        "G": 0.2902797637346091
+      },
+      "realized": -0.0003583386282936744,
+      "n_prior": 45
+    },
+    {
+      "date": "2026-04-22",
+      "state": "中仓 40%",
+      "score": 71.0,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8842280206363465,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.11577197936365348
+      },
+      "realized": 0.001636834326724988,
+      "n_prior": 45
+    },
+    {
+      "date": "2026-04-23",
+      "state": "轻仓 20%",
+      "score": 76.9,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.4531513542661237,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.24815904130908056,
+        "G": 0.29868960442479575
+      },
+      "realized": -0.0016856597079262974,
+      "n_prior": 46
+    },
+    {
+      "date": "2026-04-24",
+      "state": "满仓 100%",
+      "score": 49.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.7770647721677191,
+        "M+": 0.1366099132822301,
+        "Q": 0.0,
+        "G": 0.0863253145500509
+      },
+      "realized": -0.0,
+      "n_prior": 32
+    },
+    {
+      "date": "2026-04-27",
+      "state": "空仓",
+      "score": 60.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 35
+    },
+    {
+      "date": "2026-04-28",
+      "state": "满仓 100%",
+      "score": 55.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.8034962622905372,
+        "M+": 0.10074668741210775,
+        "Q": 0.0,
+        "G": 0.09575705029735511
+      },
+      "realized": -0.0,
+      "n_prior": 33
+    },
+    {
+      "date": "2026-04-29",
+      "state": "满仓 100%",
+      "score": 46.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.8003476810924017,
+        "M+": 0.14780126657547368,
+        "Q": 0.0,
+        "G": 0.05185105233212459
+      },
+      "realized": 0.0,
+      "n_prior": 34
+    },
+    {
+      "date": "2026-04-30",
+      "state": "轻仓 20%",
+      "score": 78.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.3610884801583464,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.45195147759528503,
+        "G": 0.18696004224636864
+      },
+      "realized": 0.0,
+      "n_prior": 47
+    },
+    {
+      "date": "2026-05-06",
+      "state": "中仓 40%",
+      "score": 74.8,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9177957782523638,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.08220422174763622
+      },
+      "realized": 0.008110606200226826,
+      "n_prior": 46
+    },
+    {
+      "date": "2026-05-07",
+      "state": "轻仓 20%",
+      "score": 83.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.4380272745295452,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3493732256842657,
+        "G": 0.212599499786189
+      },
+      "realized": 0.0,
+      "n_prior": 48
+    },
+    {
+      "date": "2026-05-08",
+      "state": "轻仓 20%",
+      "score": 81.2,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.45845509921200783,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.34743282939171105,
+        "G": 0.19411207139628114
+      },
+      "realized": 0.0013458115564875732,
+      "n_prior": 49
+    },
+    {
+      "date": "2026-05-11",
+      "state": "轻仓 20%",
+      "score": 83.7,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.4877828359594654,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3091864486490245,
+        "G": 0.20303071539151002
+      },
+      "realized": 0.0013917227550933472,
+      "n_prior": 50
+    },
+    {
+      "date": "2026-05-12",
+      "state": "轻仓 20%",
+      "score": 81.0,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.5138648350842807,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.302972019272089,
+        "G": 0.18316314564363032
+      },
+      "realized": -0.0015459496310953058,
+      "n_prior": 51
+    },
+    {
+      "date": "2026-05-13",
+      "state": "中仓 40%",
+      "score": 71.5,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9097585384995545,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.09024146150044551
+      },
+      "realized": 0.004209603115986151,
+      "n_prior": 47
+    },
+    {
+      "date": "2026-05-14",
+      "state": "轻仓 20%",
+      "score": 78.3,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.4563471832450203,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3037380766980318,
+        "G": 0.23991474005694777
+      },
+      "realized": -0.0024282359100786213,
+      "n_prior": 52
+    },
+    {
+      "date": "2026-05-15",
+      "state": "满仓 100%",
+      "score": 37.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.8138977726091703,
+        "M+": 0.15077823529551868,
+        "Q": 0.0,
+        "G": 0.035323992095311
+      },
+      "realized": -0.0,
+      "n_prior": 35
+    },
+    {
+      "date": "2026-05-18",
+      "state": "满仓 100%",
+      "score": 48.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.8808140105350142,
+        "M+": 0.08266520634526316,
+        "Q": 0.0,
+        "G": 0.036520783119722705
+      },
+      "realized": -0.0,
+      "n_prior": 36
+    },
+    {
+      "date": "2026-05-19",
+      "state": "中仓 40%",
+      "score": 72.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.9152623652622859,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.08473763473771408
+      },
+      "realized": 0.001336045108556081,
+      "n_prior": 48
+    },
+    {
+      "date": "2026-05-20",
+      "state": "轻仓 20%",
+      "score": 78.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.3909162589275713,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.40783331003279044,
+        "G": 0.20125043103963808
+      },
+      "realized": 0.0,
+      "n_prior": 53
+    },
+    {
+      "date": "2026-05-21",
+      "state": "满仓 100%",
+      "score": 46.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.8693030776563889,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.13069692234361102
+      },
+      "realized": -0.0,
+      "n_prior": 37
+    },
+    {
+      "date": "2026-05-22",
+      "state": "重仓 70%",
+      "score": 16.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.3375169993957118,
+        "Q": 0.0,
+        "G": 0.6624830006042883
+      },
+      "realized": 0.0,
+      "n_prior": 34
+    },
+    {
+      "date": "2026-05-25",
+      "state": "空仓",
+      "score": 64.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 36
+    },
+    {
+      "date": "2026-05-26",
+      "state": "满仓 100%",
+      "score": 56.1,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.7278027782030186,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.27219722179698147
+      },
+      "realized": -0.0,
+      "n_prior": 38
+    },
+    {
+      "date": "2026-05-27",
+      "state": "重仓 70%",
+      "score": 22.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.29896136571038906,
+        "Q": 0.0,
+        "G": 0.7010386342896109
+      },
+      "realized": -0.0,
+      "n_prior": 35
+    },
+    {
+      "date": "2026-05-28",
+      "state": "重仓 70%",
+      "score": 21.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.24278153632219054,
+        "Q": 0.0,
+        "G": 0.7572184636778095
+      },
+      "realized": 0.0,
+      "n_prior": 36
+    },
+    {
+      "date": "2026-05-29",
+      "state": "空仓",
+      "score": 59.5,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 37
+    },
+    {
+      "date": "2026-06-01",
+      "state": "重仓 70%",
+      "score": 21.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.3390127235125709,
+        "Q": 0.0,
+        "G": 0.6609872764874292
+      },
+      "realized": 0.0,
+      "n_prior": 37
+    },
+    {
+      "date": "2026-06-02",
+      "state": "满仓 100%",
+      "score": 42.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.7305053433646109,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.2694946566353892
+      },
+      "realized": -0.0,
+      "n_prior": 39
+    },
+    {
+      "date": "2026-06-03",
+      "state": "满仓 100%",
+      "score": 49.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.45136691632620507,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.548633083673795
+      },
+      "realized": -0.0,
+      "n_prior": 40
+    },
+    {
+      "date": "2026-06-04",
+      "state": "满仓 100%",
+      "score": 57.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.33451036913599086,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.6654896308640091
+      },
+      "realized": -0.0,
+      "n_prior": 41
+    },
+    {
+      "date": "2026-06-05",
+      "state": "满仓 100%",
+      "score": 37.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 42
+    },
+    {
+      "date": "2026-06-08",
+      "state": "重仓 70%",
+      "score": 35.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.18073841633707494,
+        "Q": 0.0,
+        "G": 0.819261583662925
+      },
+      "realized": -0.0,
+      "n_prior": 38
+    },
+    {
+      "date": "2026-06-09",
+      "state": "重仓 70%",
+      "score": 2.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.23146621045119056,
+        "Q": 0.0,
+        "G": 0.7685337895488095
+      },
+      "realized": 0.0,
+      "n_prior": 39
+    },
+    {
+      "date": "2026-06-10",
+      "state": "满仓 100%",
+      "score": 43.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 43
+    },
+    {
+      "date": "2026-06-11",
+      "state": "重仓 70%",
+      "score": 22.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.20137151917560236,
+        "Q": 0.0,
+        "G": 0.7986284808243976
+      },
+      "realized": -0.0,
+      "n_prior": 40
+    },
+    {
+      "date": "2026-06-12",
+      "state": "重仓 70%",
+      "score": 22.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.29179803900292745,
+        "Q": 0.0,
+        "G": 0.7082019609970724
+      },
+      "realized": 0.0,
+      "n_prior": 41
+    },
+    {
+      "date": "2026-06-15",
+      "state": "满仓 100%",
+      "score": 39.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 44
+    },
+    {
+      "date": "2026-06-16",
+      "state": "轻仓 20%",
+      "score": 79.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.33984897502041633,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.42871332635936416,
+        "G": 0.23143769862021957
+      },
+      "realized": 0.0,
+      "n_prior": 54
+    },
+    {
+      "date": "2026-06-17",
+      "state": "中仓 40%",
+      "score": 72.2,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8684434002642736,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.1315565997357264
+      },
+      "realized": -0.003996380625377745,
+      "n_prior": 49
+    },
+    {
+      "date": "2026-06-18",
+      "state": "空仓",
+      "score": 66.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 38
+    },
+    {
+      "date": "2026-06-22",
+      "state": "空仓",
+      "score": 57.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 39
+    },
+    {
+      "date": "2026-06-23",
+      "state": "轻仓 20%",
+      "score": 76.5,
+      "action": "温度档",
+      "position": 0.2,
+      "weights": {
+        "W2+W3": 0.30530835439027126,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.3588720371100376,
+        "G": 0.3358196084996911
+      },
+      "realized": -0.0010758373919441996,
+      "n_prior": 55
+    },
+    {
+      "date": "2026-06-24",
+      "state": "满仓 100%",
+      "score": 53.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.17127148882369864,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.8287285111763013
+      },
+      "realized": 0.0,
+      "n_prior": 45
+    },
+    {
+      "date": "2026-06-25",
+      "state": "空仓",
+      "score": 63.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 40
+    },
+    {
+      "date": "2026-06-26",
+      "state": "满仓 100%",
+      "score": 54.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 46
+    },
+    {
+      "date": "2026-06-29",
+      "state": "重仓 70%",
+      "score": 8.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.07046643137643316,
+        "Q": 0.0,
+        "G": 0.9295335686235668
+      },
+      "realized": -0.0,
+      "n_prior": 42
+    },
+    {
+      "date": "2026-06-30",
+      "state": "满仓 100%",
+      "score": 36.7,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": 0.0,
+      "n_prior": 47
+    },
+    {
+      "date": "2026-07-01",
+      "state": "中仓 40%",
+      "score": 72.1,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8136238405801,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.18637615941990007
+      },
+      "realized": 0.008674949958306043,
+      "n_prior": 50
+    },
+    {
+      "date": "2026-07-02",
+      "state": "中仓 40%",
+      "score": 70.0,
+      "action": "温度档",
+      "position": 0.4,
+      "weights": {
+        "W2+W3": 0.8110135141322856,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.18898648586771447
+      },
+      "realized": -0.004403079774570969,
+      "n_prior": 51
+    },
+    {
+      "date": "2026-07-03",
+      "state": "重仓 70%",
+      "score": 18.9,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.15220292847692662,
+        "Q": 0.07311140896377535,
+        "G": 0.774685662559298
+      },
+      "realized": 0.0,
+      "n_prior": 43
+    },
+    {
+      "date": "2026-07-06",
+      "state": "重仓 70%",
+      "score": 26.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.09220189309325871,
+        "Q": 0.1740320837805522,
+        "G": 0.733766023126189
+      },
+      "realized": -0.0,
+      "n_prior": 44
+    },
+    {
+      "date": "2026-07-07",
+      "state": "重仓 70%",
+      "score": 15.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.11402876206446208,
+        "Q": 0.5041224010386826,
+        "G": 0.3818488368968553
+      },
+      "realized": -0.0,
+      "n_prior": 45
+    },
+    {
+      "date": "2026-07-08",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.24577896014014203,
+        "Q": 0.35088506411927034,
+        "G": 0.40333597574058766
+      },
+      "realized": -0.0,
+      "n_prior": 46
+    },
+    {
+      "date": "2026-07-09",
+      "state": "重仓 70%",
+      "score": 7.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.25457550931522843,
+        "Q": 0.0,
+        "G": 0.7454244906847717
+      },
+      "realized": 0.0,
+      "n_prior": 47
+    },
+    {
+      "date": "2026-07-10",
+      "state": "重仓 70%",
+      "score": 35.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.329513688310269,
+        "Q": 0.0,
+        "G": 0.6704863116897309
+      },
+      "realized": 0.0,
+      "n_prior": 48
+    },
+    {
+      "date": "2026-07-13",
+      "state": "重仓 70%",
+      "score": 31.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.35131554823174127,
+        "Q": 0.0,
+        "G": 0.6486844517682587
+      },
+      "realized": -0.0,
+      "n_prior": 49
+    },
+    {
+      "date": "2026-07-14",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 50
+    },
+    {
+      "date": "2026-07-15",
+      "state": "满仓 100%",
+      "score": 42.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 48
+    },
+    {
+      "date": "2026-07-16",
+      "state": "重仓 70%",
+      "score": 28.3,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 51
+    },
+    {
+      "date": "2026-07-17",
+      "state": "重仓 70%",
+      "score": 22.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 52
+    },
+    {
+      "date": "2026-07-20",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 53
+    },
+    {
+      "date": "2026-07-21",
+      "state": "重仓 70%",
+      "score": 11.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 54
+    },
+    {
+      "date": "2026-07-22",
+      "state": "满仓 100%",
+      "score": 39.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 49
+    },
+    {
+      "date": "2026-07-23",
+      "state": "重仓 70%",
+      "score": 25.8,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 55
+    },
+    {
+      "date": "2026-07-24",
+      "state": "重仓 70%",
+      "score": 29.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 56
+    },
+    {
+      "date": "2026-07-27",
+      "state": "重仓 70%",
+      "score": 0.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 57
+    },
+    {
+      "date": "2026-07-28",
+      "state": "满仓 100%",
+      "score": 38.4,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 1.0
+      },
+      "realized": -0.0,
+      "n_prior": 50
+    },
+    {
+      "date": "2026-07-29",
+      "state": "重仓 70%",
+      "score": 7.0,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 58
+    },
+    {
+      "date": "2026-07-30",
+      "state": "满仓 100%",
+      "score": 39.2,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 51
+    },
+    {
+      "date": "2026-07-31",
+      "state": "重仓 70%",
+      "score": 10.6,
+      "action": "空仓",
+      "position": 0.0,
+      "weights": {
+        "W2+W3": 0.0,
+        "W4+W6": 0.0,
+        "M+": 0.0,
+        "Q": 0.0,
+        "G": 0.0
+      },
+      "realized": 0.0,
+      "n_prior": 59
+    }
+  ],
+  "terminal_wealth": 1.0406218557005684,
+  "total_return": 0.04062185570056842,
+  "max_drawdown": 0.006157802020302361,
+  "boundary": "下一日状态是重仓 70%（温度分 22），效用最高的动作是空仓，仓位 0.0%。账上期末资金 1.041。",
+  "notes": [
+    "状态是严格早于收益日的温度仓位档。分数高不自动加重仓。",
+    "五个信号组的权重按同一温度档里已经看到的后验、条件均值和协方差轮动。条件均值为负的组权重为 0，后验用来缩小仍为正的组。",
+    "总仓位仍在空仓、轮动组合上的四分之一凯利、温度计仓位里选。温度档只缩放总敞口，不把权重改回等权。",
+    "候选只有空仓、当时同档样本上的四分之一凯利、温度计自己的仓位。",
+    "估计器给出同档后验、等权收益分布、五组相关，以及正态相关下的同亏。",
+    "蒙特卡洛有两条路径：按历史同一天抽取，以及按正态相关重新绑定。候选效用取两条里更差的那条。",
+    "效用等于持有 20 个交易日的终值收益均值，减去终值收益 95% CVaR 的亏损幅度。路径里不切换状态。",
+    "收益日 t 的仓位只用 t 之前、同一温度档上的五组日收益。当日收益写回同档样本，供下一次后验使用。",
+    "下一日状态直接读最新温度档，不做状态转移。",
+    "同一温度档在 t 之前少于 30 天时，动作记为空仓。",
+    "效用相同则取仓位更小的；仓位也相同则按空仓、四分之一凯利、温度档的顺序取更靠前的。",
+    "这里用的后验来自等权日收益，不读 M+ 的 T+3 后验。不写实盘仓位，也不改观察池。"
+  ],
+  "created_at": "2026-10-02T13:00:53"
+}

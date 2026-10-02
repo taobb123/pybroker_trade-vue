@@ -618,6 +618,234 @@ export async function fetchRiskCopula(): Promise<{
   }
 }
 
+export type RiskDecisionCandidate = {
+  name: string
+  position: number | null
+  expectedReturn: number | null
+  cvar95: number | null
+  utility: number | null
+  chosen: boolean
+}
+
+export type RiskDecisionEstimate = {
+  posteriorWinRate: number | null
+  payoffB: number | null
+  kellyRaw: number | null
+  pdfMean: number | null
+  pdfVar95: number | null
+  pdfCvar95: number | null
+  maxCorrelation: number | null
+  maxPair: string
+  historicalAllNegative: number | null
+  independentAllNegative: number | null
+  gaussianAllNegative: number | null
+  sampler: string
+}
+
+export type RiskDecisionFeedback = {
+  date: string
+  state: string
+  action: string
+  realized: number | null
+  nextState: string
+}
+
+export type RiskDecisionNext = {
+  asOf: string
+  state: string
+  score: number | null
+  temperaturePosition: number | null
+  action: string
+  position: number | null
+  weights: Record<string, number>
+  nPrior: number
+  estimate: RiskDecisionEstimate | null
+  candidates: RiskDecisionCandidate[]
+  feedback: RiskDecisionFeedback | null
+}
+
+export type RiskDecisionState = {
+  label: string
+  nDays: number
+  meanPosition: number | null
+  meanRealized: number | null
+  lastAction: string
+  lastDate: string
+}
+
+export type RiskDecisionRow = {
+  date: string
+  state: string
+  score: number | null
+  action: string
+  position: number | null
+  weights: Record<string, number>
+  realized: number | null
+  nPrior: number
+}
+
+export type RiskDecision = {
+  schemaVersion: string
+  sleeves: string[]
+  nDays: number
+  sampleStart: string | null
+  sampleEnd: string | null
+  lambdaTail: number | null
+  horizonDays: number
+  nPaths: number
+  minPrior: number
+  seed: number
+  nextAction: RiskDecisionNext | null
+  states: RiskDecisionState[]
+  ledger: RiskDecisionRow[]
+  terminalWealth: number | null
+  totalReturn: number | null
+  maxDrawdown: number | null
+  boundary: string
+  notes: string[]
+  createdAt: string
+}
+
+export async function fetchRiskDecision(): Promise<{
+  ok: boolean
+  empty: boolean
+  error: string | null
+  message: string | null
+  report: RiskDecision | null
+}> {
+  const response = await fetch(apiUrl('/api/risk-return/decision'))
+  if (!response.ok) {
+    throw new Error(`读取决策中心失败 (${response.status})`)
+  }
+  const raw = (await response.json()) as Raw
+  const reportRaw = raw.report
+  let report: RiskDecision | null = null
+  if (reportRaw && typeof reportRaw === 'object') {
+    const row = reportRaw as Raw
+    const weightMap = (value: unknown): Record<string, number> => {
+      if (!value || typeof value !== 'object') return {}
+      const out: Record<string, number> = {}
+      for (const [key, item] of Object.entries(value as Raw)) {
+        const parsed = num(item)
+        if (parsed != null) out[key] = parsed
+      }
+      return out
+    }
+    const nextRaw = row.next_action
+    let nextAction: RiskDecisionNext | null = null
+    if (nextRaw && typeof nextRaw === 'object') {
+      const next = nextRaw as Raw
+      const candidates = Array.isArray(next.candidates) ? next.candidates : []
+      const estimateRaw = next.estimate
+      let estimate: RiskDecisionEstimate | null = null
+      if (estimateRaw && typeof estimateRaw === 'object') {
+        const item = estimateRaw as Raw
+        estimate = {
+          posteriorWinRate: num(item.posterior_win_rate),
+          payoffB: num(item.payoff_b),
+          kellyRaw: num(item.kelly_raw),
+          pdfMean: num(item.pdf_mean),
+          pdfVar95: num(item.pdf_var_95),
+          pdfCvar95: num(item.pdf_cvar_95),
+          maxCorrelation: num(item.max_correlation),
+          maxPair: str(item.max_pair),
+          historicalAllNegative: num(item.historical_all_negative),
+          independentAllNegative: num(item.independent_all_negative),
+          gaussianAllNegative: num(item.gaussian_all_negative),
+          sampler: str(item.sampler),
+        }
+      }
+      const feedbackRaw = next.feedback
+      let feedback: RiskDecisionFeedback | null = null
+      if (feedbackRaw && typeof feedbackRaw === 'object') {
+        const item = feedbackRaw as Raw
+        feedback = {
+          date: str(item.date),
+          state: str(item.state),
+          action: str(item.action),
+          realized: num(item.realized),
+          nextState: str(item.next_state),
+        }
+      }
+      nextAction = {
+        asOf: str(next.as_of),
+        state: str(next.state),
+        score: num(next.score),
+        temperaturePosition: num(next.temperature_position),
+        action: str(next.action),
+        position: num(next.position),
+        weights: weightMap(next.weights),
+        nPrior: num(next.n_prior) ?? 0,
+        estimate,
+        candidates: candidates.map((item) => {
+          const candidate = item as Raw
+          return {
+            name: str(candidate.name),
+            position: num(candidate.position),
+            expectedReturn: num(candidate.expected_return),
+            cvar95: num(candidate.cvar_95),
+            utility: num(candidate.utility),
+            chosen: Boolean(candidate.chosen),
+          }
+        }),
+        feedback,
+      }
+    }
+    const states = Array.isArray(row.states) ? row.states : []
+    const ledger = Array.isArray(row.ledger) ? row.ledger : []
+    report = {
+      schemaVersion: str(row.schema_version),
+      sleeves: Array.isArray(row.sleeves) ? row.sleeves.map((item) => str(item)) : [],
+      nDays: num(row.n_days) ?? 0,
+      sampleStart: row.sample_start == null ? null : str(row.sample_start),
+      sampleEnd: row.sample_end == null ? null : str(row.sample_end),
+      lambdaTail: num(row.lambda_tail),
+      horizonDays: num(row.horizon_days) ?? 0,
+      nPaths: num(row.n_paths) ?? 0,
+      minPrior: num(row.min_prior) ?? 0,
+      seed: num(row.seed) ?? 0,
+      nextAction,
+      states: states.map((item) => {
+        const state = item as Raw
+        return {
+          label: str(state.label),
+          nDays: num(state.n_days) ?? 0,
+          meanPosition: num(state.mean_position),
+          meanRealized: num(state.mean_realized),
+          lastAction: str(state.last_action),
+          lastDate: str(state.last_date),
+        }
+      }),
+      ledger: ledger.map((item) => {
+        const line = item as Raw
+        return {
+          date: str(line.date),
+          state: str(line.state),
+          score: num(line.score),
+          action: str(line.action),
+          position: num(line.position),
+          weights: weightMap(line.weights),
+          realized: num(line.realized),
+          nPrior: num(line.n_prior) ?? 0,
+        }
+      }),
+      terminalWealth: num(row.terminal_wealth),
+      totalReturn: num(row.total_return),
+      maxDrawdown: num(row.max_drawdown),
+      boundary: str(row.boundary),
+      notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],
+      createdAt: str(row.created_at),
+    }
+  }
+  return {
+    ok: Boolean(raw.ok),
+    empty: Boolean(raw.empty),
+    error: raw.error == null ? null : str(raw.error),
+    message: raw.message == null ? null : str(raw.message),
+    report,
+  }
+}
+
 export async function runRiskReturn(): Promise<RiskResponse> {
   const response = await fetch(apiUrl('/api/risk-return/run'), {
     method: 'POST',

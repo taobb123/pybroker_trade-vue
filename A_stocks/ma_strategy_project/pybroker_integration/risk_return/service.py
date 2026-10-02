@@ -17,6 +17,7 @@ from risk_return.correlation import (
 )
 from risk_return.budget import build_budget_report
 from risk_return.copula import build_copula_report
+from risk_return.decision import build_decision_report
 from risk_return.walkforward import build_walkforward_report
 from risk_return.regime import TEMPERATURE_CSV, build_regime_report, load_temperature
 from risk_return.io import DEFAULT_OUTPUT_PATH, read_json, write_json
@@ -291,6 +292,43 @@ def copula_payload(
     try:
         aligned = load_aligned(group_path, sleeve_path)
         report = build_copula_report(aligned, n_paths=n_paths, seed=seed)
+        write_json(report, dest)
+    except FileNotFoundError as exc:
+        return {
+            "ok": True,
+            "empty": True,
+            "error": None,
+            "message": str(exc),
+            "report": None,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "empty": False,
+            "error": str(exc),
+            "message": None,
+            "report": None,
+        }
+    return {"ok": True, "empty": False, "error": None, "message": None, "report": report}
+
+
+DECISION_OUTPUT = DEFAULT_OUTPUT_PATH.parent / "decision_v1.json"
+
+
+def decision_payload(
+    *,
+    group_path: Path | None = None,
+    sleeve_path: Path | None = None,
+    temperature_path: Path | None = None,
+    output_path: Path | None = None,
+    n_paths: int = 4_000,
+    seed: int = 20261001,
+) -> dict:
+    dest = output_path or DECISION_OUTPUT
+    try:
+        aligned = load_aligned(group_path, sleeve_path)
+        temperature = load_temperature(temperature_path or TEMPERATURE_CSV)
+        report = build_decision_report(aligned, temperature, n_paths=n_paths, seed=seed)
         write_json(report, dest)
     except FileNotFoundError as exc:
         return {

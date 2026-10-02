@@ -34,10 +34,13 @@ from risk_return.budget import build_budget_report
 from risk_return.budget import estimate_quarter_kelly
 from risk_return.copula import TOP_LEVEL_KEYS as COPULA_KEYS
 from risk_return.copula import build_copula_report, norm_ppf
+from risk_return.decision import TOP_LEVEL_KEYS as DECISION_KEYS
+from risk_return.decision import build_decision_report, choose_action, rotate_weights
 from risk_return.service import (
     budget_payload,
     copula_payload,
     correlation_payload,
+    decision_payload,
     latest_payload,
     regime_payload,
     run_payload,
@@ -309,6 +312,7 @@ class ApiTests(unittest.TestCase):
         self.assertIn("/api/risk-return/budget", paths)
         self.assertIn("/api/risk-return/walkforward", paths)
         self.assertIn("/api/risk-return/copula", paths)
+        self.assertIn("/api/risk-return/decision", paths)
 
 
 class CorrelationTests(unittest.TestCase):
@@ -570,6 +574,123 @@ class CopulaTests(unittest.TestCase):
             self.assertTrue(payload["empty"])
             self.assertIn("缺少已有收益表", payload["message"])
             self.assertFalse((root / "risk_return" / "output" / "copula_v6.json").exists())
+
+
+class DecisionTests(unittest.TestCase):
+    def _frame(self, values: list[float], label: str, position_pct: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+        dates = pd.bdate_range("2024-01-02", periods=len(values))
+        aligned = pd.DataFrame(
+            {
+                "date": dates,
+                "W2+W3": values,
+                "W4+W6": values,
+                "M+": values,
+                "Q": values,
+                "G": values,
+            }
+        )
+        temperature = pd.DataFrame(
+            {
+                "temp_date": pd.to_datetime(["2023-12-29", *dates.strftime("%Y-%m-%d")]),
+                "position_label": [label] * (len(values) + 1),
+                "position_pct": [position_pct] * (len(values) + 1),
+                "total_score": [70.0] * (len(values) + 1),
+            }
+        )
+        return aligned, temperature
+
+    def test_same_day_return_does_not_change_that_days_position(self) -> None:
+        values = [0.02, -0.005] * 16
+        aligned, temperature = self._frame(values, "空仓", 0.0)
+        report = build_decision_report(aligned, temperature, n_paths=300, horizon=5, seed=7)
+        self.assertEqual(tuple(report.keys()), DECISION_KEYS)
+        day = report["ledger"][30]
+        self.assertEqual(day["n_prior"], 30)
+        prior = np.array(values[:30], dtype=float)
+        sleeves = np.column_stack([prior, prior, prior, prior, prior])
+        expected = choose_action(prior, 0.0, sleeves=sleeves, n_paths=300, horizon=5, seed=7 + 30)
+        self.assertIn("posterior_win_rate", report["next_action"]["estimate"])
+        self.assertAlmostEqual(day["position"], expected["position"])
+        shocked = list(values)
+        shocked[30] = -0.80
+        shocked_frame, _ = self._frame(shocked, "空仓", 0.0)
+        shocked_report = build_decision_report(shocked_frame, temperature, n_paths=300, horizon=5, seed=7)
+        self.assertAlmostEqual(shocked_report["ledger"][30]["position"], day["position"])
+        self.assertNotAlmostEqual(shocked_report["ledger"][31]["n_prior"], day["n_prior"])
+
+    def test_short_history_and_steady_loss_stay_in_cash(self) -> None:
+        values = [-0.02] * 40
+        aligned, temperature = self._frame(values, "满仓 100%", 100.0)
+        report = build_decision_report(aligned, temperature, n_paths=200, horizon=5, seed=3)
+        self.assertTrue(all(row["position"] == 0.0 for row in report["ledger"][:30]))
+        self.assertEqual(report["ledger"][30]["action"], "空仓")
+        self.assertEqual(report["ledger"][30]["position"], 0.0)
+        self.assertEqual(report["next_action"]["action"], "空仓")
+        self.assertTrue(all(weight == 0.0 for weight in report["next_action"]["weights"].values()))
+
+    def test_flat_temperature_can_still_take_quarter_kelly(self) -> None:
+        values = [0.02, -0.005] * 20
+        aligned, temperature = self._frame(values, "空仓", 0.0)
+        report = build_decision_report(aligned, temperature, n_paths=400, horizon=8, seed=11)
+        self.assertEqual(report["ledger"][30]["action"], "四分之一凯利")
+        self.assertGreater(report["ledger"][30]["position"], 0.0)
+        self.assertEqual(report["next_action"]["state"], "空仓")
+
+    def test_negative_sleeve_is_dropped_from_rotation(self) -> None:
+        n_days = 40
+        good = [0.02, -0.004] * (n_days // 2)
+        bad = [-0.02, -0.01] * (n_days // 2)
+        dates = pd.bdate_range("2024-01-02", periods=n_days)
+        aligned = pd.DataFrame(
+            {
+                "date": dates,
+                "W2+W3": good,
+                "W4+W6": good,
+                "M+": good,
+                "Q": good,
+                "G": bad,
+            }
+        )
+        temperature = pd.DataFrame(
+            {
+                "temp_date": pd.to_datetime(["2023-12-29", *dates.strftime("%Y-%m-%d")]),
+                "position_label": ["中仓 40%"] * (n_days + 1),
+                "position_pct": [40.0] * (n_days + 1),
+                "total_score": [70.0] * (n_days + 1),
+            }
+        )
+        prior = np.column_stack([good[:30], good[:30], good[:30], good[:30], bad[:30]])
+        weights = rotate_weights(prior)
+        self.assertEqual(float(weights[-1]), 0.0)
+        self.assertGreater(float(weights[0]), 0.0)
+        report = build_decision_report(aligned, temperature, n_paths=200, horizon=5, seed=5)
+        self.assertEqual(report["ledger"][30]["weights"]["G"], 0.0)
+        shocked = aligned.copy()
+        shocked.loc[30, "G"] = 0.50
+        shocked_report = build_decision_report(shocked, temperature, n_paths=200, horizon=5, seed=5)
+        self.assertEqual(shocked_report["ledger"][30]["weights"]["G"], 0.0)
+
+    def test_missing_temperature_leaves_returns_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dates = pd.bdate_range("2024-01-02", periods=8)
+            values = [0.01, -0.02] * 4
+            group = root / "group_returns.csv"
+            sleeve = root / "sleeve_returns.csv"
+            pd.DataFrame({"date": dates, "W2+W3": values, "W4+W6": values}).to_csv(group, index=False)
+            pd.DataFrame({"date": dates, "M+": values, "Q": values, "G": values}).to_csv(sleeve, index=False)
+            before_group = group.read_bytes()
+            payload = decision_payload(
+                group_path=group,
+                sleeve_path=sleeve,
+                temperature_path=root / "missing_temperature.csv",
+                output_path=root / "risk_return" / "output" / "decision_v1.json",
+                n_paths=100,
+            )
+            self.assertTrue(payload["empty"])
+            self.assertIn("市场温度", payload["message"])
+            self.assertEqual(group.read_bytes(), before_group)
+            self.assertFalse((root / "risk_return" / "output" / "decision_v1.json").exists())
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from risk_return.service import (
     budget_payload,
     correlation_payload,
     copula_payload,
+    decision_payload,
     walkforward_payload,
     latest_payload,
     regime_payload,
@@ -53,6 +54,11 @@ def walkforward() -> dict:
 @router.get("/copula")
 def copula() -> dict:
     return copula_payload()
+
+
+@router.get("/decision")
+def decision() -> dict:
+    return decision_payload()
 
 
 @router.post("/run")
