@@ -23,6 +23,12 @@ export interface RadarSector {
   lamp: RadarLamp
 }
 
+export interface RadarRiskTag {
+  label: string
+  exposure: number | null
+  maximum: boolean
+}
+
 export interface RadarStock {
   symbol: string
   tsCode: string
@@ -35,9 +41,13 @@ export interface RadarStock {
   sectorName: string | null
   sectorLevel: string | null
   sectorPct: number | null
+  industryFactorCode: string | null
+  industryFactorName: string | null
+  industryExposure: number | null
   rsIndex: number | null
   rsSector: number | null
   strength: number | null
+  riskTags: RadarRiskTag[]
   lamp: RadarLamp
   quoteKind: RadarQuoteKind
 }
@@ -59,6 +69,14 @@ export interface RadarUniverse {
   picks: RadarPick[]
   groups: string[]
   reportExpired: boolean
+}
+
+export interface RadarRiskLeader {
+  factor: string
+  symbol: string
+  name: string
+  group: string
+  exposure: number | null
 }
 
 export interface RadarAlert {
@@ -83,6 +101,7 @@ export interface MarketRadarPayload {
   sectors: RadarSector[]
   stocks: RadarStock[]
   alerts: RadarAlert[]
+  riskLeaders: RadarRiskLeader[]
 }
 
 export function formatPct(n: number | null | undefined, digits = 2): string {

@@ -17,10 +17,14 @@ from market_radar import (
     MarketRadarError,
     build_market_radar,
     growth_ranking_mtime,
+    industry_exposure_fields,
     load_radar_factor_picks,
+    load_saved_l1_exposure,
     session_state,
     six_digit,
     universe_payload,
+    _risk_leaders,
+    _risk_tags,
 )
 
 router = APIRouter(tags=["market-radar"])
@@ -40,6 +44,8 @@ class RadarBody(BaseModel):
 
 
 def _placeholder_stocks(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    saved = load_saved_l1_exposure()
+    risk_tags = _risk_tags()
     out: list[dict[str, Any]] = []
     for p in picks:
         out.append(
@@ -60,6 +66,8 @@ def _placeholder_stocks(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "strength": None,
                 "lamp": "unknown",
                 "quote_kind": "missing",
+                **industry_exposure_fields(p["symbol"], None, saved),
+                "risk_tags": risk_tags.get(six_digit(p["symbol"]), []),
             }
         )
     return out
@@ -86,6 +94,7 @@ def _error_payload(message: str) -> dict[str, Any]:
         "sectors": [],
         "stocks": _placeholder_stocks(picks),
         "alerts": [],
+        "risk_leaders": _risk_leaders(),
     }
 
 

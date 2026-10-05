@@ -599,6 +599,74 @@ def resolve_sw_map(pro: Any, ts_codes: list[str]) -> dict[str, dict[str, str]]:
     return {c: items[c] for c in ts_codes if c in items}
 
 
+def _risk_leaders() -> list[dict[str, Any]]:
+    try:
+        from risk_index.leaders import load_radar_risk_leaders
+
+        return load_radar_risk_leaders()
+    except Exception:
+        return []
+
+
+def _risk_tags() -> dict[str, list[dict[str, Any]]]:
+    try:
+        from risk_index.leaders import load_risk_tags
+
+        return load_risk_tags()
+    except Exception:
+        return {}
+
+
+def l1_industry_exposure(sw: Optional[dict[str, str]]) -> tuple[str, str, int]:
+    """申万一级 0/1 暴露。有一级行业记 1，没有则记 0。"""
+    row = sw or {}
+    code = str(row.get("l1_code") or "").strip()
+    name = str(row.get("l1_name") or "").strip()
+    if code and name:
+        return code, name, 1
+    return "", "", 0
+
+
+def load_saved_l1_exposure(path: Optional[Path] = None) -> dict[str, tuple[str, str]]:
+    """已建好的申万一级暴露表。symbol -> (行业代码, 行业名称)。"""
+    dest = path or (_SCRIPT_DIR / "industry_factor" / "output" / "sw_l1_exposure.csv")
+    if not dest.is_file():
+        return {}
+    try:
+        frame = pd.read_csv(dest, dtype={"symbol": str}, encoding="utf-8-sig")
+    except Exception:
+        return {}
+    if frame.empty or "symbol" not in frame.columns:
+        return {}
+    out: dict[str, tuple[str, str]] = {}
+    for rec in frame.itertuples(index=False):
+        sym = six_digit(getattr(rec, "symbol", ""))
+        code = str(getattr(rec, "industry_code", "") or "").strip()
+        name = str(getattr(rec, "industry_name", "") or "").strip()
+        if sym and code and name:
+            out[sym] = (code, name)
+    return out
+
+
+def industry_exposure_fields(
+    symbol: str,
+    sw: Optional[dict[str, str]] = None,
+    saved: Optional[dict[str, tuple[str, str]]] = None,
+) -> dict[str, Any]:
+    """自选股的申万一级暴露。实时一级优先，缺一级时用已保存的暴露表。"""
+    code, name, exposure = l1_industry_exposure(sw)
+    if exposure != 1 and saved:
+        hit = saved.get(six_digit(symbol))
+        if hit:
+            code, name = hit
+            exposure = 1
+    return {
+        "industry_factor_code": code or None,
+        "industry_factor_name": name or None,
+        "industry_exposure": exposure,
+    }
+
+
 def _sector_display(sw: dict[str, str]) -> tuple[str, str, str]:
     """返回 (code, name, level)，二级优先。"""
     if sw.get("l2_code") and sw.get("l2_name"):
@@ -1448,6 +1516,8 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     sw_map = resolve_sw_map(pro, ts_codes) if ts_codes else {}
     stock_quotes = fetch_stock_quotes(ts_mod, pro, ts_codes, allow_daily=(session != "open")) if ts_codes else {}
 
+    saved_l1 = load_saved_l1_exposure()
+    risk_tags = _risk_tags()
     sector_of: dict[str, tuple[str, str, str]] = {}
     sector_codes: list[str] = []
     for code in ts_codes:
@@ -1519,6 +1589,8 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
                 "strength": strength_score(rs_index, rs_sector),
                 "lamp": lamp,
                 "quote_kind": q.get("quote_kind") or "missing",
+                **industry_exposure_fields(sym, sw_map.get(ts_code), saved_l1),
+                "risk_tags": risk_tags.get(sym, []),
             }
         )
         if (
@@ -1599,4 +1671,5 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
         "sectors": sectors_out,
         "stocks": stocks_out,
         "alerts": alerts,
+        "risk_leaders": _risk_leaders(),
     }

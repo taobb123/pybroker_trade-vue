@@ -1,0 +1,30 @@
+{
+  "classification": "申万一级 SW2021",
+  "pool": "C:\\Users\\111\\Desktop\\PybtradeVue\\pybroker_trade-vue\\A_stocks\\ma_strategy_project\\pybroker_integration\\pattern_entry_mplus_rank.csv",
+  "pool_asof": "2026-09-28",
+  "mv_asof": "2026-09-28",
+  "exposure": "0/1",
+  "n_industries": 31,
+  "n_assigned": 5211,
+  "n_conflicts": 0,
+  "cap_weight_sum": 1.0,
+  "listed_exposure_sum": 0.9891637264734372,
+  "company_count_min": 20,
+  "company_count_max": 539,
+  "cap_weight_min": 0.0015059338827855607,
+  "cap_weight_max": 0.18561993335335195,
+  "mplus": {
+    "n_pool": 53,
+    "n_mapped": 53,
+    "n_unmapped": 0,
+    "n_industries": 20,
+    "pool_mud_mean": 0.5094339622641509,
+    "industry_mean_max": 0.9886792452830188,
+    "industry_mean_min": 0.1188679245283018,
+    "industry_mean_range": 0.8698113207547169,
+    "eta_squared": 0.6649153118208024,
+    "n_singleton_industries": 9,
+    "eta_squared_n_ge_2": 0.5329221602808241
+  },
+  "notes": []
+}

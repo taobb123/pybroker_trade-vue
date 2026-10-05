@@ -4,6 +4,8 @@ import type {
   RadarAlert,
   RadarIndex,
   RadarPick,
+  RadarRiskLeader,
+  RadarRiskTag,
   RadarSector,
   RadarStock,
   RadarUniverse,
@@ -57,6 +59,14 @@ function mapSector(row: Raw): RadarSector {
   }
 }
 
+function mapRiskTags(value: unknown): RadarRiskTag[] {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const row = (item && typeof item === 'object' ? item : {}) as Raw
+    return { label: str(row.label), exposure: num(row.exposure), maximum: Boolean(row.maximum) }
+  }).filter((tag) => tag.label)
+}
+
 function mapStock(row: Raw): RadarStock {
   return {
     symbol: str(row.symbol),
@@ -70,9 +80,14 @@ function mapStock(row: Raw): RadarStock {
     sectorName: row.sector_name ? str(row.sector_name) : null,
     sectorLevel: row.sector_level ? str(row.sector_level) : null,
     sectorPct: num(row.sector_pct),
+    industryFactorCode: row.industry_factor_code ? str(row.industry_factor_code) : null,
+    industryFactorName: row.industry_factor_name ? str(row.industry_factor_name) : null,
+    industryExposure:
+      num(row.industry_exposure) != null ? Math.round(num(row.industry_exposure) as number) : null,
     rsIndex: num(row.rs_index),
     rsSector: num(row.rs_sector),
     strength: num(row.strength) != null ? Math.round(num(row.strength) as number) : null,
+    riskTags: mapRiskTags(row.risk_tags),
     lamp: asLamp(row.lamp),
     quoteKind: asKind(row.quote_kind),
   }
@@ -100,6 +115,16 @@ function mapUniverse(raw: unknown): RadarUniverse | null {
     picks: Array.isArray(row.picks) ? (row.picks as Raw[]).map(mapPick) : [],
     groups: Array.isArray(row.groups) ? (row.groups as unknown[]).map(str).filter(Boolean) : [],
     reportExpired: Boolean(row.report_expired),
+  }
+}
+
+function mapRiskLeader(row: Raw): RadarRiskLeader {
+  return {
+    factor: str(row.factor),
+    symbol: str(row.symbol),
+    name: str(row.name),
+    group: str(row.group),
+    exposure: num(row.exposure),
   }
 }
 
@@ -148,5 +173,6 @@ export async function fetchMarketRadar(opts?: { refresh?: boolean }): Promise<Ma
     sectors: Array.isArray(j.sectors) ? (j.sectors as Raw[]).map(mapSector) : [],
     stocks: Array.isArray(j.stocks) ? (j.stocks as Raw[]).map(mapStock) : [],
     alerts: Array.isArray(j.alerts) ? (j.alerts as Raw[]).map(mapAlert) : [],
+    riskLeaders: Array.isArray(j.risk_leaders) ? (j.risk_leaders as Raw[]).map(mapRiskLeader) : [],
   }
 }

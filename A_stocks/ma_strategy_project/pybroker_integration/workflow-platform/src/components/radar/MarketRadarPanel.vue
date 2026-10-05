@@ -21,6 +21,17 @@ const GROWTH_STEP_ID = 'growth_factor'
 /** 四组各前 3，量能为全部确认建仓；年化追加的 Tab 由接口 groups 接在后面 */
 const BASE_GROUPS = ['M加', 'Q', 'G·4+6', 'G·2+3', '量能'] as const
 const HIGHLIGHT_MS = 2500
+const RISK_BAR_FULL = 2
+
+function riskBarWidth(exposure: number | null | undefined): string {
+  if (exposure == null || !Number.isFinite(exposure) || exposure <= 0) return '0%'
+  return `${Math.min(100, (exposure / RISK_BAR_FULL) * 100)}%`
+}
+
+function formatRisk(exposure: number | null | undefined): string {
+  if (exposure == null || !Number.isFinite(exposure)) return '—'
+  return exposure.toFixed(2)
+}
 
 const props = defineProps<{
   /** 父页刷新时递增，触发重新拉数 */
@@ -400,24 +411,41 @@ defineExpose({ refresh: load })
               v-for="st in activeGroupStocks"
               :key="`${st.group}-${st.symbol}`"
               :data-radar-stock="stockRowKey(st)"
-              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/80 px-3 py-2 transition-colors"
+              class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-lg border bg-background/80 px-3 py-2 transition-colors"
               :class="
                 highlightKey === stockRowKey(st) &&
                 'border-amber-400/80 bg-amber-50/80 ring-2 ring-amber-300/60 dark:bg-amber-950/30 dark:ring-amber-700/50'
               "
             >
-              <div class="min-w-0">
-                <p class="truncate text-sm font-medium">
-                  <Badge v-if="st.group" variant="outline" class="mr-1.5 align-middle">
-                    {{ st.group }}{{ st.rank != null ? ` #${st.rank}` : '' }}
-                  </Badge>
-                  {{ st.name }}
-                  <span class="ml-1 font-normal tabular-nums text-muted-foreground">{{ st.symbol }}</span>
-                </p>
-                <p class="text-[11px] text-muted-foreground">
-                  {{ st.sectorName || st.industry || '未映射板块' }}
-                  <template v-if="st.sectorPct != null"> {{ formatPct(st.sectorPct) }}</template>
-                </p>
+              <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                <div class="min-w-0 shrink-0">
+                  <p class="truncate text-sm font-medium">
+                    <Badge v-if="st.group" variant="outline" class="mr-1.5 align-middle">
+                      {{ st.group }}{{ st.rank != null ? ` #${st.rank}` : '' }}
+                    </Badge>
+                    {{ st.name }}
+                    <span class="ml-1 font-normal tabular-nums text-muted-foreground">{{ st.symbol }}</span>
+                  </p>
+                  <p class="text-[11px] text-muted-foreground">
+                    {{ st.sectorName || st.industry || '未映射板块' }}
+                    <template v-if="st.sectorPct != null"> {{ formatPct(st.sectorPct) }}</template>
+                  </p>
+                </div>
+                <ul v-if="st.riskTags.length" class="w-[28rem] max-w-full space-y-1.5">
+                  <li v-for="tag in st.riskTags" :key="tag.label" class="flex items-center gap-2">
+                    <span class="w-[4.5rem] shrink-0 text-[11px] leading-none text-muted-foreground">{{ tag.label }}</span>
+                    <span class="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                      <span
+                        class="absolute inset-y-0 left-0 rounded-full"
+                        :class="tag.maximum ? 'bg-amber-500' : 'bg-rose-500'"
+                        :style="{ width: riskBarWidth(tag.exposure) }"
+                      />
+                    </span>
+                    <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                      {{ formatRisk(tag.exposure) }}<template v-if="tag.maximum"> 最大</template>
+                    </span>
+                  </li>
+                </ul>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <span class="tabular-nums text-sm font-semibold" :class="pctClass(st.pct)">
