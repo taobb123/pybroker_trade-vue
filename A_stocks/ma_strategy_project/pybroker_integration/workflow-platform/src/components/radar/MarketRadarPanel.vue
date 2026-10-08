@@ -9,6 +9,7 @@ import { fetchMarketRadar } from '@/api/marketRadar'
 import { LAMP_LABEL, POLL_MS } from '@/config/marketRadarRules'
 import {
   barWidthPct,
+  extremeSectors,
   formatPct,
   lampClass,
   pctClass,
@@ -53,8 +54,16 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null
 
 const emptyUniverse = computed(() => (payload.value?.universe?.count ?? 0) === 0)
 const sessionClosed = computed(() => payload.value?.session === 'closed')
+/** 条形图只画涨幅前三、跌幅后三；自选股行仍用完整 sectors / sectorPct */
+const extremeSectorBars = computed(() => extremeSectors(payload.value?.sectors ?? []))
+const sectorBarsTrimmed = computed(() => {
+  const ranked = (payload.value?.sectors ?? []).filter(
+    (s) => s.pct != null && Number.isFinite(s.pct),
+  ).length
+  return ranked > extremeSectorBars.value.length
+})
 const sectorMaxAbs = computed(() => {
-  const vals = (payload.value?.sectors ?? []).map((s) => Math.abs(s.pct ?? 0))
+  const vals = extremeSectorBars.value.map((s) => Math.abs(s.pct ?? 0))
   return Math.max(3, ...vals, 0)
 })
 
@@ -321,10 +330,16 @@ defineExpose({ refresh: load })
       </div>
 
       <div class="space-y-2">
-        <p class="text-xs font-medium text-foreground">成长因子板块</p>
-        <ul v-if="payload?.sectors.length" class="space-y-2">
+        <p class="text-xs font-medium text-foreground">
+          成长因子板块
+          <span
+            v-if="sectorBarsTrimmed"
+            class="ml-1 font-normal text-muted-foreground"
+          >涨幅前三 · 跌幅后三</span>
+        </p>
+        <ul v-if="extremeSectorBars.length" class="space-y-2">
           <li
-            v-for="sec in payload.sectors"
+            v-for="sec in extremeSectorBars"
             :key="sec.code"
             class="space-y-1 rounded-md px-1.5 py-1 -mx-1.5 cursor-pointer transition-colors hover:bg-background/80"
             role="button"

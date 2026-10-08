@@ -116,6 +116,20 @@ export function formatSignedPctPoints(n: number | null | undefined): string {
   return `${sign}${n.toFixed(2)}`
 }
 
+/** 成长因子板块条：涨幅前三与跌幅后三；不足 2n 时全部保留，无涨跌的不进条形图。 */
+export function extremeSectors<T extends { code: string; pct: number | null }>(
+  sectors: T[],
+  n = 3,
+): T[] {
+  const ranked = sectors.filter((s) => s.pct != null && Number.isFinite(s.pct))
+  ranked.sort((a, b) => (b.pct as number) - (a.pct as number))
+  if (ranked.length <= n * 2) return ranked
+  const top = ranked.slice(0, n)
+  const bottom = ranked.slice(-n)
+  const seen = new Set(top.map((s) => s.code))
+  return [...top, ...bottom.filter((s) => !seen.has(s.code))]
+}
+
 export function barWidthPct(value: number | null, maxAbs: number): number {
   if (value == null || !Number.isFinite(value) || maxAbs <= 0) return 4
   return Math.max(4, Math.min(100, Math.round((Math.abs(value) / maxAbs) * 100)))
