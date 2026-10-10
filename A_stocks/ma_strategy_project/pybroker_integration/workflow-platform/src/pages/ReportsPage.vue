@@ -27,6 +27,7 @@ import PredictionKlinePanel from '@/components/charts/PredictionKlinePanel.vue'
 import MarkdownReportPanel from '@/components/reports/MarkdownReportPanel.vue'
 import ImageReportPanel from '@/components/reports/ImageReportPanel.vue'
 import TextReportPanel from '@/components/reports/TextReportPanel.vue'
+import ConditionalOrdersTable from '@/components/workflow/ConditionalOrdersTable.vue'
 import { formatDurationMs, formatTime } from '@/api/parse'
 import type { RunRecord } from '@/api/history'
 import { isPredictionKlinePath } from '@/api/kline'
@@ -504,6 +505,12 @@ async function onPickOutput(out: WorkspaceOutput) {
                       </TableBody>
                     </Table>
                   </div>
+                  <ConditionalOrdersTable
+                    v-if="activeIsTodayHighLow"
+                    :headers="tableData.headers"
+                    :rows="tableData.rows"
+                    :truncated="tableData.truncated"
+                  />
                 </template>
               </template>
               <p v-else class="py-8 text-center text-sm text-muted-foreground">

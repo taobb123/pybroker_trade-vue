@@ -59,7 +59,8 @@ import {
   type TablePreview,
 } from '@/api/workflow'
 import { filterStockCodes } from '@/api/filterStockCodes'
-import { copyTextToClipboard, formatPreviewCell } from '@/api/tableCopy'
+import { copyTextToClipboard, formatPreviewCell, isTodayHighLowTable } from '@/api/tableCopy'
+import ConditionalOrdersTable from '@/components/workflow/ConditionalOrdersTable.vue'
 import { hasColumnMap, resolveTableColumns } from '@/api/tableColumns'
 import { formatDurationMs, formatTime } from '@/api/parse'
 import {
@@ -268,6 +269,7 @@ const displayColumns = computed(() => {
 const previewRowCount = computed(() => tableData.value?.rows?.length ?? 0)
 
 const mappedTable = computed(() => hasColumnMap(activeOutputPath.value))
+const isTodayHighLowPreview = computed(() => isTodayHighLowTable(tableLoadedPath.value))
 
 watch(
   () => props.expandAdvanced,
@@ -796,33 +798,41 @@ watch([tableHost, tableExpanded], () => {
         <p v-if="tableLoading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
         <div
           v-else-if="tableData?.exists && displayColumns.length"
-          class="max-h-[min(420px,50vh)] min-w-0 max-w-full overflow-auto rounded-lg border border-border/40 bg-muted/20"
+          class="min-w-0 max-w-full space-y-3"
         >
-          <Table class="w-max min-w-full">
-            <TableHeader class="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
-              <TableRow>
-                <TableHead
-                  v-for="col in displayColumns"
-                  :key="col.key"
-                  class="whitespace-nowrap bg-muted/95"
-                >
-                  {{ col.label }}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="(row, ri) in tableData.rows" :key="ri">
-                <TableCell
-                  v-for="col in displayColumns"
-                  :key="col.key"
-                  class="max-w-[220px] truncate whitespace-nowrap font-mono text-xs"
-                  :title="formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '')"
-                >
-                  {{ formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '') }}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+          <div class="max-h-[min(420px,50vh)] min-w-0 max-w-full overflow-auto rounded-lg border border-border/40 bg-muted/20">
+            <Table class="w-max min-w-full">
+              <TableHeader class="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
+                <TableRow>
+                  <TableHead
+                    v-for="col in displayColumns"
+                    :key="col.key"
+                    class="whitespace-nowrap bg-muted/95"
+                  >
+                    {{ col.label }}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="(row, ri) in tableData.rows" :key="ri">
+                  <TableCell
+                    v-for="col in displayColumns"
+                    :key="col.key"
+                    class="max-w-[220px] truncate whitespace-nowrap font-mono text-xs"
+                    :title="formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '')"
+                  >
+                    {{ formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '') }}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          <ConditionalOrdersTable
+            v-if="isTodayHighLowPreview"
+            :headers="tableData.headers"
+            :rows="tableData.rows"
+            :truncated="tableData.truncated"
+          />
         </div>
         <p v-else class="py-6 text-center text-sm text-muted-foreground">
           {{

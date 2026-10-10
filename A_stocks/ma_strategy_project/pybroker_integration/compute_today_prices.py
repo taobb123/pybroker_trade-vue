@@ -16,6 +16,8 @@ import os
 import sys
 import subprocess
 import argparse
+from decimal import Decimal, ROUND_HALF_UP
+
 import pandas as pd
 
 # cwd 常为 pybroker_integration：先保证上级 ma_strategy_project 的 config/data 优先
@@ -140,6 +142,82 @@ def normalize_date_series(s: pd.Series) -> pd.Series:
     return pd.to_datetime(s, errors='coerce').dt.strftime('%Y-%m-%d')
 
 
+CONDITIONAL_ORDERS_CSV = 'today_conditional_orders.csv'
+CONDITIONAL_ORDER_COLUMNS = ['股票名称', '条件类型', '幅度', '触发价', '实行价', '触发档', '实行档']
+CONDITIONAL_ORDER_PCT = '0.3%'
+
+
+def _price_cents(value) -> int | None:
+    """报价收到分（四舍五入）。无效值返回 None。"""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        q = Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    except Exception:
+        return None
+    return int(q * 100)
+
+
+def _cents_text(cents: int) -> str:
+    sign = '-' if cents < 0 else ''
+    amount = abs(cents)
+    return f'{sign}{amount // 100}.{amount % 100:02d}'
+
+
+def _plus_half_diff_cents(price_cents: int, diff_cents: int) -> int:
+    """price + d/2，结果四舍五入到分。"""
+    doubled = price_cents * 2 + diff_cents
+    if doubled >= 0:
+        return (doubled + 1) // 2
+    return -((abs(doubled) + 1) // 2)
+
+
+def build_conditional_orders(final: pd.DataFrame) -> pd.DataFrame:
+    """由高低价表生成条件单。high_low_diff 为 0 的股票不生成。
+
+    每只股票 5 行，顺序为：
+    反弹买入：触发买二/实行买三，触发买一/实行买二；
+    回落卖出：触发买一+d/2/实行 high，触发 high/实行卖一+d/2，触发卖一+d/2/实行卖三。
+    幅度固定 0.3%，不参与改价。
+    """
+    rows: list[dict[str, str]] = []
+    for _, row in final.iterrows():
+        diff = _price_cents(row.get('high_low_diff'))
+        if diff is None or diff == 0:
+            continue
+        name = str(row.get('stock_name', '')).strip()
+        if not name:
+            continue
+        high = _price_cents(row.get('today_high'))
+        sell1 = _price_cents(row.get('卖一'))
+        sell3 = _price_cents(row.get('卖三'))
+        buy1 = _price_cents(row.get('买一'))
+        buy2 = _price_cents(row.get('买二'))
+        buy3 = _price_cents(row.get('买三'))
+        if None in (high, sell1, sell3, buy1, buy2, buy3):
+            continue
+        buy1_half = _plus_half_diff_cents(buy1, diff)
+        sell1_half = _plus_half_diff_cents(sell1, diff)
+        specs = [
+            ('反弹买入', buy2, buy3, '买二', '买三'),
+            ('反弹买入', buy1, buy2, '买一', '买二'),
+            ('回落卖出', buy1_half, high, '买一+d/2', 'high'),
+            ('回落卖出', high, sell1_half, 'high', '卖一+d/2'),
+            ('回落卖出', sell1_half, sell3, '卖一+d/2', '卖三'),
+        ]
+        for kind, trigger, execute, trigger_label, execute_label in specs:
+            rows.append({
+                '股票名称': name,
+                '条件类型': kind,
+                '幅度': CONDITIONAL_ORDER_PCT,
+                '触发价': _cents_text(trigger),
+                '实行价': _cents_text(execute),
+                '触发档': trigger_label,
+                '实行档': execute_label,
+            })
+    return pd.DataFrame(rows, columns=CONDITIONAL_ORDER_COLUMNS)
+
+
 def main():
     parser = argparse.ArgumentParser(description='运行两套训练并计算当日高低价，或仅从已有 CSV 计算')
     parser.add_argument('--no-run-training', action='store_true', help='不运行训练脚本，仅读取已有 result1_last.csv / result2_last2.csv 计算')
@@ -251,7 +329,14 @@ def main():
     }
     final_path = os.path.join(script_dir, 'today_high_low_result.csv')
     final.to_csv(final_path, index=False, encoding='utf-8-sig')
-    print(f"当日高低价结果已写入: {final_path}\n")
+    print(f"当日高低价结果已写入: {final_path}")
+
+    orders = build_conditional_orders(final)
+    orders_path = os.path.join(script_dir, CONDITIONAL_ORDERS_CSV)
+    orders.to_csv(orders_path, index=False, encoding='utf-8-sig')
+    kept = len(orders) // 5
+    skipped = len(final) - kept
+    print(f"条件单已写入: {orders_path}（{len(orders)} 行，{kept} 只；高低价差为 0 跳过 {skipped} 只）\n")
 
     print("=" * 60)
     print("当日预测高价 / 低价（按股票）")
