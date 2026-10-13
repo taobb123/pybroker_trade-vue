@@ -1,3 +1,2 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-百亚股份,红柱,涨,2026-09-24,2026-09-25,2026-09-22|2026-09-23|2026-09-24,红绿红,绿红绿,0,3,后续相同概率偏高,up,red,same_bias,003006
-济川药业,绿柱,涨,2026-09-24,2026-09-25,2026-09-22|2026-09-23|2026-09-24,绿绿绿,绿绿绿,3,0,后续不同概率偏高,up,green,diff_bias,600566
+珠江啤酒,红柱,跌,2026-10-12,2026-10-13,2026-10-08|2026-10-09|2026-10-12,红红红,红红红,3,0,后续不同概率偏高,down,red,diff_bias,002461
