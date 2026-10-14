@@ -1,5 +1,6 @@
 /**
- * 选球：市场中性多头净值 Top2 因子 × 各因子排名 Top2 股
+ * 选球：市场中性全量个股因子（A/B/Q/G/M+/M-）按多头净值取 Top2，各因子排名 Top2 股。
+ * EQ、ROT 是组合权重，不参与选股。
  */
 import { findStockCodeColumnIndex } from '@/api/tableCopy'
 import { fetchWorkspaceTable, type TablePreview } from '@/api/workflow'
@@ -9,7 +10,7 @@ import {
   valuationToScore,
 } from '@/data/loadOpportunities'
 
-export type NeutralFactorId = 'A' | 'B' | 'Q' | 'M+' | 'M-'
+export type NeutralFactorId = 'A' | 'B' | 'Q' | 'G' | 'M+' | 'M-'
 
 export const FACTOR_META: Record<
   NeutralFactorId,
@@ -18,6 +19,7 @@ export const FACTOR_META: Record<
   A: { label: '形态', rankCsv: 'pattern_entry_scan.csv', scoreCol: 'score' },
   B: { label: '相对PE', rankCsv: 'pattern_entry_valuation_rank.csv', scoreCol: 'upside' },
   Q: { label: '公司估值Q', rankCsv: 'pattern_entry_q_rank.csv', scoreCol: 'company_q' },
+  G: { label: '增长因子', rankCsv: 'pattern_entry_g_rank.csv', scoreCol: '增长分' },
   'M+': { label: '动量MUD', rankCsv: 'pattern_entry_mplus_rank.csv', scoreCol: 'mud_plus' },
   'M-': { label: '反转MUD', rankCsv: 'pattern_entry_mminus_rank.csv', scoreCol: 'mud_minus' },
 }
@@ -86,6 +88,14 @@ function isTruthy(v: string): boolean {
   return s === 'true' || s === '1' || s === 'yes'
 }
 
+/** 仅多头行 `X_L` 归到因子 X；不在 FACTOR_META 的组合行（EQ/ROT）忽略。 */
+export function factorIdFromVariant(variant: string): NeutralFactorId | null {
+  const raw = variant.trim()
+  const base = raw.endsWith('_L') ? raw.slice(0, -2) : raw
+  if (Object.prototype.hasOwnProperty.call(FACTOR_META, base)) return base as NeutralFactorId
+  return null
+}
+
 /** 从 metrics 按多头累计收益取前 N 个因子（优先 *_L，否则用主组 long_total_return） */
 export function pickTopFactorsByLongNav(table: TablePreview, topN = TOP_FACTORS): FactorPick[] {
   if (!table.exists || !table.headers?.length || !table.rows?.length) return []
@@ -101,12 +111,7 @@ export function pickTopFactorsByLongNav(table: TablePreview, topN = TOP_FACTORS)
     const longNav = cellNum(row, longIdx)
     if (longNav == null) continue
 
-    let factorId: NeutralFactorId | null = null
-    if (variant === 'A' || variant === 'A_L') factorId = 'A'
-    else if (variant === 'B' || variant === 'B_L') factorId = 'B'
-    else if (variant === 'Q' || variant === 'Q_L') factorId = 'Q'
-    else if (variant === 'M+' || variant === 'M+_L') factorId = 'M+'
-    else if (variant === 'M-' || variant === 'M-_L') factorId = 'M-'
+    const factorId = factorIdFromVariant(variant)
     if (!factorId) continue
 
     const preferL = variant.endsWith('_L')
@@ -169,6 +174,8 @@ function parseRankTable(factorId: NeutralFactorId, table: TablePreview): RankRow
     'score',
     'upside',
     'company_q',
+    '增长分',
+    'growth_score',
     'mud_plus',
     'mud_minus',
   ])
@@ -177,7 +184,7 @@ function parseRankTable(factorId: NeutralFactorId, table: TablePreview): RankRow
   const underIdx = colIndex(h, ['undervalued'])
   const tagIdx = colIndex(h, ['select_tag'])
   const entryIdx = colIndex(h, ['entry'])
-  const comboIdx = colIndex(h, ['combo_name', 'state', 'notes'])
+  const comboIdx = colIndex(h, ['combo_name', 'state', 'notes', '行业'])
 
   const rows: RankRow[] = []
   for (let i = 0; i < (table.rows as unknown[][]).length; i++) {
@@ -238,6 +245,10 @@ function rankRowToOpportunity(
   } else if (factorId === 'Q') {
     const q = row.rawScore
     fundamental = q != null ? Math.max(50, Math.min(96, Math.round(q * 100))) : null
+    trend = fundamental
+  } else if (factorId === 'G') {
+    const g = row.rawScore
+    fundamental = g != null ? Math.max(50, Math.min(96, Math.round(g * 100))) : null
     trend = fundamental
   } else if (factorId === 'M+') {
     const m = row.rawScore

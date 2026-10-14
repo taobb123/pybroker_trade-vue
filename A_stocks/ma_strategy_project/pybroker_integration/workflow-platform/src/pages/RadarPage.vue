@@ -152,7 +152,7 @@ onMounted(() => {
             今天有没有好球？
           </h2>
           <p class="mt-1 max-w-xl text-sm text-muted-foreground">
-            市场中性多头净值 Top2 因子 × 各取前 2 股；选球卡内嵌预测 K 线，右侧为做 T 买一/买二等档位。
+            市场中性全量因子（形态 / 相对PE / Q / 增长因子 / 动量MUD / 反转MUD）按多头净值取 Top2，各取前 2 股；选球卡内嵌预测 K 线，右侧为做 T 买一/买二等档位。
             综合分 ≥ {{ GOOD_PITCH_THRESHOLD }} 标为好球。下方盘中雷达盯成长因子 M加 / Q 各前 3。
           </p>
           <p v-if="sourceHint" class="mt-1 text-[11px] text-muted-foreground">
