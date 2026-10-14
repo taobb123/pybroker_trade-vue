@@ -18,6 +18,11 @@
 「Q」与 G·2+3 由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
 不推 M减 / 估值因子，也不按成长分重推东财「量能」。半凯利仍取 M+ 排名 Top2。观察池入池条件不变。
 
+建仓名单跨次保留：上轮「建仓」仍用原锚点进入形态循环，不因观察池换锚点而退回观察。
+仅两类冲突移出建仓：最新六组合为「下跌放量」，或形态变为「作废」。
+高位放量滞涨、底部缩量、底部放量上涨、上涨缩量整理、上涨放量突破不移除。
+因「下跌放量」移出时不踢观察池；若当次观察池另有非建仓结果，保留该结果。
+
 用法（在 ma_strategy_project 目录下）：
     python pybroker_integration/fetch_pattern_entry.py
     python pybroker_integration/fetch_pattern_entry.py --combo-id 6
@@ -30,7 +35,7 @@ import argparse
 import os
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
@@ -360,13 +365,14 @@ class BreakoutPullbackRebreak(PatternBase):
             pct = (c / prev_c - 1.0) * 100.0 if prev_c > 0 else 0.0
             days = i - b_idx  # 1-based since breakout
 
-            # 作废：跌破平台
+            # 作废：跌破平台（建仓之后仍检查）
             if c < platform * (1.0 - tol):
                 invalid_reason = f"收盘跌破平台 {platform:.4f}"
                 state = "invalid"
+                entry = False
                 break
 
-            # 作废：爆量滞涨
+            # 作废：爆量滞涨（建仓之后仍检查）
             if (
                 _finite(brk_vol)
                 and brk_vol > 0
@@ -375,7 +381,13 @@ class BreakoutPullbackRebreak(PatternBase):
             ):
                 invalid_reason = f"爆量滞涨(量≥{stag_mult:.1f}x突破量且涨跌≤{stag_pct}%)"
                 state = "invalid"
+                entry = False
                 break
+
+            # 已建仓：不再走回踩/超时，只继续看上面的结构作废
+            if entry:
+                state = "entry"
+                continue
 
             ma10 = float(row["ma10"]) if _finite(float(row.get("ma10", _nan()))) else _nan()
             hold_platform = lo >= platform * (1.0 - tol)
@@ -411,10 +423,10 @@ class BreakoutPullbackRebreak(PatternBase):
                     entry = True
                     state = "entry"
                     notes.append("再放量突破前高，主路径建仓")
-                    # 切到当前行作为信号日
+                    # 切到当前行作为信号日；后续 K 线继续监控作废
                     signal_date = str(row["date"])
                     close_now = c
-                    break
+                    continue
                 if days > max_pb + max_wait:
                     invalid_reason = f"再突破超时(确认后>{max_wait}日)"
                     state = "invalid"
@@ -578,7 +590,9 @@ class BreakoutPullbackRebreak(PatternBase):
             notes="；".join([n for n in notes if n]),
             combo_id=anchor.combo_id,
             combo_name=anchor.combo_name,
-            position_frac=1.0 if entry else (0.6 if pullback_ok else 0.0),
+            position_frac=(
+                0.0 if state == "invalid" else (1.0 if entry else (0.6 if pullback_ok else 0.0))
+            ),
             trial_ok=False,
             add_ok=bool(pullback_ok and not entry),
             panic_low=_nan(),
@@ -736,11 +750,25 @@ class VolumeDumpReversal(PatternBase):
             )
             hist = float(row["macd_hist"]) if _finite(float(row.get("macd_hist", _nan()))) else _nan()
 
-            # 再创新低 → 趋势未止，作废（已破压后也适用）
+            # 再创新低 → 趋势未止，作废（建仓之后也适用）
             if lo < panic_low * (1.0 - new_low_tol):
                 invalid_reason = f"再创恐慌新低({lo:.4f}<{panic_low:.4f})"
                 state = "invalid"
+                entry = False
+                position_frac = 0.0
                 break
+
+            # 已建仓：只继续看再创新低和跌回压力，不再走试仓/超时
+            if entry:
+                if c < resistance * (1.0 - plat_tol):
+                    invalid_reason = f"破压后跌回压力下({c:.4f}<{resistance:.4f})"
+                    state = "invalid"
+                    entry = False
+                    position_frac = 0.0
+                    break
+                state = "entry"
+                position_frac = 1.0
+                continue
 
             # —— 尚未破压：等待止跌缩量，再等放量突破压力 ——
             if not trial_ok:
@@ -797,6 +825,8 @@ class VolumeDumpReversal(PatternBase):
             if c < resistance * (1.0 - plat_tol):
                 invalid_reason = f"破压后跌回压力下({c:.4f}<{resistance:.4f})"
                 state = "invalid"
+                entry = False
+                position_frac = 0.0
                 break
 
             if not pullback_ok:
@@ -853,7 +883,7 @@ class VolumeDumpReversal(PatternBase):
                 notes.append("再放量创新高·加满建仓")
                 signal_date = str(row["date"])
                 close_now = c
-                break
+                continue
 
             if days_since_rev > max_pb + max_rebreak:
                 invalid_reason = f"再突破超时(确认后>{max_rebreak}日)"
@@ -1868,6 +1898,250 @@ def resolve_all_anchors(
     return anchors, notes
 
 
+# 与现有「建仓」冲突、需要移出建仓名单的六组合。其余组合不移除。
+_ENTRY_CONFLICT_COMBO_ID = 6
+_ENTRY_CONFLICT_NOTE = "六组合转为下跌放量，移出建仓"
+
+
+def _anchor_key(symbol: str, breakout_day: str, combo_id: int) -> Tuple[str, str, int]:
+    return (_norm_symbol(symbol), str(breakout_day or "")[:10], int(combo_id))
+
+
+def _csv_bool(value) -> bool:
+    return str(value or "").strip().lower() in ("1", "true", "yes", "y")
+
+
+def _csv_float(value, default: float = float("nan")) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return default
+    return out
+
+
+def _row_is_held_entry(row) -> bool:
+    code = str(row.get("state_code") or "").strip().lower()
+    if code:
+        return code == "entry"
+    if str(row.get("state") or "").strip() == "建仓":
+        return True
+    return _csv_bool(row.get("entry"))
+
+
+def _note_append(notes: str, extra: str) -> str:
+    base = str(notes or "").strip().strip("；")
+    if not extra or extra in base:
+        return base
+    return f"{base}；{extra}" if base else extra
+
+
+def demote_entry_result(result: PatternResult, reason: str) -> PatternResult:
+    """移出建仓名单，但保留成观察，便于当次看到移除原因。"""
+    return replace(
+        result,
+        state="watch",
+        entry=False,
+        position_frac=0.0,
+        notes=_note_append(result.notes, reason),
+    )
+
+
+def _pattern_from_csv_row(row) -> Tuple[WatchAnchor, PatternResult]:
+    sym = _norm_symbol(row.get("symbol", ""))
+    combo_id = int(float(row.get("combo_id") or 4))
+    combo_name = str(row.get("combo_name") or "").strip() or _combo_name_default(combo_id)
+    breakout_day = str(row.get("breakout_day") or "")[:10]
+    anchor = WatchAnchor(
+        symbol=sym,
+        stock_name=str(row.get("stock_name") or ""),
+        breakout_day=breakout_day,
+        platform_level=_csv_float(row.get("platform_level")),
+        breakout_high=_csv_float(row.get("breakout_high")),
+        breakout_close=_csv_float(row.get("breakout_close")),
+        breakout_vol=_csv_float(row.get("breakout_vol")),
+        breakout_vol_ratio=_nan(),
+        combo_id=combo_id,
+        combo_name=combo_name,
+    )
+    carried = PatternResult(
+        symbol=sym,
+        stock_name=anchor.stock_name,
+        pattern_id=str(row.get("pattern_id") or ""),
+        state="entry",
+        entry=True,
+        score=_csv_float(row.get("score"), 0.0),
+        signal_date=str(row.get("signal_date") or "")[:10],
+        breakout_day=breakout_day,
+        platform_level=anchor.platform_level,
+        breakout_high=anchor.breakout_high,
+        breakout_close=anchor.breakout_close,
+        breakout_vol=anchor.breakout_vol,
+        close=_csv_float(row.get("close")),
+        pullback_bars=int(_csv_float(row.get("pullback_bars"), 0.0) or 0),
+        bars_since_breakout=int(_csv_float(row.get("bars_since_breakout"), 0.0) or 0),
+        pullback_ok=_csv_bool(row.get("pullback_ok")),
+        ma5_hold=_csv_bool(row.get("ma5_hold")),
+        macd_ok=_csv_bool(row.get("macd_ok")),
+        turnover_fade=_csv_bool(row.get("turnover_fade")),
+        notes=str(row.get("notes") or ""),
+        combo_id=combo_id,
+        combo_name=combo_name,
+        position_frac=_csv_float(row.get("position_frac"), 1.0),
+        trial_ok=_csv_bool(row.get("trial_ok")),
+        add_ok=_csv_bool(row.get("add_ok")),
+        panic_low=_csv_float(row.get("panic_low")),
+    )
+    if not _finite(carried.position_frac):
+        carried.position_frac = 1.0
+    return anchor, carried
+
+
+def load_held_entries(path: str) -> Dict[str, Tuple[WatchAnchor, PatternResult]]:
+    """上一份形态表里的建仓。文件不存在或没有建仓时返回空。"""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        df = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+    except Exception:
+        return {}
+    if df is None or df.empty or "symbol" not in df.columns:
+        return {}
+    held: Dict[str, Tuple[WatchAnchor, PatternResult]] = {}
+    for _, row in df.iterrows():
+        if not _row_is_held_entry(row):
+            continue
+        anchor, carried = _pattern_from_csv_row(row)
+        if len(anchor.symbol) != 6:
+            continue
+        held[anchor.symbol] = (anchor, carried)
+    return held
+
+
+def classify_held_combos(
+    symbols: Sequence[str],
+    *,
+    end_date: str,
+) -> Tuple[Dict[str, int], List[str]]:
+    """只对建仓名单跑六组合，不写六组合主表、不改观察池。"""
+    syms = [_norm_symbol(s) for s in symbols if len(_norm_symbol(s)) == 6]
+    if not syms:
+        return {}, []
+    from fetch_vp_six_combo import VP_SIX_CONFIG, hits_from_symbols, scan_vp_six
+
+    hits, notes = hits_from_symbols(syms, source_note="建仓名单六组合复核")
+    cfg = VP_SIX_CONFIG
+    snaps, skipped = scan_vp_six(
+        hits,
+        end_date=end_date,
+        history_calendar_days=int(cfg["history_calendar_days"]),
+        enable_phase2=True,
+        skip_chips=False,
+        range_lookback_bars=int(cfg["range_lookback_bars"]),
+        vol_ma_bars=int(cfg["vol_ma_bars"]),
+        breakout_lookback_bars=int(cfg["breakout_lookback_bars"]),
+        vol_amplify_ratio=float(cfg["vol_amplify_ratio"]),
+        vol_shrink_ratio=float(cfg["vol_shrink_ratio"]),
+        stagnant_abs_pct=float(cfg["stagnant_abs_pct"]),
+        bottom_range_pct=float(cfg["bottom_range_pct"]),
+        high_range_pct=float(cfg["high_range_pct"]),
+        downtrend_ma20_lookback=int(cfg["downtrend_ma20_lookback"]),
+        min_bars=int(cfg["min_bars"]),
+        turnover_ma_bars=int(cfg["turnover_ma_bars"]),
+        turnover_high_pct=float(cfg["turnover_high_pct"]),
+        turnover_low_pct=float(cfg["turnover_low_pct"]),
+        turnover_amplify_ratio=float(cfg["turnover_amplify_ratio"]),
+        turnover_shrink_ratio=float(cfg["turnover_shrink_ratio"]),
+        resonance_pass_score=float(cfg["resonance_pass_score"]),
+    )
+    combo_by_symbol = {_norm_symbol(s.symbol): int(s.combo_id) for s in snaps}
+    if skipped:
+        notes.append("建仓复核未分类: " + ", ".join(skipped))
+    return combo_by_symbol, notes
+
+
+def _held_eval_result(
+    symbol: str,
+    anchor: WatchAnchor,
+    watch_results: Sequence[PatternResult],
+    held_eval: Dict[str, PatternResult],
+) -> Optional[PatternResult]:
+    found = held_eval.get(symbol)
+    if found is not None:
+        return found
+    key = _anchor_key(anchor.symbol, anchor.breakout_day, anchor.combo_id)
+    for result in watch_results:
+        if _anchor_key(result.symbol, result.breakout_day, result.combo_id) == key:
+            return result
+    return None
+
+
+def reconcile_held_entries(
+    watch_results: Sequence[PatternResult],
+    held: Dict[str, Tuple[WatchAnchor, PatternResult]],
+    held_eval: Dict[str, PatternResult],
+    combo_by_symbol: Dict[str, int],
+) -> Tuple[List[PatternResult], List[str]]:
+    """保留上轮建仓；仅「下跌放量」或形态「作废」移出。"""
+    if not held:
+        return list(watch_results), []
+
+    watch_by_symbol: Dict[str, List[PatternResult]] = {}
+    for result in watch_results:
+        watch_by_symbol.setdefault(_norm_symbol(result.symbol), []).append(result)
+
+    kept = 0
+    removed_dump = 0
+    removed_invalid = 0
+    out: List[PatternResult] = []
+    for result in watch_results:
+        if _norm_symbol(result.symbol) not in held:
+            out.append(result)
+
+    for symbol, (anchor, carried) in held.items():
+        sticky = _held_eval_result(symbol, anchor, watch_results, held_eval)
+        combo_id = combo_by_symbol.get(symbol)
+        if sticky is not None and sticky.state == "invalid":
+            out.append(sticky)
+            removed_invalid += 1
+            continue
+        if combo_id == _ENTRY_CONFLICT_COMBO_ID:
+            replacements = [
+                row
+                for row in watch_by_symbol.get(symbol, [])
+                if row.state != "entry" and not row.entry
+            ]
+            if replacements:
+                for row in replacements:
+                    out.append(replace(row, notes=_note_append(row.notes, _ENTRY_CONFLICT_NOTE)))
+            else:
+                base = sticky if sticky is not None else carried
+                out.append(demote_entry_result(base, _ENTRY_CONFLICT_NOTE))
+            removed_dump += 1
+            continue
+        if sticky is not None and (sticky.entry or sticky.state == "entry"):
+            out.append(sticky)
+            kept += 1
+            continue
+        # 复核没得出新的建仓或作废：分类失败、锚点缺失都不算冲突，沿用上轮建仓
+        out.append(carried)
+        kept += 1
+
+    out.sort(
+        key=lambda x: (
+            0 if x.entry else 1,
+            _STATE_RANK.get(x.state, 9),
+            -float(x.position_frac),
+            -float(x.score),
+            x.symbol,
+        )
+    )
+    notes = [
+        f"【建仓延续】上轮 {len(held)} 只 · 保留 {kept} · "
+        f"下跌放量移出 {removed_dump} · 作废移出 {removed_invalid}"
+    ]
+    return out, notes
+
+
 def main() -> None:
     cfg = dict(PATTERN_ENTRY_CONFIG)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -1994,25 +2268,70 @@ def main() -> None:
         print(str(exc))
         sys.exit(2)
 
+    out_path_early = os.path.abspath(args.out_csv)
+    held = load_held_entries(out_path_early)
+    if held:
+        notes.append(f"上轮建仓 {len(held)} 只进入本轮复核")
+
     for n in notes:
         print(n)
 
-    if not anchors:
+    if not anchors and not held:
         out_df = pd.DataFrame()
-        out_path = os.path.abspath(args.out_csv)
-        ddir = os.path.dirname(out_path)
+        ddir = os.path.dirname(out_path_early)
         if ddir:
             os.makedirs(ddir, exist_ok=True)
-        out_df.to_csv(out_path, index=False, encoding="utf-8-sig")
-        print(f"无观察股票，已写空表: {out_path}")
+        out_df.to_csv(out_path_early, index=False, encoding="utf-8-sig")
+        print(f"无观察股票，已写空表: {out_path_early}")
         sys.exit(0)
 
-    results, skipped = scan_pattern_entry(
-        anchors,
+    watch_results: List[PatternResult] = []
+    skipped: List[str] = []
+    if anchors:
+        watch_results, skipped = scan_pattern_entry(
+            anchors,
+            end_date=str(args.end_date),
+            history_calendar_days=int(args.days),
+            cfg=cfg,
+        )
+
+    watch_keys = {
+        _anchor_key(a.symbol, a.breakout_day, a.combo_id) for a in anchors
+    }
+    extra_anchors = [
+        anchor
+        for _sym, (anchor, _carried) in held.items()
+        if _anchor_key(anchor.symbol, anchor.breakout_day, anchor.combo_id) not in watch_keys
+    ]
+    held_eval: Dict[str, PatternResult] = {}
+    if extra_anchors:
+        extra_results, extra_skipped = scan_pattern_entry(
+            extra_anchors,
+            end_date=str(args.end_date),
+            history_calendar_days=int(args.days),
+            cfg=cfg,
+        )
+        skipped.extend(extra_skipped)
+        for row in extra_results:
+            held_eval[_norm_symbol(row.symbol)] = row
+        print(f"建仓锚点补扫 {len(extra_anchors)} 只（不在当次观察池或锚点已变）")
+
+    combo_by_symbol, combo_notes = classify_held_combos(
+        list(held.keys()),
         end_date=str(args.end_date),
-        history_calendar_days=int(args.days),
-        cfg=cfg,
     )
+    for n in combo_notes:
+        print(n)
+
+    results, hold_notes = reconcile_held_entries(
+        watch_results,
+        held,
+        held_eval,
+        combo_by_symbol,
+    )
+    for n in hold_notes:
+        print(n)
+
     out_df = results_to_dataframe(results)
     out_path = os.path.abspath(args.out_csv)
     ddir = os.path.dirname(out_path)
