@@ -45,7 +45,7 @@ class RadarBody(BaseModel):
 
 def _placeholder_stocks(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     saved = load_saved_l1_exposure()
-    risk_tags = _risk_tags()
+    risk_tags = _risk_tags(picks)
     out: list[dict[str, Any]] = []
     for p in picks:
         out.append(
@@ -94,7 +94,7 @@ def _error_payload(message: str) -> dict[str, Any]:
         "sectors": [],
         "stocks": _placeholder_stocks(picks),
         "alerts": [],
-        "risk_leaders": _risk_leaders(),
+        "risk_leaders": _risk_leaders(picks),
     }
 
 

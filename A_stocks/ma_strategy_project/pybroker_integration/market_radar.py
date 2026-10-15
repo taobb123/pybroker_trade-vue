@@ -599,20 +599,20 @@ def resolve_sw_map(pro: Any, ts_codes: list[str]) -> dict[str, dict[str, str]]:
     return {c: items[c] for c in ts_codes if c in items}
 
 
-def _risk_leaders() -> list[dict[str, Any]]:
+def _risk_leaders(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     try:
-        from risk_index.leaders import load_radar_risk_leaders
+        from risk_index.leaders import leaders_for_picks
 
-        return load_radar_risk_leaders()
+        return leaders_for_picks(picks)
     except Exception:
         return []
 
 
-def _risk_tags() -> dict[str, list[dict[str, Any]]]:
+def _risk_tags(picks: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     try:
-        from risk_index.leaders import load_risk_tags
+        from risk_index.leaders import risk_tags_for_picks
 
-        return load_risk_tags()
+        return risk_tags_for_picks(picks)
     except Exception:
         return {}
 
@@ -1517,7 +1517,8 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
     stock_quotes = fetch_stock_quotes(ts_mod, pro, ts_codes, allow_daily=(session != "open")) if ts_codes else {}
 
     saved_l1 = load_saved_l1_exposure()
-    risk_tags = _risk_tags()
+    shown = [p for p in emit_picks if six_digit(p.get("symbol") or "") in seen]
+    risk_tags = _risk_tags(shown)
     sector_of: dict[str, tuple[str, str, str]] = {}
     sector_codes: list[str] = []
     for code in ts_codes:
@@ -1671,5 +1672,5 @@ def build_market_radar(symbols: list[str] | None = None) -> dict[str, Any]:
         "sectors": sectors_out,
         "stocks": stocks_out,
         "alerts": alerts,
-        "risk_leaders": _risk_leaders(),
+        "risk_leaders": _risk_leaders(shown),
     }

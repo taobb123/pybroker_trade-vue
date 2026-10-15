@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from risk_index.fundamental import fundamental_raw
-from risk_index.leaders import column_max_exposures, risk_tags_by_symbol
+from risk_index.leaders import column_max_exposures, risk_tags_by_symbol, risk_tags_for_picks
 from risk_index.price_descriptors import price_raw_frame
 from risk_index.spec import DESCRIPTORS
 from risk_index.standardize import compose_indices, zscore
@@ -88,6 +88,36 @@ class ColumnMaxTest(unittest.TestCase):
         self.assertTrue(second["价值风险"])
         by_label = {item["label"]: item for item in tags["000002"]}
         self.assertEqual(by_label["波动风险"]["exposure"], 1.1)
+
+    def test_tags_follow_current_picks_not_the_rest_of_the_universe(self) -> None:
+        universe = pd.DataFrame(
+            {
+                "symbol": ["000001", "000752", "002027"],
+                "波动率": [1.2, -0.9, 0.4],
+                "流动性": [0.1, 0.9, -2.2],
+                "价值": [-0.2, 0.3, -0.1],
+                "盈利波动率": [-0.5, 0.97, -0.2],
+                "财务杠杆": [0.2, -0.05, -0.3],
+                "动能": [0.1, 0.6, -0.5],
+                "成长性": [0.2, -3.7, 0.03],
+            }
+        )
+        picks = [
+            {"symbol": "752", "name": "西发", "group": "Q", "rank": 3},
+            {"symbol": "002027.SZ", "name": "分众传媒", "group": "M加", "rank": 1},
+            {"symbol": "999999", "name": "不在截面", "group": "Q", "rank": 2},
+        ]
+        tags = risk_tags_for_picks(picks, universe)
+        self.assertNotIn("000001", tags)
+        self.assertEqual(
+            [item["label"] for item in tags["000752"]],
+            ["流动风险", "价值风险", "盈利波动风险"],
+        )
+        self.assertTrue(all(item["maximum"] for item in tags["000752"]))
+        self.assertEqual([item["label"] for item in tags["002027"]], ["波动风险"])
+        self.assertTrue(tags["002027"][0]["maximum"])
+        self.assertEqual(tags["002027"][0]["exposure"], 0.4)
+        self.assertEqual(tags["999999"], [])
 
 
 class PriceDescriptorTest(unittest.TestCase):

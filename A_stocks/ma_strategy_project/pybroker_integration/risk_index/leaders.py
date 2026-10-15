@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""自选暴露清单：每一列取暴露度最大的一只股票。"""
+"""自选暴露清单：按当前名单接上全市场暴露，再标出大于 0 的风险。"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,6 +16,7 @@ EXPOSURE_COLUMNS = (
     "财务杠杆",
 )
 DEFAULT_PATH = Path(__file__).resolve().parent / "output" / "radar_exposure.csv"
+UNIVERSE_PATH = Path(__file__).resolve().parent / "output" / "universe_exposure.csv"
 RISK_LABELS = (
     ("波动率", "波动风险"),
     ("流动性", "流动风险"),
@@ -101,6 +102,60 @@ def _read_exposure(path: Path | None = None) -> pd.DataFrame:
         return pd.read_csv(dest, dtype={"symbol": str}, encoding="utf-8-sig")
     except Exception:
         return pd.DataFrame()
+
+
+def _symbol6(value: object) -> str:
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if not digits:
+        return ""
+    return digits[-6:].zfill(6)
+
+
+def exposures_for_picks(
+    picks: list[dict] | None,
+    universe: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """当前自选左连接全市场暴露。名单里没有的股票不进入结果。"""
+    rows: list[dict] = []
+    for pick in picks or []:
+        symbol = _symbol6(pick.get("symbol"))
+        if not symbol:
+            continue
+        rows.append(
+            {
+                "symbol": symbol,
+                "name": str(pick.get("name") or ""),
+                "group": str(pick.get("group") or ""),
+                "rank": pick.get("rank"),
+            }
+        )
+    columns = ["symbol", "name", "group", "rank", *EXPOSURE_COLUMNS]
+    base = pd.DataFrame(rows)
+    if base.empty:
+        return pd.DataFrame(columns=columns)
+    frame = universe if universe is not None else _read_exposure(UNIVERSE_PATH)
+    if frame is None or frame.empty or "symbol" not in frame.columns:
+        return base
+    work = frame.copy()
+    work["symbol"] = work["symbol"].map(_symbol6)
+    keep = ["symbol", *[name for name in EXPOSURE_COLUMNS if name in work.columns]]
+    work = work.loc[work["symbol"] != "", keep].drop_duplicates("symbol", keep="first")
+    return base.merge(work, on="symbol", how="left")
+
+
+def risk_tags_for_picks(
+    picks: list[dict] | None,
+    universe: pd.DataFrame | None = None,
+) -> dict[str, list[dict]]:
+    """只给当前自选打风险标签。「最大」在这批股票里比较。"""
+    return risk_tags_by_symbol(exposures_for_picks(picks, universe))
+
+
+def leaders_for_picks(
+    picks: list[dict] | None,
+    universe: pd.DataFrame | None = None,
+) -> list[dict]:
+    return column_max_exposures(exposures_for_picks(picks, universe))
 
 
 def load_radar_risk_leaders(path: Path | None = None) -> list[dict]:
