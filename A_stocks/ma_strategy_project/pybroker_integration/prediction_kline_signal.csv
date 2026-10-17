@@ -1,2 +1,2 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-珠江啤酒,红柱,跌,2026-10-12,2026-10-13,2026-10-08|2026-10-09|2026-10-12,红红红,红红红,3,0,后续不同概率偏高,down,red,diff_bias,002461
+人民网,绿柱,涨,2026-10-15,2026-10-16,2026-10-13|2026-10-14|2026-10-15,红红红,绿红红,2,1,后续不同概率偏高,up,green,diff_bias,603000
