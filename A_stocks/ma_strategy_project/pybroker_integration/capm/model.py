@@ -20,7 +20,8 @@ NOTES = (
     "年化 Alpha 是日截距乘 252。窗口短时这个数会被放大，天数不足时优先看区间超额。",
     "主列用最近 250 个重叠交易日，旁列用最近 120 日。重叠少于 60 日不估计。",
     "情形按主列划分。Alpha 的 t 统计量绝对值小于 1 时，视为接近零。",
-    "象限也按主列；主列空着时用 120 日。高 α 要年化 α 为正且 t(α) ≥ 1。高 β 是 β > 1。",
+    "象限只用最近 120 日的年化 α、t(α) 和 β。高 α 要年化 α 为正且 t(α) ≥ 1。高 β 是 β > 1。",
+    "120 日窗口空着时，象限记为样本不足，不用 250 日顶上。250 日数字仍显示，不决定象限。",
     "优先跟踪是高 α / 低 β。高 α / 高 β 先看超额是否持续。象限不写入观察池，也不改变仓位。",
 )
 
@@ -28,7 +29,7 @@ QUADRANT_INSUFFICIENT = {
     "id": "insufficient",
     "title": "样本不足",
     "action": "暂不归类",
-    "hint": "250 日和 120 日窗口都空着。",
+    "hint": "最近 120 日窗口空着。",
 }
 
 
@@ -121,7 +122,7 @@ def attribute_frame(both: pd.DataFrame) -> dict:
     source = primary or alt
     label_window = PRIMARY_WINDOW if primary else (ALT_WINDOW if alt else None)
     label = scenario_label(source["total"], source["t_alpha"]) if source else "样本不足"
-    quadrant = classify_quadrant(source)
+    quadrant = classify_quadrant(alt)
     if primary is None and alt is None:
         if len(both) < MIN_OBS:
             reason = f"与沪深300重叠 {len(both)} 个交易日，少于 {MIN_OBS} 日"

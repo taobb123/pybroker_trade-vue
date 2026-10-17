@@ -11,7 +11,7 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from capm.model import align_returns, classify_quadrant, fit_window, scenario_label
+from capm.model import align_returns, attribute_frame, classify_quadrant, fit_window, scenario_label
 from capm.service import sleeves_payload, stocks_payload
 from capm.sources import WATCH_FILES, load_books, load_market
 from capm_api import router
@@ -102,6 +102,20 @@ class ModelTests(unittest.TestCase):
             "low_alpha_low_beta",
         )
         self.assertEqual(classify_quadrant(None)["id"], "insufficient")
+
+    def test_quadrant_follows_recent_120_not_250(self) -> None:
+        dates = pd.bdate_range("2024-01-02", periods=250)
+        market = np.linspace(-0.02, 0.03, 250)
+        asset = np.empty(250)
+        asset[:130] = 2.2 * market[:130]
+        asset[130:] = 0.001 + 0.4 * market[130:]
+        both = pd.DataFrame({"asset": asset, "market": market}, index=dates)
+        out = attribute_frame(both)
+        assert out["w120"] is not None and out["w250"] is not None
+        self.assertAlmostEqual(out["w120"]["beta"], 0.4, places=6)
+        self.assertGreater(out["w250"]["beta"], 1.0)
+        self.assertEqual(out["quadrant"]["id"], "high_alpha_low_beta")
+        self.assertEqual(classify_quadrant(out["w250"])["id"], "low_alpha_high_beta")
 
 
 class ServiceTests(unittest.TestCase):

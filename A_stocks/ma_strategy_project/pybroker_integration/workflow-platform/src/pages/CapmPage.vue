@@ -210,7 +210,8 @@ onMounted(() => {
       <h2 class="text-base font-semibold tracking-tight">收益归因 · CAPM</h2>
       <p class="mt-1 text-xs text-muted-foreground">
         用沪深300拆开市场贝塔和超额。主列是最近 250 个交易日，旁边是 120 日。无风险利率按 0。
-        象限按主列划分，主列空着时用 120 日。高 α 要年化 α 为正且 t(α) ≥ 1，高 β 是 β > 1。
+        象限只用最近 120 日的年化 α、t(α) 和 β。高 α 要年化 α 为正且 t(α) ≥ 1，高 β 是 β > 1。
+        250 日数字仍显示，不决定象限。
         这一页只对照，不写入观察池，也不改仓位。
       </p>
     </div>
@@ -282,7 +283,7 @@ onMounted(() => {
                       <p class="text-sm font-medium">{{ row.quadrant }}</p>
                       <p class="text-xs text-muted-foreground">
                         {{ row.quadrantAction }}
-                        <span v-if="row.labelWindow === 120"> · 按 120 日</span>
+                        <span v-if="row.quadrantId !== 'insufficient'"> · 按 120 日</span>
                       </p>
                     </TableCell>
                     <TableCell>
@@ -404,7 +405,7 @@ onMounted(() => {
                       <p class="text-sm font-medium">{{ row.quadrant }}</p>
                       <p class="text-xs text-muted-foreground">
                         {{ row.quadrantAction }}
-                        <span v-if="row.labelWindow === 120"> · 按 120 日</span>
+                        <span v-if="row.quadrantId !== 'insufficient'"> · 按 120 日</span>
                       </p>
                     </TableCell>
                     <TableCell><Badge variant="secondary">{{ row.label }}</Badge></TableCell>
