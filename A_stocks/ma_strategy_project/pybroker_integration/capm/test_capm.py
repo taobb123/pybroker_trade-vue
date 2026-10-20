@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from capm.act import assess_act
 from capm.model import align_returns, attribute_frame, classify_quadrant, fit_window, scenario_label
 from capm.service import sleeves_payload, stocks_payload
-from capm.sources import WATCH_FILES, latest_trading_day, load_books, load_market
+from capm.sources import WATCH_FILES, latest_trading_day, load_books, load_market, load_theme_universe
 from capm_api import router
 
 
@@ -422,10 +422,25 @@ class Vp6UniverseTests(unittest.TestCase):
             watch4.write_text("symbol,stock_name\n000001,平安\n", encoding="utf-8")
             watch6.write_text("symbol,stock_name\n600000,浦发\n", encoding="utf-8")
             before = watch4.read_bytes()
+            mplus = root / "mplus.csv"
+            growth = root / "g46.csv"
+            quality = root / "q.csv"
+            pd.DataFrame(
+                {"symbol": ["000001", "000001"], "stock_name": ["平安", "被覆盖"]}
+            ).to_csv(mplus, index=False, encoding="utf-8-sig")
+            pd.DataFrame(
+                {"股票代码": ["600000", "000001"], "股票名称": ["浦发", "另一名"], "排名": [20, 1]}
+            ).to_csv(growth, index=False, encoding="utf-8-sig")
+            quality.write_text("", encoding="utf-8")
             scan = root / "scan.csv"
             pd.DataFrame(
-                {"symbol": ["000001", "600000"], "stock_name": ["平安", "浦发"]}
-            ).to_csv(scan, index=False)
+                {
+                    "symbol": ["000001", "300001", "300002"],
+                    "stock_name": ["平安", "未确认", "量能"],
+                    "state_code": ["entry", "watch", "entry"],
+                }
+            ).to_csv(scan, index=False, encoding="utf-8-sig")
+            theme_ranks = (mplus, growth, quality, root / "missing_g23.csv")
             dates = list(book_dates[-7:])
             ohlc = pd.DataFrame(
                 {
@@ -452,6 +467,7 @@ class Vp6UniverseTests(unittest.TestCase):
                 bench_path=bench_path,
                 watch_paths=(watch4, watch6),
                 scan_path=scan,
+                theme_rank_paths=theme_ranks,
                 cache_path=root / "bars.csv",
                 fallback_path=root / "missing.csv",
                 ohlc_path=ohlc_path,
@@ -459,11 +475,15 @@ class Vp6UniverseTests(unittest.TestCase):
             )
             self.assertEqual(watch4.read_bytes(), before)
             self.assertEqual(payload["report"]["universe"], "vp6")
-            self.assertEqual(payload["report"]["requested"], 2)
+            self.assertEqual(payload["report"]["requested"], 3)
             by_symbol = {row["symbol"]: row for row in payload["report"]["rows"]}
+            self.assertEqual([row["symbol"] for row in payload["report"]["rows"]], ["000001", "600000", "300002"])
+            self.assertEqual(by_symbol["000001"]["name"], "平安")
             self.assertEqual(by_symbol["000001"]["act_label"], "震仓洗盘")
             self.assertAlmostEqual(by_symbol["000001"]["act_return"], 0.2)
             self.assertEqual(by_symbol["600000"]["act_label"], "无")
+            self.assertEqual(by_symbol["300002"]["act_label"], "无日线")
+            self.assertTrue(any("missing_g23.csv" in note for note in payload["report"]["notes"]))
 
             pasted = stocks_payload(
                 universe="paste",
@@ -471,6 +491,7 @@ class Vp6UniverseTests(unittest.TestCase):
                 bench_path=bench_path,
                 watch_paths=(watch4, watch6),
                 scan_path=scan,
+                theme_rank_paths=theme_ranks,
                 cache_path=root / "bars.csv",
                 fallback_path=root / "missing.csv",
                 ohlc_path=ohlc_path,
@@ -480,6 +501,24 @@ class Vp6UniverseTests(unittest.TestCase):
             self.assertEqual(pasted["report"]["rows"][0]["symbol"], "000001")
             self.assertEqual(pasted["report"]["rows"][0]["act_label"], "震仓洗盘")
             self.assertEqual(watch4.read_bytes(), before)
+
+    def test_theme_tables_keep_every_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codes = [f"{i:06d}" for i in range(1, 21)]
+            rank = root / "q.csv"
+            pd.DataFrame({"symbol": codes, "stock_name": codes, "rank": list(range(1, 21))}).to_csv(
+                rank, index=False, encoding="utf-8-sig"
+            )
+            rows, missing = load_theme_universe((rank,), root / "no_scan.csv")
+            self.assertEqual([item["symbol"] for item in rows], codes)
+            self.assertEqual(missing, ["no_scan.csv"])
+
+    def test_missing_theme_tables_fail_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaises(FileNotFoundError):
+                load_theme_universe((root / "mplus.csv",), root / "scan.csv")
 
 
 class ApiTests(unittest.TestCase):

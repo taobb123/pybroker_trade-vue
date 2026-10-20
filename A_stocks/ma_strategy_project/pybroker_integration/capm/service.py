@@ -23,7 +23,7 @@ from capm.sources import (
     load_closes,
     load_market,
     load_ohlc,
-    load_vp6,
+    load_theme_universe,
     load_watch,
     nav_to_returns,
     parse_symbols,
@@ -63,6 +63,7 @@ def stocks_payload(
     bench_path: Path | None = None,
     watch_paths: tuple[Path, ...] | None = None,
     scan_path: Path | None = None,
+    theme_rank_paths: tuple[Path, ...] | None = None,
     cache_path: Path | None = None,
     fallback_path: Path | None = None,
     ohlc_path: Path | None = None,
@@ -75,7 +76,9 @@ def stocks_payload(
 ) -> dict:
     try:
         market = load_market(bench_path)
-        picked, truncated, names = _resolve_universe(universe, symbols, watch_paths, scan_path)
+        picked, truncated, names, missing = _resolve_universe(
+            universe, symbols, watch_paths, scan_path, theme_rank_paths
+        )
     except (FileNotFoundError, ValueError) as exc:
         return _empty(str(exc))
     if not picked:
@@ -114,6 +117,10 @@ def stocks_payload(
         "主力表演读最近 10 个交易日的量价组合，日线写在 capm/cache/ohlc.csv。",
         f"本次请求 {len(picked)} 只，其中 {ready} 只能做出 120 日或 250 日窗口。",
     ]
+    if _universe_name(universe) == "vp6":
+        extra.append("个股名单来自形态建仓和回测对比的题材全表，不按排名截取。")
+        if missing:
+            extra.append("未读到：" + "、".join(missing))
     if truncated:
         extra.append(f"粘贴代码超过 {SYMBOL_LIMIT} 只，只取前 {SYMBOL_LIMIT} 只。")
     if horizon:
@@ -192,23 +199,30 @@ def _resolve_universe(
     symbols: str,
     watch_paths: tuple[Path, ...] | None,
     scan_path: Path | None,
-) -> tuple[list[str], bool, dict[str, str]]:
+    theme_rank_paths: tuple[Path, ...] | None,
+) -> tuple[list[str], bool, dict[str, str], list[str]]:
     if universe == "paste":
         codes, truncated = parse_symbols(symbols, SYMBOL_LIMIT)
-        names = _known_names(watch_paths, scan_path)
-        return codes, truncated, names
+        names, _missing = _known_names(watch_paths, scan_path, theme_rank_paths)
+        return codes, truncated, names, []
     if universe == "watch46":
         watch = load_watch(watch_paths)
-        return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}
-    scanned = load_vp6(scan_path)
-    return [item["symbol"] for item in scanned], False, {item["symbol"]: item["stock_name"] for item in scanned}
+        return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}, []
+    scanned, missing = load_theme_universe(theme_rank_paths, scan_path)
+    return [item["symbol"] for item in scanned], False, {item["symbol"]: item["stock_name"] for item in scanned}, missing
 
 
-def _known_names(watch_paths: tuple[Path, ...] | None, scan_path: Path | None) -> dict[str, str]:
+def _known_names(
+    watch_paths: tuple[Path, ...] | None,
+    scan_path: Path | None,
+    theme_rank_paths: tuple[Path, ...] | None,
+) -> tuple[dict[str, str], list[str]]:
     names: dict[str, str] = {}
+    missing: list[str] = []
     try:
-        for item in load_vp6(scan_path):
-            names[item["symbol"]] = item["stock_name"]
+        for item in load_theme_universe(theme_rank_paths, scan_path)[0]:
+            if item["stock_name"]:
+                names[item["symbol"]] = item["stock_name"]
     except (FileNotFoundError, ValueError):
         names = {}
     try:
@@ -217,7 +231,7 @@ def _known_names(watch_paths: tuple[Path, ...] | None, scan_path: Path | None) -
                 names[item["symbol"]] = item["stock_name"]
     except FileNotFoundError:
         pass
-    return names
+    return names, missing
 
 
 def _universe_name(universe: str) -> str:

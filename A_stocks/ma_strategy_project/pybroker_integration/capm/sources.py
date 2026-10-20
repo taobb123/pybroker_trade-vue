@@ -21,6 +21,15 @@ WATCH_FILES = (
     PROJECT_ROOT / "vp_combo_watch_4.csv",
     PROJECT_ROOT / "vp_combo_watch_6.csv",
 )
+THEME_RANK_FILES = (
+    PROJECT_ROOT / "pattern_entry_mplus_rank.csv",
+    PROJECT_ROOT / "pattern_entry_g_rank.csv",
+    PROJECT_ROOT / "vp_combo_23_q_rank.csv",
+    PROJECT_ROOT / "vp_combo_23_g_rank.csv",
+)
+PATTERN_SCAN = PROJECT_ROOT / "pattern_entry_scan.csv"
+_CODE_COLUMNS = ("symbol", "股票代码", "代码")
+_NAME_COLUMNS = ("stock_name", "股票名称", "名称")
 
 SLEEVES = ("W2+W3", "W4+W6", "M+", "Q", "G")
 GROUP_COLUMNS = ("W2+W3", "W4+W6")
@@ -202,6 +211,106 @@ def load_watch(paths: tuple[Path, ...] | None = None) -> list[dict[str, str]]:
     if not found:
         raise FileNotFoundError("缺少观察池 vp_combo_watch_4.csv / vp_combo_watch_6.csv")
     return rows
+
+
+def load_theme_universe(
+    rank_paths: tuple[Path, ...] | None = None,
+    scan_path: Path | None = None,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """形态建仓与回测对比的题材全表。排名表不截前 N，量能只留确认建仓。"""
+    ranks = rank_paths if rank_paths is not None else THEME_RANK_FILES
+    scan = Path(scan_path) if scan_path is not None else PATTERN_SCAN
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    missing: list[str] = []
+    found = False
+    for path in (*ranks, scan):
+        frame = _read_symbol_table(path)
+        if frame is None:
+            if path.is_file():
+                found = True
+            else:
+                missing.append(path.name)
+            continue
+        found = True
+        for item in _symbol_rows(frame, entry_only=path == scan):
+            if item["symbol"] in seen:
+                continue
+            seen.add(item["symbol"])
+            rows.append(item)
+    if not found:
+        raise FileNotFoundError(
+            "缺少形态建仓和回测对比的题材全表：" + "、".join(missing or [p.name for p in (*ranks, scan)])
+        )
+    if not rows:
+        raise ValueError("形态建仓和回测对比的题材全表里没有股票")
+    return rows, missing
+
+
+def _read_symbol_table(path: Path) -> pd.DataFrame | None:
+    if not path.is_file():
+        return None
+    try:
+        frame = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+    except pd.errors.EmptyDataError:
+        return None
+    except UnicodeDecodeError:
+        frame = pd.read_csv(path, dtype=str, encoding="utf-8")
+    if frame is None or frame.empty or len(frame.columns) == 0:
+        return None
+    return frame
+
+
+def _named_column(frame: pd.DataFrame, names: tuple[str, ...]) -> str | None:
+    lookup = {str(col).strip(): col for col in frame.columns}
+    for name in names:
+        if name in lookup:
+            return str(lookup[name])
+    return None
+
+
+def _symbol_rows(frame: pd.DataFrame, *, entry_only: bool) -> list[dict[str, str]]:
+    code_col = _named_column(frame, _CODE_COLUMNS)
+    if code_col is None:
+        return []
+    name_col = _named_column(frame, _NAME_COLUMNS)
+    state_code = _named_column(frame, ("state_code",))
+    select_tag = _named_column(frame, ("select_tag",))
+    state = _named_column(frame, ("state",))
+    entry = _named_column(frame, ("entry",))
+    rows: list[dict[str, str]] = []
+    for _, record in frame.iterrows():
+        if entry_only and not _confirmed_entry(record, state_code, select_tag, state, entry):
+            continue
+        code = _code(record.get(code_col))
+        if not code:
+            continue
+        name = ""
+        if name_col is not None:
+            raw = record.get(name_col)
+            name = "" if pd.isna(raw) else str(raw).strip()
+            if name.lower() in {"nan", "none"}:
+                name = ""
+        rows.append({"symbol": code, "stock_name": name})
+    return rows
+
+
+def _confirmed_entry(
+    record: pd.Series,
+    state_code: str | None,
+    select_tag: str | None,
+    state: str | None,
+    entry: str | None,
+) -> bool:
+    if state_code is not None:
+        return str(record.get(state_code) or "").strip().lower() == "entry"
+    if select_tag is not None:
+        return str(record.get(select_tag) or "").strip() == "待选后通过"
+    if state is not None:
+        return str(record.get(state) or "").strip() == "建仓"
+    if entry is not None:
+        return str(record.get(entry) or "").strip().lower() in {"1", "true", "yes", "y"}
+    return False
 
 
 def load_vp6(path: Path | None = None) -> list[dict[str, str]]:
