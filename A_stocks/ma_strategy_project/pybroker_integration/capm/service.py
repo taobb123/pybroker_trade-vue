@@ -8,20 +8,28 @@ from typing import Callable
 
 import pandas as pd
 
+from capm.act import NO_BARS, act_from_frame, phase1_combo_id
 from capm.model import NOTES, PRIMARY_WINDOW, align_returns, as_jsonable, attribute_frame
 from capm.sources import (
     BARS_CACHE,
     BARS_FALLBACK,
+    BENCH_CACHE,
     FETCH_PAD_START,
+    OHLC_CACHE,
     SLEEVES,
+    closes_to_returns,
     fetch_closes,
     load_books,
     load_closes,
     load_market,
+    load_ohlc,
+    load_vp6,
     load_watch,
+    nav_to_returns,
     parse_symbols,
+    store_benchmark,
     store_closes,
-    closes_to_returns,
+    store_ohlc,
     _code,
 )
 
@@ -49,50 +57,102 @@ def sleeves_payload(
 
 def stocks_payload(
     *,
-    universe: str = "watch46",
+    universe: str = "vp6",
     symbols: str = "",
     refresh: bool = False,
     bench_path: Path | None = None,
     watch_paths: tuple[Path, ...] | None = None,
+    scan_path: Path | None = None,
     cache_path: Path | None = None,
     fallback_path: Path | None = None,
+    ohlc_path: Path | None = None,
     fetcher: Callable[[list[str], str, str], pd.DataFrame] | None = None,
+    ohlc_fetcher: Callable[[list[str], str, str], pd.DataFrame] | None = None,
+    classify: Callable[[pd.DataFrame], int | None] | None = None,
+    session_end: str | None = None,
+    bench_fetcher: Callable[[str, str], pd.DataFrame] | None = None,
+    bench_cache: Path | None = None,
 ) -> dict:
     try:
         market = load_market(bench_path)
-        picked, truncated, names = _resolve_universe(universe, symbols, watch_paths)
+        picked, truncated, names = _resolve_universe(universe, symbols, watch_paths, scan_path)
     except (FileNotFoundError, ValueError) as exc:
         return _empty(str(exc))
     if not picked:
         return _empty("没有可计算的股票代码")
     cache = Path(cache_path or BARS_CACHE)
     fallback = Path(fallback_path) if fallback_path is not None else BARS_FALLBACK
+    ohlc_cache = Path(ohlc_path or OHLC_CACHE)
     note = ""
+    bench_note = ""
+    horizon = session_end if refresh else None
+    if refresh and horizon and bench_fetcher is not None:
+        market, bench_note = _extend_market(market, horizon, bench_fetcher, Path(bench_cache or BENCH_CACHE))
     if refresh:
-        note = _refresh_missing(picked, market, cache, fallback, fetcher or fetch_closes)
+        note = _refresh_missing(picked, market, cache, fallback, fetcher or fetch_closes, horizon=horizon)
+        if ohlc_fetcher is not None:
+            act_note = _refresh_act_bars(picked, market, ohlc_cache, ohlc_fetcher, horizon=horizon)
+            note = f"{note} {act_note}".strip()
     closes = load_closes(set(picked), cache_path=cache, fallback_path=fallback)
     returns = closes_to_returns(closes)
-    rows = [
-        _row(names.get(code) or code, returns.get(code, pd.Series(dtype=float)), market, symbol=code, stock_name=names.get(code, ""))
-        for code in picked
-    ]
+    acts = _acts(picked, load_ohlc(set(picked), cache_path=ohlc_cache), classify or phase1_combo_id)
+    rows = []
+    for code in picked:
+        row = _row(
+            names.get(code) or code,
+            returns.get(code, pd.Series(dtype=float)),
+            market,
+            symbol=code,
+            stock_name=names.get(code, ""),
+        )
+        row.update(acts.get(code, _blank_act()))
+        rows.append(row)
     ready = sum(1 for row in rows if row["w250"] or row["w120"])
     extra = [
-        "个股先用本地日线。缓存写在 capm/cache/bars.csv，没有再读已有的 bars.csv。",
+        "个股先用本地日线。收盘缓存写在 capm/cache/bars.csv，没有再读已有的 bars.csv。",
         "补齐只补本地对不齐主窗口的代码，并只写入这份缓存。",
+        "主力表演读最近 10 个交易日的量价组合，日线写在 capm/cache/ohlc.csv。",
         f"本次请求 {len(picked)} 只，其中 {ready} 只能做出 120 日或 250 日窗口。",
     ]
     if truncated:
         extra.append(f"粘贴代码超过 {SYMBOL_LIMIT} 只，只取前 {SYMBOL_LIMIT} 只。")
+    if horizon:
+        extra.append(f"本次补齐请求截止 {horizon}，按最近一个已收盘交易日。表上的区间终点是对齐后实际拿到的最后一天。")
+    if bench_note:
+        extra.insert(0, bench_note)
     if note:
         extra.insert(0, note)
     report = _report(rows, market, extra_notes=tuple(extra))
-    if note:
-        report["message"] = note
-    report["report"]["universe"] = "paste" if universe == "paste" else "watch46"
+    message = " ".join(part for part in (bench_note, note) if part)
+    if message:
+        report["message"] = message
+    report["report"]["universe"] = _universe_name(universe)
     report["report"]["requested"] = len(picked)
     report["report"]["ready"] = ready
     return report
+
+
+def _extend_market(
+    market: pd.Series,
+    horizon: str,
+    fetcher: Callable[[str, str], pd.DataFrame],
+    cache: Path,
+) -> tuple[pd.Series, str]:
+    target = pd.Timestamp(horizon).normalize()
+    if len(market) and pd.Timestamp(market.index.max()).normalize() >= target:
+        return market, ""
+    start = pd.Timestamp(market.index.max()).date().isoformat() if len(market) else FETCH_PAD_START
+    fresh = fetcher(start, target.date().isoformat())
+    if fresh is None or fresh.empty:
+        last = pd.Timestamp(market.index.max()).date().isoformat() if len(market) else "空"
+        return market, f"沪深300没有补到 {target.date().isoformat()}，窗口仍停在 {last}。"
+    store_benchmark(fresh, cache)
+    extra = nav_to_returns(fresh)
+    merged = pd.concat([market, extra])
+    merged = merged[~merged.index.duplicated(keep="last")].sort_index()
+    merged = merged.replace([float("inf"), float("-inf")], pd.NA).dropna()
+    last = pd.Timestamp(merged.index.max()).date().isoformat() if len(merged) else target.date().isoformat()
+    return merged, f"沪深300补到 {last}。"
 
 
 def _refresh_missing(
@@ -101,17 +161,24 @@ def _refresh_missing(
     cache: Path,
     fallback: Path,
     fetcher: Callable[[list[str], str, str], pd.DataFrame],
+    horizon: str | None = None,
 ) -> str:
     closes = load_closes(set(symbols), cache_path=cache, fallback_path=fallback)
     returns = closes_to_returns(closes)
+    target = pd.Timestamp(horizon).normalize() if horizon else None
     need = []
     for code in symbols:
-        both = align_returns(returns.get(code, pd.Series(dtype=float)), market)
-        if len(both) < PRIMARY_WINDOW:
+        series = returns.get(code, pd.Series(dtype=float))
+        both = align_returns(series, market)
+        last = pd.Timestamp(series.index.max()).normalize() if len(series) else None
+        stale = target is not None and (last is None or last < target)
+        if len(both) < PRIMARY_WINDOW or stale:
             need.append(code)
     if not need:
+        if target is not None:
+            return f"本地日线已覆盖到 {target.date().isoformat()}，未再请求行情。"
         return "本地日线已覆盖 250 日窗口，未再请求行情。"
-    end = pd.Timestamp(market.index.max()).date().isoformat()
+    end = target.date().isoformat() if target is not None else pd.Timestamp(market.index.max()).date().isoformat()
     fresh = fetcher(need, FETCH_PAD_START, end)
     if fresh is None or fresh.empty:
         return f"有 {len(need)} 只不足 250 日，本次没有补到新日线。"
@@ -124,18 +191,91 @@ def _resolve_universe(
     universe: str,
     symbols: str,
     watch_paths: tuple[Path, ...] | None,
+    scan_path: Path | None,
 ) -> tuple[list[str], bool, dict[str, str]]:
     if universe == "paste":
         codes, truncated = parse_symbols(symbols, SYMBOL_LIMIT)
-        names = {}
-        try:
-            for item in load_watch(watch_paths):
-                names[item["symbol"]] = item["stock_name"]
-        except FileNotFoundError:
-            names = {}
+        names = _known_names(watch_paths, scan_path)
         return codes, truncated, names
-    watch = load_watch(watch_paths)
-    return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}
+    if universe == "watch46":
+        watch = load_watch(watch_paths)
+        return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}
+    scanned = load_vp6(scan_path)
+    return [item["symbol"] for item in scanned], False, {item["symbol"]: item["stock_name"] for item in scanned}
+
+
+def _known_names(watch_paths: tuple[Path, ...] | None, scan_path: Path | None) -> dict[str, str]:
+    names: dict[str, str] = {}
+    try:
+        for item in load_vp6(scan_path):
+            names[item["symbol"]] = item["stock_name"]
+    except (FileNotFoundError, ValueError):
+        names = {}
+    try:
+        for item in load_watch(watch_paths):
+            if item["stock_name"]:
+                names[item["symbol"]] = item["stock_name"]
+    except FileNotFoundError:
+        pass
+    return names
+
+
+def _universe_name(universe: str) -> str:
+    if universe == "paste":
+        return "paste"
+    if universe == "watch46":
+        return "watch46"
+    return "vp6"
+
+
+def _blank_act() -> dict:
+    return {"act_label": NO_BARS, "act_return": None, "act_end": None}
+
+
+def _acts(
+    symbols: list[str],
+    ohlc: pd.DataFrame,
+    classify: Callable[[pd.DataFrame], int | None],
+) -> dict[str, dict]:
+    grouped = {}
+    if ohlc is not None and not ohlc.empty:
+        grouped = {str(symbol): part for symbol, part in ohlc.groupby("symbol", sort=False)}
+    out = {}
+    for code in symbols:
+        part = grouped.get(code)
+        if part is None or len(part) < 2:
+            out[code] = _blank_act()
+            continue
+        out[code] = act_from_frame(part, classify)
+    return out
+
+
+def _refresh_act_bars(
+    symbols: list[str],
+    market: pd.Series,
+    cache: Path,
+    fetcher: Callable[[list[str], str, str], pd.DataFrame],
+    horizon: str | None = None,
+) -> str:
+    have = load_ohlc(set(symbols), cache_path=cache)
+    counts = have.groupby("symbol").size().to_dict() if not have.empty else {}
+    last_map = have.groupby("symbol")["date"].max().to_dict() if not have.empty else {}
+    target = pd.Timestamp(horizon).normalize() if horizon else None
+    need = []
+    for code in symbols:
+        last = last_map.get(code)
+        stale = target is not None and (last is None or pd.Timestamp(last).normalize() < target)
+        if int(counts.get(code, 0)) < 75 or stale:
+            need.append(code)
+    if not need:
+        return "主力表演日线已覆盖最近窗口，未再请求行情。"
+    end = target.date().isoformat() if target is not None else pd.Timestamp(market.index.max()).date().isoformat()
+    fresh = fetcher(need, FETCH_PAD_START, end)
+    if fresh is None or fresh.empty:
+        return f"有 {len(need)} 只没有主力表演日线，本次没有补到。"
+    store_ohlc(fresh, cache)
+    got = {code for code in (_code(item) for item in fresh["symbol"]) if code}
+    return f"主力表演日线请求 {len(need)} 只，写入缓存 {len(got)} 只。"
 
 
 def _row(

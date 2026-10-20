@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -13,6 +14,9 @@ GROUP_CSV = PROJECT_ROOT / "output" / "h0_w23_w46" / "group_returns.csv"
 SLEEVE_CSV = PROJECT_ROOT / "output" / "doc15_sleeves" / "sleeve_returns.csv"
 BARS_FALLBACK = PROJECT_ROOT / "output" / "h0_w23_w46" / "bars.csv"
 BARS_CACHE = PROJECT_ROOT / "capm" / "cache" / "bars.csv"
+OHLC_CACHE = PROJECT_ROOT / "capm" / "cache" / "ohlc.csv"
+BENCH_CACHE = PROJECT_ROOT / "capm" / "cache" / "benchmark.csv"
+VP6_SCAN = PROJECT_ROOT / "vp_six_combo_scan.csv"
 WATCH_FILES = (
     PROJECT_ROOT / "vp_combo_watch_4.csv",
     PROJECT_ROOT / "vp_combo_watch_6.csv",
@@ -24,24 +28,126 @@ SLEEVE_COLUMNS = ("M+", "Q", "G")
 FETCH_PAD_START = "2025-06-01"
 
 
-def load_market(path: Path | None = None) -> pd.Series:
+def nav_to_returns(frame: pd.DataFrame) -> pd.Series:
+    if "date" not in frame.columns or "equity" not in frame.columns:
+        raise ValueError("沪深300净值缺少 date 或 equity")
+    work = frame
+    if "variant" in work.columns:
+        mask = work["variant"].astype(str).str.contains("300", na=False)
+        if bool(mask.any()):
+            work = work.loc[mask]
+    work = work.copy()
+    work["date"] = pd.to_datetime(work["date"], errors="coerce").dt.normalize()
+    work["equity"] = pd.to_numeric(work["equity"], errors="coerce")
+    work = work.dropna(subset=["date", "equity"]).sort_values("date")
+    returns = work["equity"].pct_change()
+    out = pd.Series(returns.to_numpy(), index=work["date"])
+    out = out[~out.index.duplicated(keep="last")]
+    return out.replace([float("inf"), float("-inf")], pd.NA).dropna()
+
+
+def load_market(path: Path | None = None, cache_path: Path | None = None) -> pd.Series:
     file = Path(path or BENCH_CSV)
     if not file.is_file():
         raise FileNotFoundError("缺少沪深300净值 benchmark_nav.csv")
-    frame = pd.read_csv(file)
-    if "date" not in frame.columns or "equity" not in frame.columns:
-        raise ValueError("沪深300净值缺少 date 或 equity")
-    if "variant" in frame.columns:
-        mask = frame["variant"].astype(str).str.contains("300", na=False)
-        if bool(mask.any()):
-            frame = frame.loc[mask]
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
-    frame["equity"] = pd.to_numeric(frame["equity"], errors="coerce")
-    frame = frame.dropna(subset=["date", "equity"]).sort_values("date")
-    returns = frame["equity"].pct_change()
-    out = pd.Series(returns.to_numpy(), index=frame["date"])
-    out = out[~out.index.duplicated(keep="last")]
-    return out.replace([float("inf"), float("-inf")], pd.NA).dropna()
+    series = nav_to_returns(pd.read_csv(file))
+    cache = Path(cache_path) if cache_path is not None else (None if path is not None else BENCH_CACHE)
+    if cache is not None and cache.is_file():
+        try:
+            extra = nav_to_returns(pd.read_csv(cache))
+        except (OSError, ValueError):
+            extra = pd.Series(dtype=float)
+        if not extra.empty:
+            series = pd.concat([series, extra])
+            series = series[~series.index.duplicated(keep="last")].sort_index()
+    return series
+
+
+def latest_trading_day(now: datetime | None = None, opens: list | None = None) -> str:
+    """最近一个已收盘的交易日。15:05 前不用当天，避免日线还没出来。"""
+    moment = now or datetime.now()
+    cutoff = moment.replace(hour=15, minute=5, second=0, microsecond=0)
+    day = pd.Timestamp(moment).normalize()
+    if moment < cutoff:
+        day -= pd.Timedelta(days=1)
+    sessions = opens if opens is not None else _fetch_open_days(day - pd.Timedelta(days=30), day)
+    if sessions:
+        eligible = sorted(pd.Timestamp(item).normalize() for item in sessions if pd.Timestamp(item).normalize() <= day)
+        if eligible:
+            return eligible[-1].date().isoformat()
+    while int(day.weekday()) >= 5:
+        day -= pd.Timedelta(days=1)
+    return day.date().isoformat()
+
+
+def _fetch_open_days(start: pd.Timestamp, end: pd.Timestamp) -> list:
+    try:
+        from market_radar import get_tushare_bundle
+
+        _, pro = get_tushare_bundle()
+        cal = pro.trade_cal(
+            exchange="SSE",
+            start_date=pd.Timestamp(start).strftime("%Y%m%d"),
+            end_date=pd.Timestamp(end).strftime("%Y%m%d"),
+            is_open="1",
+        )
+    except Exception:
+        return []
+    if cal is None or getattr(cal, "empty", True) or "cal_date" not in cal.columns:
+        return []
+    dates = pd.to_datetime(cal["cal_date"].astype(str), format="%Y%m%d", errors="coerce")
+    return [item for item in dates.dropna().dt.normalize().tolist()]
+
+
+def fetch_benchmark(start: str, end: str) -> pd.DataFrame:
+    """补沪深300收盘。失败时返回空表，不改市场中性回测产物。"""
+    empty = pd.DataFrame(columns=["date", "equity", "variant"])
+    try:
+        from market_radar import get_tushare_bundle
+
+        _, pro = get_tushare_bundle()
+        raw = pro.index_daily(
+            ts_code="000300.SH",
+            start_date=pd.Timestamp(start).strftime("%Y%m%d"),
+            end_date=pd.Timestamp(end).strftime("%Y%m%d"),
+        )
+    except Exception:
+        return empty
+    if raw is None or raw.empty or "trade_date" not in raw.columns or "close" not in raw.columns:
+        return empty
+    frame = pd.DataFrame(
+        {
+            "date": pd.to_datetime(raw["trade_date"].astype(str), format="%Y%m%d", errors="coerce"),
+            "equity": pd.to_numeric(raw["close"], errors="coerce"),
+            "variant": "沪深300",
+        }
+    )
+    return frame.dropna(subset=["date", "equity"])
+
+
+def store_benchmark(rows: pd.DataFrame, cache_path: Path) -> None:
+    if rows is None or rows.empty or "date" not in rows.columns:
+        return
+    fresh = rows.copy()
+    if "equity" not in fresh.columns and "close" in fresh.columns:
+        fresh["equity"] = fresh["close"]
+    if "equity" not in fresh.columns:
+        return
+    fresh["date"] = pd.to_datetime(fresh["date"], errors="coerce").dt.normalize()
+    fresh["equity"] = pd.to_numeric(fresh["equity"], errors="coerce")
+    fresh["variant"] = "沪深300"
+    fresh = fresh.dropna(subset=["date", "equity"])
+    if fresh.empty:
+        return
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if cache_path.is_file():
+        old = pd.read_csv(cache_path)
+        merged = pd.concat([old, fresh[["date", "equity", "variant"]]], ignore_index=True)
+    else:
+        merged = fresh[["date", "equity", "variant"]]
+    merged["date"] = pd.to_datetime(merged["date"], errors="coerce").dt.normalize()
+    merged = merged.dropna(subset=["date", "equity"]).drop_duplicates(["date"], keep="last")
+    merged.sort_values("date").to_csv(cache_path, index=False, encoding="utf-8-sig")
 
 
 def load_books(
@@ -96,6 +202,106 @@ def load_watch(paths: tuple[Path, ...] | None = None) -> list[dict[str, str]]:
     if not found:
         raise FileNotFoundError("缺少观察池 vp_combo_watch_4.csv / vp_combo_watch_6.csv")
     return rows
+
+
+def load_vp6(path: Path | None = None) -> list[dict[str, str]]:
+    file = Path(path or VP6_SCAN)
+    if not file.is_file():
+        raise FileNotFoundError("缺少量价六组合分类结果 vp_six_combo_scan.csv")
+    frame = pd.read_csv(file, dtype={"symbol": str})
+    if "symbol" not in frame.columns:
+        raise ValueError("vp_six_combo_scan.csv 缺少 symbol")
+    names = frame["stock_name"] if "stock_name" in frame.columns else ""
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for symbol, name in zip(frame["symbol"], names):
+        code = _code(symbol)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        rows.append({"symbol": code, "stock_name": "" if pd.isna(name) else str(name)})
+    return rows
+
+
+def load_ohlc(
+    symbols: set[str],
+    *,
+    cache_path: Path | None = None,
+) -> pd.DataFrame:
+    file = Path(cache_path or OHLC_CACHE)
+    columns = ["date", "symbol", "high", "low", "close", "volume"]
+    if not file.is_file():
+        return pd.DataFrame(columns=columns)
+    frame = pd.read_csv(file, dtype={"symbol": str})
+    if not set(columns).issubset(frame.columns):
+        return pd.DataFrame(columns=columns)
+    frame = frame[columns].copy()
+    frame["symbol"] = frame["symbol"].map(_code)
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    for col in ("high", "low", "close", "volume"):
+        frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    frame = frame.dropna(subset=["symbol", "date", "high", "low", "close", "volume"])
+    frame = frame[frame["symbol"].isin(symbols)]
+    return frame.drop_duplicates(["symbol", "date"], keep="last").sort_values(["symbol", "date"])
+
+
+def store_ohlc(new_rows: pd.DataFrame, cache_path: Path) -> None:
+    needed = {"date", "symbol", "high", "low", "close", "volume"}
+    if new_rows is None or new_rows.empty or not needed.issubset(new_rows.columns):
+        return
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    fresh = new_rows[list(needed)].copy()
+    fresh["symbol"] = fresh["symbol"].map(_code)
+    fresh["date"] = pd.to_datetime(fresh["date"], errors="coerce").dt.normalize()
+    for col in ("high", "low", "close", "volume"):
+        fresh[col] = pd.to_numeric(fresh[col], errors="coerce")
+    fresh = fresh.dropna(subset=["symbol", "date", "high", "low", "close", "volume"])
+    if fresh.empty:
+        return
+    if cache_path.is_file():
+        old = load_ohlc(set(fresh["symbol"]).union(_cached_symbols(cache_path)), cache_path=cache_path)
+        merged = pd.concat([old, fresh], ignore_index=True)
+    else:
+        merged = fresh
+    merged = merged.drop_duplicates(["symbol", "date"], keep="last")
+    merged.to_csv(cache_path, index=False, encoding="utf-8-sig")
+
+
+def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
+    """补齐主力表演所需的高低收和成交量。失败的代码跳过。"""
+    from backtest_sy_002028_threshold import fetch_ohlc_qfq
+
+    frames: list[pd.DataFrame] = []
+    for index, symbol in enumerate(symbols):
+        try:
+            raw = fetch_ohlc_qfq(symbol, start, end)
+        except Exception:
+            raw = None
+        if raw is not None and not raw.empty and {"date", "high", "low", "close", "volume"}.issubset(raw.columns):
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "date": pd.to_datetime(raw["date"], errors="coerce"),
+                        "symbol": symbol,
+                        "high": pd.to_numeric(raw["high"], errors="coerce"),
+                        "low": pd.to_numeric(raw["low"], errors="coerce"),
+                        "close": pd.to_numeric(raw["close"], errors="coerce"),
+                        "volume": pd.to_numeric(raw["volume"], errors="coerce"),
+                    }
+                )
+            )
+        if index + 1 < len(symbols):
+            time.sleep(0.12)
+    if not frames:
+        return pd.DataFrame(columns=["date", "symbol", "high", "low", "close", "volume"])
+    return pd.concat(frames, ignore_index=True).dropna(subset=["date", "close", "high", "low", "volume"])
+
+
+def _cached_symbols(cache_path: Path) -> set[str]:
+    if not cache_path.is_file():
+        return set()
+    frame = pd.read_csv(cache_path, dtype={"symbol": str}, usecols=["symbol"])
+    return {code for code in frame["symbol"].map(_code) if code}
 
 
 def parse_symbols(text: str, limit: int = 80) -> tuple[list[str], bool]:

@@ -3,6 +3,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_hk_workflow_api.ps1
 
 REPO_DIR=/root/pybroker_trade-vue DEPLOY_BRANCH=main SERVICE_NAME=workflow-api bash /root/pybroker_trade-vue/A_stocks/ma_strategy_project/pybroker_integration/scripts/sync_workflow_api_on_server.sh
 
+
+
+
+
+
+
+
+
+
+
+
+@docs/主力表演识别状态机.md 阅读吸取文档的思路，不需要移植里面的条件参数，也不需要实现完整需求。
+现在的需求是结合系统现有的“量价六组合”形态和状态机监测机制，通过把量价组合有机串联来实现持续监测状态，为了能识别“主力表演”的阶段（所谓主力表演就是主力故意释放前期套牢盘或者震仓洗盘，给后续的拉升做准备的动作），利用量价序列的后期收益和表现来验证前面的对于“主力表演”的识别效果。
+复述需求，与我讨论。
+
+在股市中，一般有散户和 主力的区别，主力在诱骗散户接盘之前，会主动使用手法释放前期套牢盘、洗盘等一些迷惑散户的配合量比的方法，我称之为“主力表演”。现在我如何从量价六组合的形态之中选出“主力表演”阶段？
+
 风险指数
 行业归属并不是股票风险的唯一来源。对一些共同的投资主题的暴露也是股票风险的来源，我们用风险指数因子来衡量它。我们在股票市场识别出的风险指数可以归为以下几个类别。
 波动率。按波动率区分股票。在这个维度中排名较高的股票在历史时期上具有较高的波动率，我们也预期他们在未来仍然保持较高的波动率。

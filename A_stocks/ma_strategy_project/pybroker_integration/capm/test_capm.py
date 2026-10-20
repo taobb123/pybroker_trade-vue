@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -11,9 +12,10 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from capm.act import assess_act
 from capm.model import align_returns, attribute_frame, classify_quadrant, fit_window, scenario_label
 from capm.service import sleeves_payload, stocks_payload
-from capm.sources import WATCH_FILES, load_books, load_market
+from capm.sources import WATCH_FILES, latest_trading_day, load_books, load_market
 from capm_api import router
 
 
@@ -223,6 +225,261 @@ class ServiceTests(unittest.TestCase):
             self.assertTrue(cache.is_file())
             self.assertEqual(watch4.read_text(encoding="utf-8"), before)
             self.assertTrue(any("写入缓存" in note for note in refreshed["report"]["notes"]))
+
+    def test_refresh_rolls_window_to_later_session(self) -> None:
+        bench, book_dates, _asset, market = _market_and_asset(n=260)
+        old_end = pd.Timestamp(book_dates[-1]).normalize()
+        extra = pd.bdate_range(old_end + pd.Timedelta(days=1), periods=4)
+        session_end = extra[-1].date().isoformat()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bench_path = root / "benchmark_nav.csv"
+            bench.to_csv(bench_path, index=False)
+            before = bench_path.read_bytes()
+            watch4 = root / "watch4.csv"
+            watch6 = root / "watch6.csv"
+            watch4.write_text("symbol,stock_name\n000001,平安\n", encoding="utf-8")
+            watch6.write_text("symbol,stock_name\n", encoding="utf-8")
+            closes = pd.DataFrame(
+                {
+                    "date": book_dates,
+                    "symbol": "000001",
+                    "close": 10 * np.cumprod(1.0 + (0.0001 + 0.8 * market)),
+                }
+            )
+            bars = root / "bars.csv"
+            closes.to_csv(bars, index=False)
+
+            def _bench(start, end):
+                self.assertEqual(start, old_end.date().isoformat())
+                self.assertEqual(end, session_end)
+                level = float(bench["equity"].iloc[-1])
+                equity = [level]
+                for _ in extra:
+                    equity.append(equity[-1] * 1.01)
+                return pd.DataFrame(
+                    {"date": [old_end, *list(extra)], "equity": equity, "variant": "沪深300"}
+                )
+
+            def _fill(symbols, start, end):
+                self.assertEqual(symbols, ["000001"])
+                self.assertEqual(end, session_end)
+                dates = list(book_dates) + list(extra)
+                shock = np.resize(0.001, len(dates))
+                return pd.DataFrame(
+                    {
+                        "date": dates,
+                        "symbol": symbols[0],
+                        "close": 10 * np.cumprod(1.0 + shock),
+                    }
+                )
+
+            payload = stocks_payload(
+                universe="watch46",
+                refresh=True,
+                session_end=session_end,
+                bench_path=bench_path,
+                bench_fetcher=_bench,
+                bench_cache=root / "benchmark.csv",
+                watch_paths=(watch4, watch6),
+                cache_path=root / "bars_cache.csv",
+                fallback_path=bars,
+                fetcher=_fill,
+            )
+            self.assertEqual(bench_path.read_bytes(), before)
+            self.assertEqual(payload["report"]["rows"][0]["w250"]["end"], session_end)
+            self.assertIn("沪深300补到", payload["message"])
+
+    def test_failed_benchmark_extension_keeps_the_old_end(self) -> None:
+        bench, book_dates, _asset, market = _market_and_asset(n=260)
+        old_end = pd.Timestamp(book_dates[-1]).date().isoformat()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bench_path = root / "benchmark_nav.csv"
+            bench.to_csv(bench_path, index=False)
+            watch4 = root / "watch4.csv"
+            watch6 = root / "watch6.csv"
+            watch4.write_text("symbol,stock_name\n000001,平安\n", encoding="utf-8")
+            watch6.write_text("symbol,stock_name\n", encoding="utf-8")
+            pd.DataFrame(
+                {
+                    "date": book_dates,
+                    "symbol": "000001",
+                    "close": 10 * np.cumprod(1.0 + market),
+                }
+            ).to_csv(root / "bars.csv", index=False)
+
+            def _empty(_start, _end):
+                return pd.DataFrame(columns=["date", "equity"])
+
+            def _fill(symbols, _start, end):
+                self.assertEqual(end, "2026-10-20")
+                return pd.DataFrame(
+                    {
+                        "date": list(book_dates),
+                        "symbol": symbols[0],
+                        "close": 10 * np.cumprod(1.0 + np.resize(0.001, len(book_dates))),
+                    }
+                )
+
+            payload = stocks_payload(
+                universe="watch46",
+                refresh=True,
+                session_end="2026-10-20",
+                bench_path=bench_path,
+                bench_fetcher=_empty,
+                bench_cache=root / "benchmark.csv",
+                watch_paths=(watch4, watch6),
+                cache_path=root / "bars_cache.csv",
+                fallback_path=root / "bars.csv",
+                fetcher=_fill,
+            )
+            self.assertEqual(payload["report"]["rows"][0]["w250"]["end"], old_end)
+            self.assertIn("窗口仍停在", payload["message"])
+
+
+class SessionTests(unittest.TestCase):
+    def test_latest_session_uses_last_close(self) -> None:
+        self.assertEqual(latest_trading_day(datetime(2026, 10, 17, 16, 0), opens=[]), "2026-10-16")
+        self.assertEqual(
+            latest_trading_day(datetime(2026, 10, 20, 10, 0), opens=["2026-10-19", "2026-10-20"]),
+            "2026-10-19",
+        )
+        self.assertEqual(
+            latest_trading_day(datetime(2026, 10, 20, 16, 0), opens=["2026-10-19", "2026-10-20"]),
+            "2026-10-20",
+        )
+        self.assertEqual(
+            latest_trading_day(datetime(2026, 10, 8, 16, 0), opens=["2026-09-30", "2026-10-09"]),
+            "2026-09-30",
+        )
+
+    def test_benchmark_cache_does_not_jump_at_the_join(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "base.csv"
+            cache = root / "cache.csv"
+            pd.DataFrame(
+                {"date": ["2026-09-23", "2026-09-24"], "equity": [1.0, 1.1], "variant": "沪深300"}
+            ).to_csv(base, index=False)
+            pd.DataFrame(
+                {"date": ["2026-09-24", "2026-09-25"], "equity": [4000.0, 4040.0], "variant": "沪深300"}
+            ).to_csv(cache, index=False)
+            series = load_market(base, cache_path=cache)
+            self.assertAlmostEqual(float(series.loc[pd.Timestamp("2026-09-24")]), 0.1, places=8)
+            self.assertAlmostEqual(float(series.loc[pd.Timestamp("2026-09-25")]), 0.01, places=8)
+
+
+class ActTests(unittest.TestCase):
+    def test_wash_completes_on_first_three_and_uses_three_day_return(self) -> None:
+        found = assess_act([4, 4, 4, 3, 1, 1, 1], [10, 10, 10, 10, 11, 12, 13])
+        self.assertEqual(found["label"], "震仓洗盘")
+        self.assertAlmostEqual(found["ret"], 0.3)
+        self.assertEqual(found["end_index"], 3)
+
+    def test_release_returns_to_shrink_after_one_risk_day(self) -> None:
+        found = assess_act([4, 5, 3, 1, 1, 1], [10, 10, 10, 10, 10, 12])
+        self.assertEqual(found["label"], "释放套牢盘")
+        self.assertEqual(found["end_index"], 2)
+        self.assertAlmostEqual(found["ret"], 0.2)
+
+    def test_two_risk_days_break_the_path(self) -> None:
+        self.assertEqual(assess_act([4, 5, 6], [10, 10, 9])["label"], "打断")
+        self.assertEqual(assess_act([2, 3, 5, 6], [10, 10, 10, 9])["label"], "打断")
+        self.assertIsNone(assess_act([3, 5, 6], [10, 10, 9])["ret"])
+
+    def test_open_path_has_no_return(self) -> None:
+        found = assess_act([2, 2, 4], [10, 10, 10])
+        self.assertEqual(found["label"], "未走完")
+        self.assertIsNone(found["ret"])
+
+    def test_quiet_tape_is_empty(self) -> None:
+        self.assertEqual(assess_act([1, 1, 1], [10, 10, 10])["label"], "无")
+
+    def test_single_risk_day_between_two_and_three_is_release(self) -> None:
+        self.assertEqual(assess_act([2, 5, 3], [10, 9, 10])["label"], "释放套牢盘")
+
+    def test_return_stays_empty_until_three_sessions(self) -> None:
+        found = assess_act([4, 3], [10, 10])
+        self.assertEqual(found["label"], "震仓洗盘")
+        self.assertIsNone(found["ret"])
+
+    def test_only_the_latest_ten_sessions_count(self) -> None:
+        ids = [4, 3, 1, 1, 1] + [1] * 10
+        found = assess_act(ids, [10.0] * len(ids))
+        self.assertEqual(found["label"], "无")
+
+
+class Vp6UniverseTests(unittest.TestCase):
+    def test_scan_universe_keeps_paste_and_does_not_touch_watch(self) -> None:
+        bench, book_dates, _asset, market = _market_and_asset(n=80)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bench_path = root / "benchmark_nav.csv"
+            bench.to_csv(bench_path, index=False)
+            watch4 = root / "watch4.csv"
+            watch6 = root / "watch6.csv"
+            watch4.write_text("symbol,stock_name\n000001,平安\n", encoding="utf-8")
+            watch6.write_text("symbol,stock_name\n600000,浦发\n", encoding="utf-8")
+            before = watch4.read_bytes()
+            scan = root / "scan.csv"
+            pd.DataFrame(
+                {"symbol": ["000001", "600000"], "stock_name": ["平安", "浦发"]}
+            ).to_csv(scan, index=False)
+            dates = list(book_dates[-7:])
+            ohlc = pd.DataFrame(
+                {
+                    "date": dates + dates,
+                    "symbol": ["000001"] * 7 + ["600000"] * 7,
+                    "high": [10] * 14,
+                    "low": [9] * 14,
+                    "close": [10, 10, 10, 10, 11, 12, 13, 8, 8, 8, 8, 8, 8, 8],
+                    "volume": [100] * 14,
+                    "combo_id": [4, 4, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                }
+            )
+            ohlc_path = root / "ohlc.csv"
+            ohlc.drop(columns=["combo_id"]).to_csv(ohlc_path, index=False)
+
+            def _classify(hist: pd.DataFrame) -> int:
+                day = pd.Timestamp(hist.iloc[-1]["date"]).normalize()
+                code = str(hist.iloc[-1]["symbol"])
+                matched = ohlc[(ohlc["symbol"] == code) & (pd.to_datetime(ohlc["date"]).dt.normalize() == day)]
+                return int(matched.iloc[-1]["combo_id"])
+
+            payload = stocks_payload(
+                universe="vp6",
+                bench_path=bench_path,
+                watch_paths=(watch4, watch6),
+                scan_path=scan,
+                cache_path=root / "bars.csv",
+                fallback_path=root / "missing.csv",
+                ohlc_path=ohlc_path,
+                classify=_classify,
+            )
+            self.assertEqual(watch4.read_bytes(), before)
+            self.assertEqual(payload["report"]["universe"], "vp6")
+            self.assertEqual(payload["report"]["requested"], 2)
+            by_symbol = {row["symbol"]: row for row in payload["report"]["rows"]}
+            self.assertEqual(by_symbol["000001"]["act_label"], "震仓洗盘")
+            self.assertAlmostEqual(by_symbol["000001"]["act_return"], 0.2)
+            self.assertEqual(by_symbol["600000"]["act_label"], "无")
+
+            pasted = stocks_payload(
+                universe="paste",
+                symbols="000001",
+                bench_path=bench_path,
+                watch_paths=(watch4, watch6),
+                scan_path=scan,
+                cache_path=root / "bars.csv",
+                fallback_path=root / "missing.csv",
+                ohlc_path=ohlc_path,
+                classify=_classify,
+            )
+            self.assertEqual(pasted["report"]["universe"], "paste")
+            self.assertEqual(pasted["report"]["rows"][0]["symbol"], "000001")
+            self.assertEqual(pasted["report"]["rows"][0]["act_label"], "震仓洗盘")
+            self.assertEqual(watch4.read_bytes(), before)
 
 
 class ApiTests(unittest.TestCase):

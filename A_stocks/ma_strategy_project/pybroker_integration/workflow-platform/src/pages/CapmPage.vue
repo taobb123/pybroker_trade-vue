@@ -32,7 +32,7 @@ const stockError = ref('')
 const loadingSleeves = ref(false)
 const loadingStocks = ref(false)
 const pasted = ref('')
-const universe = ref<'watch46' | 'paste'>('watch46')
+const universe = ref<'vp6' | 'paste'>('vp6')
 const band = ref('all')
 const sleeveQuadrant = ref('all')
 const stockQuadrant = ref('all')
@@ -87,6 +87,13 @@ function pct(value: number | null | undefined): string {
 function num(value: number | null | undefined, digits = 2): string {
   if (value == null || Number.isNaN(value)) return '—'
   return value.toFixed(digits)
+}
+
+function actText(row: CapmRow): string {
+  const label = row.actLabel || '无'
+  if (label === '无') return '—'
+  if (row.actReturn == null) return label
+  return `${label} ${pct(row.actReturn)}`
 }
 
 function span(window: CapmWindow | null): string {
@@ -166,7 +173,7 @@ async function loadSleeves() {
   }
 }
 
-async function loadStocks(nextUniverse: 'watch46' | 'paste') {
+async function loadStocks(nextUniverse: 'vp6' | 'paste') {
   universe.value = nextUniverse
   loadingStocks.value = true
   stockError.value = ''
@@ -200,7 +207,7 @@ async function fillBars() {
 
 onMounted(() => {
   void loadSleeves()
-  void loadStocks('watch46')
+  void loadStocks('vp6')
 })
 </script>
 
@@ -212,6 +219,8 @@ onMounted(() => {
         用沪深300拆开市场贝塔和超额。主列是最近 250 个交易日，旁边是 120 日。无风险利率按 0。
         象限只用最近 120 日的年化 α、t(α) 和 β。高 α 要年化 α 为正且 t(α) ≥ 1，高 β 是 β > 1。
         250 日数字仍显示，不决定象限。
+        个股默认用「量价六组合」分类结果里的全部股票，粘贴代码仍可单独计算。
+        主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         这一页只对照，不写入观察池，也不改仓位。
       </p>
     </div>
@@ -319,16 +328,17 @@ onMounted(() => {
           <CardHeader>
             <CardTitle>个股贝塔对照</CardTitle>
             <CardDescription>
-              默认读当前 4+6 观察池，粘贴代码用同一套象限。只在本页筛选，不改观察池。
-              本地日线对不齐时记为样本不足。补齐会读取缺失行情并写入归因缓存。
+              默认读量价六组合分类结果的全部股票，粘贴代码用同一套象限。只在本页筛选，不改观察池。
+              250 日区间取最近 250 个重叠交易日，终点跟着本地行情的最后一天。
+              「补到最新交易日」会把沪深300和个股日线补到最近一个已收盘交易日，并写入本页缓存。
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
             <div class="flex flex-wrap gap-2">
-              <Button size="sm" :disabled="loadingStocks" @click="loadStocks('watch46')">计算观察池</Button>
+              <Button size="sm" :disabled="loadingStocks" @click="loadStocks('vp6')">计算量价六组合</Button>
               <Button size="sm" variant="outline" :disabled="loadingStocks" @click="loadStocks('paste')">计算粘贴代码</Button>
               <Button size="sm" variant="outline" :disabled="loadingStocks" @click="fillBars">
-                {{ loadingStocks ? '计算中' : '补齐缺失日线' }}
+                {{ loadingStocks ? '计算中' : '补到最新交易日' }}
               </Button>
             </div>
             <Textarea
@@ -367,6 +377,7 @@ onMounted(() => {
               </Button>
             </div>
             <p v-if="stocks" class="text-xs text-muted-foreground">
+              样本 {{ stocks.sampleStart || '—' }} 至 {{ stocks.sampleEnd || '—' }}。
               请求 {{ stocks.requested ?? stocks.rows.length }} 只，能估计窗口的 {{ stocks.ready ?? '—' }} 只。
               当前显示 {{ visibleStocks.length }} 只。分档用 250 日 β，没有则用 120 日 β。
             </p>
@@ -380,6 +391,7 @@ onMounted(() => {
                       <button type="button" class="hover:underline" @click="toggleSort('name')">代码</button>
                     </TableHead>
                     <TableHead>名称</TableHead>
+                    <TableHead>主力表演</TableHead>
                     <TableHead>象限</TableHead>
                     <TableHead>情形</TableHead>
                     <TableHead>
@@ -401,6 +413,7 @@ onMounted(() => {
                   <TableRow v-for="row in visibleStocks" :key="row.key">
                     <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
                     <TableCell>{{ row.stockName || row.name }}</TableCell>
+                    <TableCell class="whitespace-nowrap text-sm">{{ actText(row) }}</TableCell>
                     <TableCell>
                       <p class="text-sm font-medium">{{ row.quadrant }}</p>
                       <p class="text-xs text-muted-foreground">

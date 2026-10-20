@@ -30,6 +30,9 @@ export type CapmRow = {
   reason: string
   w250: CapmWindow | null
   w120: CapmWindow | null
+  actLabel: string
+  actReturn: number | null
+  actEnd: string | null
 }
 
 export type CapmReport = {
@@ -121,6 +124,9 @@ function mapReport(value: unknown): CapmReport | null {
         reason: str(line.reason),
         w250: mapWindow(line.w250),
         w120: mapWindow(line.w120),
+        actLabel: str(line.act_label),
+        actReturn: num(line.act_return),
+        actEnd: line.act_end == null || line.act_end === '' ? null : str(line.act_end),
       }
     }),
     notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],
@@ -152,14 +158,14 @@ export async function fetchCapmSleeves(): Promise<CapmResponse> {
   return readBody(response)
 }
 
-export async function fetchCapmStocks(universe: 'watch46' | 'paste', symbols = ''): Promise<CapmResponse> {
+export async function fetchCapmStocks(universe: 'vp6' | 'paste' | 'watch46', symbols = ''): Promise<CapmResponse> {
   const query = new URLSearchParams({ universe, symbols })
   const response = await fetch(apiUrl(`/api/capm/stocks?${query.toString()}`))
   if (!response.ok) throw new Error(`读取个股对比失败 (${response.status})`)
   return readBody(response)
 }
 
-export async function refreshCapmStocks(universe: 'watch46' | 'paste', symbols = ''): Promise<CapmResponse> {
+export async function refreshCapmStocks(universe: 'vp6' | 'paste' | 'watch46', symbols = ''): Promise<CapmResponse> {
   const response = await fetch(apiUrl('/api/capm/stocks'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
