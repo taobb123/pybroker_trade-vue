@@ -101,14 +101,16 @@ def stocks_payload(
     acts = _acts(picked, load_ohlc(set(picked), cache_path=ohlc_cache), classify or phase1_combo_id)
     rows = []
     for code in picked:
+        series = returns.get(code, pd.Series(dtype=float))
         row = _row(
             names.get(code) or code,
-            returns.get(code, pd.Series(dtype=float)),
+            series,
             market,
             symbol=code,
             stock_name=names.get(code, ""),
         )
         row.update(acts.get(code, _blank_act()))
+        row["session_return"] = _session_return(series)
         rows.append(row)
     ready = sum(1 for row in rows if row["w250"] or row["w120"])
     extra = [
@@ -244,6 +246,16 @@ def _universe_name(universe: str) -> str:
 
 def _blank_act() -> dict:
     return {"act_label": NO_BARS, "act_return": None, "act_end": None}
+
+
+def _session_return(series: pd.Series) -> float | None:
+    """最近一个有收盘的交易日相对前一交易日的涨跌。没有两根收盘则为空。"""
+    if series is None or len(series) == 0:
+        return None
+    value = series.iloc[-1]
+    if pd.isna(value):
+        return None
+    return float(value)
 
 
 def _acts(

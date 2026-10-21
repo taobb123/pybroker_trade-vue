@@ -33,6 +33,7 @@ export type CapmRow = {
   actLabel: string
   actReturn: number | null
   actEnd: string | null
+  sessionReturn: number | null
 }
 
 export type CapmReport = {
@@ -127,6 +128,7 @@ function mapReport(value: unknown): CapmReport | null {
         actLabel: str(line.act_label),
         actReturn: num(line.act_return),
         actEnd: line.act_end == null || line.act_end === '' ? null : str(line.act_end),
+        sessionReturn: num(line.session_return),
       }
     }),
     notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],

@@ -196,6 +196,8 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(watch4.read_text(encoding="utf-8"), before)
             by_symbol = {row["symbol"]: row for row in quiet["report"]["rows"]}
             self.assertAlmostEqual(by_symbol["000001"]["w250"]["beta"], 0.8, places=5)
+            self.assertAlmostEqual(by_symbol["000001"]["session_return"], 0.0001 + 0.8 * market[-1], places=8)
+            self.assertIsNone(by_symbol["600000"]["session_return"])
             self.assertEqual(by_symbol["000001"]["quadrant_id"], "high_alpha_low_beta")
             self.assertAlmostEqual(by_symbol["000001"]["w120"]["beta"], 0.8, places=5)
             self.assertEqual(by_symbol["600000"]["quadrant_id"], "insufficient")

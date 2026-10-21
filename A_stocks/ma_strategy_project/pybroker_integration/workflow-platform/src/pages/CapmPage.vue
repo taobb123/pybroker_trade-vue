@@ -34,9 +34,10 @@ const loadingStocks = ref(false)
 const pasted = ref('')
 const universe = ref<'vp6' | 'paste'>('vp6')
 const band = ref('all')
+const actBand = ref('all')
 const sleeveQuadrant = ref('all')
 const stockQuadrant = ref('all')
-const sortKey = ref<'beta' | 'alpha' | 'r2' | 'name'>('beta')
+const sortKey = ref<'beta' | 'alpha' | 'r2' | 'name' | 'session'>('session')
 const sortDir = ref<-1 | 1>(-1)
 
 const quadrantCards = [
@@ -79,6 +80,12 @@ const bands = [
   { id: 'very', label: 'β > 1.5' },
 ]
 
+const actBands = [
+  { id: 'all', label: '表演全部' },
+  { id: 'wash_drop_2_5', label: '震仓下跌 2%–5%' },
+  { id: 'release_gt0', label: '释放套牢盘 > 0%' },
+]
+
 function pct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'
   return `${(value * 100).toFixed(2)}%`
@@ -114,8 +121,28 @@ function bandOf(beta: number | null): string {
   return 'very'
 }
 
+function actPercent(row: CapmRow): number | null {
+  if (row.actReturn == null || Number.isNaN(row.actReturn)) return null
+  return Number((row.actReturn * 100).toFixed(2))
+}
+
+function matchesActBand(row: CapmRow, id: string): boolean {
+  if (id === 'all') return true
+  const value = actPercent(row)
+  if (value == null) return false
+  if (id === 'wash_drop_2_5') return row.actLabel === '震仓洗盘' && value < -2 && value > -5
+  if (id === 'release_gt0') return row.actLabel === '释放套牢盘' && value > 0
+  return false
+}
+
+function sessionSortable(row: CapmRow): boolean {
+  if (row.actLabel !== '震仓洗盘' && row.actLabel !== '释放套牢盘') return false
+  return row.sessionReturn != null && !Number.isNaN(row.sessionReturn)
+}
+
 function sortValue(row: CapmRow): number | string {
   if (sortKey.value === 'name') return row.symbol || row.name
+  if (sortKey.value === 'session') return row.sessionReturn ?? Number.NEGATIVE_INFINITY
   if (sortKey.value === 'alpha') return row.w250?.alphaAnn ?? row.w120?.alphaAnn ?? Number.NEGATIVE_INFINITY
   if (sortKey.value === 'r2') return row.w250?.r2 ?? row.w120?.r2 ?? Number.NEGATIVE_INFINITY
   return betaOf(row) ?? Number.NEGATIVE_INFINITY
@@ -134,8 +161,16 @@ const visibleSleeves = computed(() => applyQuadrant(sleeves.value?.rows ?? [], s
 
 const visibleStocks = computed(() => {
   const rows = applyQuadrant(stocks.value?.rows ?? [], stockQuadrant.value)
-  const filtered = band.value === 'all' ? rows : rows.filter((row) => bandOf(betaOf(row)) === band.value)
+  const byBeta = band.value === 'all' ? rows : rows.filter((row) => bandOf(betaOf(row)) === band.value)
+  const filtered = byBeta.filter((row) => matchesActBand(row, actBand.value))
   return [...filtered].sort((a, b) => {
+    if (sortKey.value === 'session') {
+      const leftOn = sessionSortable(a)
+      const rightOn = sessionSortable(b)
+      if (leftOn !== rightOn) return leftOn ? -1 : 1
+      if (!leftOn || !rightOn) return 0
+      return ((a.sessionReturn ?? 0) - (b.sessionReturn ?? 0)) * sortDir.value
+    }
     const left = sortValue(a)
     const right = sortValue(b)
     if (left === Number.NEGATIVE_INFINITY || right === Number.NEGATIVE_INFINITY) {
@@ -149,7 +184,7 @@ const visibleStocks = computed(() => {
   })
 })
 
-function toggleSort(key: 'beta' | 'alpha' | 'r2' | 'name') {
+function toggleSort(key: 'beta' | 'alpha' | 'r2' | 'name' | 'session') {
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 1 ? -1 : 1
     return
@@ -221,6 +256,7 @@ onMounted(() => {
         250 日数字仍显示，不决定象限。
         个股默认用形态建仓和回测对比里各题材的全部股票，不按排名截取。粘贴代码仍可单独计算。
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
+        全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
       </p>
     </div>
@@ -376,10 +412,23 @@ onMounted(() => {
                 {{ item.label }}
               </Button>
             </div>
+            <div class="flex flex-wrap gap-1">
+              <Button
+                v-for="item in actBands"
+                :key="item.id"
+                size="sm"
+                :variant="actBand === item.id ? 'default' : 'outline'"
+                @click="actBand = item.id"
+              >
+                {{ item.label }}
+              </Button>
+            </div>
             <p v-if="stocks" class="text-xs text-muted-foreground">
               样本 {{ stocks.sampleStart || '—' }} 至 {{ stocks.sampleEnd || '—' }}。
               请求 {{ stocks.requested ?? stocks.rows.length }} 只，能估计窗口的 {{ stocks.ready ?? '—' }} 只。
               当前显示 {{ visibleStocks.length }} 只。分档用 250 日 β，没有则用 120 日 β。
+              主力表演按走完后 3 个交易日的涨跌筛选。震仓洗盘只看跌幅大于 2% 且小于 5%（涨跌在 -5% 和 -2% 之间）。释放套牢盘只看大于 0%。刚好等于 -2%、-5%、0%，以及没有这段收益的，只留在「表演全部」。
+              当日涨幅是该股票最近一根收盘相对前一交易日收盘的涨跌。默认把全部震仓洗盘和全部释放套牢盘按这个涨幅从高到低排在前面。打断、未走完、无，以及没有当日涨幅的，留在后面。
             </p>
             <p v-if="stockError" class="text-xs text-destructive">{{ stockError }}</p>
             <p v-else-if="stockMessage" class="text-xs text-muted-foreground">{{ stockMessage }}</p>
@@ -392,6 +441,9 @@ onMounted(() => {
                     </TableHead>
                     <TableHead>名称</TableHead>
                     <TableHead>主力表演</TableHead>
+                    <TableHead>
+                      <button type="button" class="hover:underline" @click="toggleSort('session')">当日涨幅</button>
+                    </TableHead>
                     <TableHead>象限</TableHead>
                     <TableHead>情形</TableHead>
                     <TableHead>
@@ -414,6 +466,7 @@ onMounted(() => {
                     <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
                     <TableCell>{{ row.stockName || row.name }}</TableCell>
                     <TableCell class="whitespace-nowrap text-sm">{{ actText(row) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.sessionReturn) }}</TableCell>
                     <TableCell>
                       <p class="text-sm font-medium">{{ row.quadrant }}</p>
                       <p class="text-xs text-muted-foreground">
