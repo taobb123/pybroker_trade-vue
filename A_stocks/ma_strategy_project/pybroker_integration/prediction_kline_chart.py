@@ -27,6 +27,27 @@ LOOKBACK_TRADING_DAYS = 3
 LOOKBACK_CSV_NAME = "today_high_low_lookback.csv"
 LOOKBACK_DATE_COL = "预测日"
 HIGH_CHANGE_MEDIAN_COL = "预测高价日变动中位数"
+PRED_HIGH_COL = "预测高"
+PRED_LOW_COL = "预测低"
+ACTUAL_HIGH_COL = "实际高"
+ACTUAL_LOW_COL = "实际低"
+ACTUAL_HIGH_HIGHER_COL = "实际高点更高"
+HIGH_DELTA_COL = "高点差值"
+ACTUAL_LOW_HIGHER_COL = "实际低点更高"
+LOW_DELTA_COL = "低点差值"
+LOOKBACK_COLUMNS = [
+    LOOKBACK_DATE_COL,
+    "stock_name",
+    PRED_HIGH_COL,
+    ACTUAL_HIGH_COL,
+    ACTUAL_HIGH_HIGHER_COL,
+    HIGH_DELTA_COL,
+    PRED_LOW_COL,
+    ACTUAL_LOW_COL,
+    ACTUAL_LOW_HIGHER_COL,
+    LOW_DELTA_COL,
+    HIGH_CHANGE_MEDIAN_COL,
+]
 T_LEVEL_COLUMNS = [
     "卖三",
     "卖二",
@@ -92,6 +113,189 @@ def predicted_high_change_medians(history_csv: str) -> dict[str, float]:
     return out
 
 
+def _date_key(value: Any) -> str:
+    ts = pd.to_datetime(value, errors="coerce")
+    if pd.isna(ts):
+        return str(value or "").strip()[:10]
+    return ts.strftime("%Y-%m-%d")
+
+
+def _round2(value: float) -> float:
+    return float(pd.Series([float(value)]).round(2).iloc[0])
+
+
+def compare_predicted_actual_extremes(
+    pred_high: float,
+    pred_low: float,
+    actual_high: float | None,
+    actual_low: float | None,
+) -> dict[str, Any]:
+    """预测高低对照当天实际高低。
+
+    高点差值 = 预测高 − 实际高，负数表示实际高点更高。
+    低点差值 = 实际低 − 预测低，正数表示实际低点更高。
+    缺少实际高低时，比较列留空。
+    """
+    ph = _round2(pred_high)
+    pl = _round2(pred_low)
+    row: dict[str, Any] = {
+        PRED_HIGH_COL: ph,
+        ACTUAL_HIGH_COL: None,
+        ACTUAL_HIGH_HIGHER_COL: None,
+        HIGH_DELTA_COL: None,
+        PRED_LOW_COL: pl,
+        ACTUAL_LOW_COL: None,
+        ACTUAL_LOW_HIGHER_COL: None,
+        LOW_DELTA_COL: None,
+    }
+    if (
+        actual_high is None
+        or actual_low is None
+        or pd.isna(actual_high)
+        or pd.isna(actual_low)
+    ):
+        return row
+    ah = _round2(actual_high)
+    al = _round2(actual_low)
+    high_delta = _round2(ph - ah)
+    low_delta = _round2(al - pl)
+    row[ACTUAL_HIGH_COL] = ah
+    row[HIGH_DELTA_COL] = high_delta
+    row[ACTUAL_HIGH_HIGHER_COL] = "是" if high_delta < 0 else "否"
+    row[ACTUAL_LOW_COL] = al
+    row[LOW_DELTA_COL] = low_delta
+    row[ACTUAL_LOW_HIGHER_COL] = "是" if low_delta > 0 else "否"
+    return row
+
+
+def _ohlc_cache_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "capm", "cache", "ohlc.csv")
+
+
+def _ranges_from_ohlc_frame(
+    df: pd.DataFrame,
+    symbols: set[str],
+) -> dict[tuple[str, str], tuple[float, float]]:
+    if df is None or df.empty or not {"date", "symbol", "high", "low"}.issubset(df.columns):
+        return {}
+    work = df.copy()
+    work["symbol"] = work["symbol"].map(lambda s: normalize_a_share_symbol(str(s)))
+    work = work[work["symbol"].isin(symbols)]
+    work["high"] = pd.to_numeric(work["high"], errors="coerce")
+    work["low"] = pd.to_numeric(work["low"], errors="coerce")
+    work = work.dropna(subset=["symbol", "date", "high", "low"])
+    out: dict[tuple[str, str], tuple[float, float]] = {}
+    for sym, date, high, low in zip(work["symbol"], work["date"], work["high"], work["low"]):
+        out[(str(sym), _date_key(date))] = (float(high), float(low))
+    return out
+
+
+def _cached_ohlc_symbols(ohlc_csv: str | None = None) -> set[str]:
+    path = ohlc_csv or _ohlc_cache_path()
+    if not path or not os.path.isfile(path):
+        return set()
+    try:
+        frame = pd.read_csv(path, encoding="utf-8-sig", dtype={"symbol": str}, usecols=["symbol"])
+    except Exception:
+        return set()
+    if frame.empty or "symbol" not in frame.columns:
+        return set()
+    return {
+        normalize_a_share_symbol(str(sym))
+        for sym in frame["symbol"].tolist()
+        if str(sym).strip() and normalize_a_share_symbol(str(sym))
+    }
+
+
+def recent_past_date_span(history_csv: str, n: int) -> tuple[str, str] | None:
+    """综合高低历史里，未来棒之前最近 n 个交易日的起止日期。"""
+    if not history_csv or not os.path.isfile(history_csv):
+        return None
+    frame = pd.read_csv(history_csv, encoding="utf-8-sig")
+    if frame.empty or "date" not in frame.columns:
+        return None
+    past = frame.loc[~_future_mask(frame)]
+    dates = sorted({_date_key(d) for d in past["date"].tolist() if _date_key(d)})
+    if not dates:
+        return None
+    window = dates[-max(1, int(n)) :]
+    return window[0], window[-1]
+
+
+def fill_missing_symbol_ohlc(
+    symbols: list[str],
+    start: str,
+    end: str,
+    *,
+    ohlc_csv: str | None = None,
+    fetcher: Any = None,
+) -> int:
+    """本次股票在主力表演日线缓存中没有记录时，补齐所需区间并写回同一份缓存。已有记录的不重复拉取。"""
+    path = ohlc_csv or _ohlc_cache_path()
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for raw in symbols:
+        sym = normalize_a_share_symbol(str(raw))
+        if sym and sym not in seen:
+            seen.add(sym)
+            wanted.append(sym)
+    missing = [sym for sym in wanted if sym not in _cached_ohlc_symbols(path)]
+    if not missing:
+        return 0
+    if not start or not end:
+        print(f"主力表演日线缓存缺少 {len(missing)} 只，没有可补齐的日期。")
+        return 0
+    fetch = fetcher
+    if fetch is None:
+        from capm.sources import fetch_act_bars
+
+        fetch = fetch_act_bars
+    try:
+        fresh = fetch(missing, start, end)
+    except Exception as exc:
+        print(f"主力表演日线缓存缺少 {', '.join(missing)}，补齐失败（{start}~{end}）: {exc}")
+        return 0
+    if fresh is None or fresh.empty:
+        print(f"主力表演日线缓存缺少 {', '.join(missing)}，未补到日线（{start}~{end}）。")
+        return 0
+    from pathlib import Path
+
+    from capm.sources import store_ohlc
+
+    store_ohlc(fresh, Path(path))
+    got = sorted({normalize_a_share_symbol(str(s)) for s in fresh["symbol"].tolist() if str(s).strip()})
+    print(
+        f"主力表演日线缓存缺少 {len(missing)} 只，已补齐 {len(got)} 只、{len(fresh)} 行"
+        f"（{start}~{end}）: {path}"
+    )
+    return int(len(fresh))
+
+
+def resolve_actual_high_low(
+    symbols: list[str],
+    dates: list[str] | None = None,
+    *,
+    ohlc_csv: str | None = None,
+) -> dict[tuple[str, str], tuple[float, float]]:
+    """交易日实际最高、最低。只读主力表演日线缓存 capm/cache/ohlc.csv。"""
+    wanted = {normalize_a_share_symbol(str(s)) for s in symbols if str(s).strip()}
+    if not wanted:
+        return {}
+    path = ohlc_csv or _ohlc_cache_path()
+    cached: dict[tuple[str, str], tuple[float, float]] = {}
+    if path and os.path.isfile(path):
+        try:
+            frame = pd.read_csv(path, encoding="utf-8-sig", dtype={"symbol": str})
+        except Exception:
+            frame = pd.DataFrame()
+        cached = _ranges_from_ohlc_frame(frame, wanted)
+    need_dates = sorted({_date_key(d) for d in (dates or []) if _date_key(d)})
+    if need_dates:
+        need = {(sym, day) for sym in wanted for day in need_dates}
+        return {key: val for key, val in cached.items() if key in need}
+    return {key: val for key, val in cached.items() if key[0] in wanted}
+
+
 def build_lookback_highlow_csv(
     history_csv: str,
     out_csv: str,
@@ -100,8 +304,9 @@ def build_lookback_highlow_csv(
     symbol_order: list[str] | None = None,
     medians: dict[str, float] | None = None,
     lookback_n: int = LOOKBACK_TRADING_DAYS,
+    actuals: dict[tuple[str, str], tuple[float, float]] | None = None,
 ) -> int:
-    """从综合高低历史取未来棒之前的最近 N 个交易日，写成与当日表同结构的回溯表。"""
+    """最近 N 个已发生交易日：预测高低对照当天实际高低，并保留预测高价日变动中位数。"""
     if not history_csv or not os.path.isfile(history_csv):
         return 0
     df = pd.read_csv(history_csv, encoding="utf-8-sig", dtype={"symbol": str})
@@ -132,25 +337,36 @@ def build_lookback_highlow_csv(
         return 0
     if medians is None:
         medians = predicted_high_change_medians(history_csv)
-    levels = t_levels_from_high_low(past["high"], past["low"]).reset_index(drop=True)
-    out = pd.concat(
-        [
-            past[["date_str", "symbol"]].reset_index(drop=True),
-            levels,
-        ],
-        axis=1,
-    )
-    out = out.rename(columns={"date_str": LOOKBACK_DATE_COL})
-    out["stock_name"] = out["symbol"].map(lambda s: names.get(str(s), str(s)))
-    out[HIGH_CHANGE_MEDIAN_COL] = out["symbol"].map(medians)
+    if actuals is None:
+        actuals = resolve_actual_high_low(allowed, keep_dates)
+    rows: list[dict[str, Any]] = []
+    for rec in past.itertuples(index=False):
+        sym = str(rec.symbol)
+        day = str(rec.date_str)
+        pair = actuals.get((sym, day))
+        compared = compare_predicted_actual_extremes(
+            float(rec.high),
+            float(rec.low),
+            pair[0] if pair else None,
+            pair[1] if pair else None,
+        )
+        rows.append(
+            {
+                LOOKBACK_DATE_COL: day,
+                "symbol": sym,
+                "stock_name": names.get(sym, sym),
+                **compared,
+                HIGH_CHANGE_MEDIAN_COL: medians.get(sym),
+            }
+        )
+    out = pd.DataFrame(rows)
     date_rank = {d: i for i, d in enumerate(reversed(keep_dates))}
     sym_rank = {s: i for i, s in enumerate(allowed)}
     out["_d"] = out[LOOKBACK_DATE_COL].map(date_rank)
     out["_s"] = out["symbol"].map(lambda s: sym_rank.get(str(s), 10**9))
     out = out.sort_values(["_d", "_s"])
-    cols = [LOOKBACK_DATE_COL, "卖三", "卖二", "卖一", "stock_name", "today_high", "high_low_diff", "today_low", "买一", "买二", "买三", HIGH_CHANGE_MEDIAN_COL]
     os.makedirs(os.path.dirname(os.path.abspath(out_csv)) or ".", exist_ok=True)
-    out[cols].to_csv(out_csv, index=False, encoding="utf-8-sig")
+    out[LOOKBACK_COLUMNS].to_csv(out_csv, index=False, encoding="utf-8-sig")
     return int(len(out))
 
 
@@ -641,6 +857,7 @@ def _chart_payload_from_rows(
     names: dict[str, str],
     history_n: int = HISTORY_DAYS,
     model_label: str = MODEL_LABEL,
+    actuals: dict[tuple[str, str], tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     dates: list[str] = []
     opens: list[float] = []
@@ -650,18 +867,31 @@ def _chart_payload_from_rows(
     is_future: list[bool] = []
     anchor_ts: list[str] = []
     open_sources: list[str] = []
+    actual_highs: list[float | None] = []
+    actual_lows: list[float | None] = []
+    ranges = actuals or {}
+    sym = normalize_a_share_symbol(str(symbol))
 
     for row in rows:
-        dates.append(str(row.get("date", "")))
+        day = _date_key(row.get("date", ""))
+        dates.append(day)
         hi = float(row.get("high", row.get("close", float("nan"))))
         lo = float(row.get("low", row.get("open", float("nan"))))
         highs.append(hi)
         lows.append(lo)
         opens.append(float(row.get("open", lo)))
         closes.append(float(row.get("close", hi)))
-        is_future.append(bool(row.get("is_future", False)))
+        future = bool(row.get("is_future", False))
+        is_future.append(future)
         anchor_ts.append(str(row.get("anchor_t", "")))
         open_sources.append(str(row.get("open_source", "")))
+        pair = None if future else ranges.get((sym, day))
+        if pair:
+            actual_highs.append(_round2(pair[0]))
+            actual_lows.append(_round2(pair[1]))
+        else:
+            actual_highs.append(None)
+            actual_lows.append(None)
 
     return {
         "symbol": str(symbol),
@@ -674,6 +904,8 @@ def _chart_payload_from_rows(
         "closes": closes,
         "highs": highs,
         "lows": lows,
+        "actual_highs": actual_highs,
+        "actual_lows": actual_lows,
         "is_future": is_future,
         "anchor_t": anchor_ts,
         "open_sources": open_sources,
@@ -689,6 +921,7 @@ def build_charts_json(
     history_n: int = HISTORY_DAYS,
     max_charts: int = CHART_SYMBOL_COUNT,
     model_label: str = MODEL_LABEL,
+    actuals: dict[tuple[str, str], tuple[float, float]] | None = None,
 ) -> dict[str, Any] | None:
     """为列表中前 max_charts 只股票生成单 JSON（charts 数组）。"""
     chart_syms = [normalize_a_share_symbol(s) for s in symbols[:max_charts]]
@@ -706,6 +939,15 @@ def build_charts_json(
     for sym, nm in csv_overrides.items():
         if nm and str(nm).strip():
             names[normalize_a_share_symbol(sym)] = str(nm).strip()
+    if actuals is None:
+        hist = _read_kline_history_df(history_csv)
+        past_dates: list[str] = []
+        if not hist.empty and "date" in hist.columns:
+            scoped = hist[hist["symbol"].isin(set(chart_syms))]
+            if "is_future" in scoped.columns:
+                scoped = scoped[scoped["is_future"] == False]  # noqa: E712
+            past_dates = [_date_key(d) for d in scoped["date"].tolist()]
+        actuals = resolve_actual_high_low(chart_syms, past_dates)
     charts: list[dict[str, Any]] = []
     for sym in symbols[:max_charts]:
         norm_sym = normalize_a_share_symbol(sym)
@@ -714,7 +956,12 @@ def build_charts_json(
             continue
         charts.append(
             _chart_payload_from_rows(
-                rows, norm_sym, names, history_n=history_n, model_label=model_label
+                rows,
+                norm_sym,
+                names,
+                history_n=history_n,
+                model_label=model_label,
+                actuals=actuals,
             )
         )
     if not charts:

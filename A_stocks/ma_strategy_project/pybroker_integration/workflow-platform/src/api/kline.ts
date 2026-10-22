@@ -21,6 +21,10 @@ export type PredictionChart = {
   highs: number[]
   lows: number[]
   closes: number[]
+  /** 当天实际最高。未来预测日为空，影线不使用。 */
+  actual_highs?: Array<number | null>
+  /** 当天实际最低。未来预测日为空，影线不使用。 */
+  actual_lows?: Array<number | null>
   is_future?: boolean[]
   model_label?: string
   pred_dir?: string
@@ -63,6 +67,33 @@ function num(v: unknown, fallback = NaN): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+function actualAt(list: Array<number | null> | undefined, index: number): number | null {
+  if (!list || index < 0 || index >= list.length) return null
+  const raw = list[index]
+  if (raw == null || raw === '') return null
+  const n = num(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 实体是预测高低。上影线尖端是实际高，下影线尖端是实际低。
+ * 实际高不高于预测高时没有上影；实际低不低于预测低时没有下影。
+ * 比较先保留两位，与近三日表一致。
+ */
+function wickHigh(predHi: number, actualHi: number | null, future: boolean): number {
+  if (future || actualHi == null) return predHi
+  return round2(actualHi) > round2(predHi) ? actualHi : predHi
+}
+
+function wickLow(predLo: number, actualLo: number | null, future: boolean): number {
+  if (future || actualLo == null) return predLo
+  return round2(actualLo) < round2(predLo) ? actualLo : predLo
+}
+
 /**
  * 与旧版一致：综合高低模型 open≈low、close≈high，不能用 open/close 判断涨跌。
  * 用 (high+low)/2 相对前一根 mid：升=红，降=绿。
@@ -98,9 +129,11 @@ export function toCandlestickOption(chart: PredictionChart) {
     const up = prevMid == null ? true : mid >= prevMid
     const color = up ? COLOR_UP : COLOR_DOWN
     const future = Boolean(chart.is_future?.[i])
+    const top = wickHigh(hi, actualAt(chart.actual_highs, i), future)
+    const bot = wickLow(lo, actualAt(chart.actual_lows, i), future)
     values.push({
-      // ECharts: [open, close, low, high] — 用区间两端画实体，颜色由 itemStyle 强制
-      value: [lo, hi, lo, hi],
+      // ECharts: [open, close, low, high]。实体是预测高低，上影到实际高，下影到实际低。
+      value: [lo, hi, bot, top],
       itemStyle: {
         color,
         color0: color,
@@ -121,18 +154,27 @@ export function toCandlestickOption(chart: PredictionChart) {
         const list = Array.isArray(params) ? params : [params]
         const p = list[0] as { dataIndex?: number; name?: string } | undefined
         const idx = p?.dataIndex ?? 0
-        const o = num(chart.opens[idx])
-        const c = num(chart.closes[idx])
         const h = num(chart.highs[idx])
         const l = num(chart.lows[idx])
-        const fut = chart.is_future?.[idx] ? '（预测日）' : ''
-        return [
-          `${chart.dates[idx] || p?.name || ''}${fut}`,
-          `高: ${Number.isFinite(h) ? h.toFixed(2) : '-'}`,
-          `低: ${Number.isFinite(l) ? l.toFixed(2) : '-'}`,
-          `开: ${Number.isFinite(o) ? o.toFixed(2) : '-'}`,
-          `收: ${Number.isFinite(c) ? c.toFixed(2) : '-'}`,
-        ].join('<br/>')
+        const future = Boolean(chart.is_future?.[idx])
+        const ah = actualAt(chart.actual_highs, idx)
+        const al = actualAt(chart.actual_lows, idx)
+        const lines = [
+          `${chart.dates[idx] || p?.name || ''}${future ? '（预测日）' : ''}`,
+          `预测高: ${Number.isFinite(h) ? h.toFixed(2) : '-'}`,
+          `预测低: ${Number.isFinite(l) ? l.toFixed(2) : '-'}`,
+        ]
+        if (!future && ah != null && al != null && Number.isFinite(h) && Number.isFinite(l)) {
+          const highDelta = round2(round2(h) - round2(ah))
+          const lowDelta = round2(round2(al) - round2(l))
+          lines.push(
+            `实际高: ${ah.toFixed(2)}`,
+            `高点差值: ${highDelta.toFixed(2)}${highDelta < 0 ? '（实际高更高）' : ''}`,
+            `实际低: ${al.toFixed(2)}`,
+            `低点差值: ${lowDelta.toFixed(2)}${lowDelta > 0 ? '（实际低更高）' : ''}`,
+          )
+        }
+        return lines.join('<br/>')
       },
     },
     grid: { left: 52, right: 16, top: 16, bottom: 36, containLabel: false },

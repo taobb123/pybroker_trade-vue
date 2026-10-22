@@ -50,6 +50,8 @@ from prediction_kline_chart import (
     build_charts_json,
     build_combined_highlow_history_csv,
     build_lookback_highlow_csv,
+    fill_missing_symbol_ohlc,
+    recent_past_date_span,
     compute_high_low_from_preds,
     predicted_high_change_medians,
     t_levels_from_high_low,
@@ -365,6 +367,11 @@ def main():
             for s, n in zip(merge_df['symbol'].astype(str), merge_df['stock_name'].astype(str))
         }
         lookback_path = os.path.join(script_dir, LOOKBACK_CSV_NAME)
+        chart_symbols = load_train_model_shift_symbols()[:CHART_SYMBOL_COUNT]
+        span = recent_past_date_span(combined_history, HISTORY_DAYS)
+        if span:
+            fill_symbols = list(dict.fromkeys([*symbol_order, *chart_symbols]))
+            fill_missing_symbol_ohlc(fill_symbols, span[0], span[1])
         n_lookback = build_lookback_highlow_csv(
             combined_history,
             lookback_path,
@@ -381,7 +388,6 @@ def main():
         ]
         final.to_csv(final_path, index=False, encoding='utf-8-sig')
         print(f"已写入{HIGH_CHANGE_MEDIAN_COL}: {final_path}")
-        chart_symbols = load_train_model_shift_symbols()[:CHART_SYMBOL_COUNT]
         chart_names = resolve_display_names(chart_symbols, symbol_names_path)
         payload = build_charts_json(
             combined_history,

@@ -905,7 +905,7 @@ watch([tableHost, tableExpanded], () => {
           >
             {{ day.slice(5) }}
           </Button>
-          <span class="text-[11px] text-muted-foreground">前三个交易日来自本次 walk-forward</span>
+          <span class="text-[11px] text-muted-foreground">前三个交易日：预测高低对照当天实际高低</span>
         </div>
         <p v-if="tableLoading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
         <div
