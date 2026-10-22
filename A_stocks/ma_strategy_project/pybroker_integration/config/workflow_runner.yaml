@@ -321,7 +321,12 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 读取 M+动量前13、Q前13、G·4+6与G·2+3增长分前13，以及形态建仓全部确认建仓；组内成长排序写 CSV；暂不推东财
+  frequency_note: 读取 M+动量前13、Q前13、G·4+6与G·2+3增长分前13，以及形态建仓全部确认建仓；组内成长排序写 CSV；暂不推东财。参数里可选粘贴代码，结果单独成表
+  symbols_paste: true
+  symbols_paste_as_input: true
+  symbols_paste_hint: 每行一个 6 位代码，也可用逗号或空格分隔
+  symbols_paste_empty_hint: 留空则仍按上游前13与确认建仓排序
+  symbols_paste_output: factor_growth_paste_rank.csv
   workspace_inputs:
   - path: pattern_entry_mplus_rank.csv
     label: 形态建仓 M+动量排名（取前13）
@@ -346,6 +351,8 @@ steps:
     label: G·2+3前13成长因子排序
   - path: pattern_entry_volume_growth_rank.csv
     label: 量能确认建仓成长因子排序
+  - path: factor_growth_paste_rank.csv
+    label: 粘贴代码排序
 - id: compute_today
   title: 做 T 止盈止损
   type: script
@@ -362,6 +369,8 @@ steps:
     label: 预测 K 线
   - path: today_high_low_result.csv
     label: 当日高低价
+  - path: today_high_low_lookback.csv
+    label: 近三日预测
 - id: filter_stock_codes
   title: 股票代码清洗
   type: frontend_tool

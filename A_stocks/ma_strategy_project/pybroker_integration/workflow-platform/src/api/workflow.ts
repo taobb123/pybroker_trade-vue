@@ -80,6 +80,8 @@ function mapStep(s: Record<string, unknown>): WorkflowStep {
     symbolsPasteEmptyHint: s.symbols_paste_empty_hint
       ? String(s.symbols_paste_empty_hint)
       : undefined,
+    symbolsPasteAsInput: Boolean(s.symbols_paste_as_input),
+    symbolsPasteOutput: s.symbols_paste_output ? String(s.symbols_paste_output) : undefined,
     symbolsPasteComboOptions: Array.isArray(s.symbols_paste_combo_options)
       ? (s.symbols_paste_combo_options as ComboOption[]).map((o) => ({
           id: String(o.id),

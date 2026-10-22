@@ -48,7 +48,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { WorkflowStep } from '@/api/types'
-import { isPathOutput } from '@/api/types'
+import { isPathOutput, normalizeSymbols } from '@/api/types'
 import { isPredictionKlinePath } from '@/api/kline'
 import {
   fetchBacktestCompareSwitch,
@@ -92,6 +92,7 @@ const draft = computed(() => store.ensureDraft(props.step))
 const strategyOpen = ref(false)
 const paramsOpen = ref(false)
 
+const PASTE_INPUT = '__paste__'
 const inputPath = ref('')
 const inputContent = ref('')
 const inputLoading = ref(false)
@@ -110,6 +111,10 @@ const tableHost = ref<HTMLElement | null>(null)
 const tableVisible = ref(false)
 const tableLoadedPath = ref('')
 const TABLE_PREVIEW_ROWS = 40
+const LOOKBACK_CSV = 'today_high_low_lookback.csv'
+const lookbackData = ref<TablePreview | null>(null)
+/** 空字符串表示看当日；否则为回溯预测日 YYYY-MM-DD */
+const lookbackDate = ref('')
 let tableObserver: IntersectionObserver | null = null
 
 const isBacktestCompare = computed(() => props.step.id === 'vp_combo_23_long_compare')
@@ -248,6 +253,13 @@ const klineOutputs = computed(() =>
   ),
 )
 
+const pasteMode = computed(
+  () => Boolean(props.step.symbolsPasteAsInput) && Boolean(draft.value.pasteInput),
+)
+const pastedCount = computed(
+  () => normalizeSymbols(draft.value.symbolsText).split(',').filter(Boolean).length,
+)
+
 const hasInputPanel = computed(() => {
   if (props.step.id === 'fetch_dc_concept_ma5') return false
   return (
@@ -257,16 +269,54 @@ const hasInputPanel = computed(() => {
   )
 })
 
-const displayColumns = computed(() => {
-  if (!tableData.value?.headers?.length) return []
-  return resolveTableColumns(
-    activeOutputPath.value,
-    tableData.value.headers,
-    showAllColumns.value,
-  )
+const isComputeToday = computed(() => props.step.id === 'compute_today')
+
+function headerIndex(headers: string[] | undefined, name: string): number {
+  if (!headers?.length) return -1
+  const target = name.trim().toLowerCase()
+  return headers.findIndex((h) => h.trim().toLowerCase() === target)
+}
+
+const lookbackDates = computed(() => {
+  const data = lookbackData.value
+  if (!data?.exists) return []
+  const idx = headerIndex(data.headers, '预测日')
+  if (idx < 0) return []
+  const found = new Set<string>()
+  for (const row of data.rows) {
+    const day = String(row[idx] ?? '').trim()
+    if (day) found.add(day)
+  }
+  return [...found].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
 })
 
-const previewRowCount = computed(() => tableData.value?.rows?.length ?? 0)
+const viewingLookback = computed(
+  () => isComputeToday.value && Boolean(lookbackDate.value) && Boolean(lookbackData.value?.exists),
+)
+
+const viewHeaders = computed(() =>
+  viewingLookback.value ? (lookbackData.value?.headers ?? []) : (tableData.value?.headers ?? []),
+)
+
+const viewRows = computed(() => {
+  if (!viewingLookback.value || !lookbackData.value) return tableData.value?.rows ?? []
+  const idx = headerIndex(lookbackData.value.headers, '预测日')
+  if (idx < 0) return []
+  return lookbackData.value.rows.filter((row) => String(row[idx] ?? '').trim() === lookbackDate.value)
+})
+
+const viewPath = computed(() =>
+  viewingLookback.value ? LOOKBACK_CSV : tableLoadedPath.value || activeOutputPath.value,
+)
+
+const displayColumns = computed(() => {
+  if (!viewHeaders.value.length) return []
+  return resolveTableColumns(viewPath.value, viewHeaders.value, showAllColumns.value)
+})
+
+const previewRowCount = computed(() =>
+  viewingLookback.value ? viewRows.value.length : (tableData.value?.rows?.length ?? 0),
+)
 
 const mappedTable = computed(() => hasColumnMap(activeOutputPath.value))
 const isTodayHighLowPreview = computed(() => isTodayHighLowTable(tableLoadedPath.value))
@@ -290,6 +340,18 @@ watch(
   },
   { immediate: true },
 )
+
+function onInputChoice(value: unknown) {
+  const picked = String(value || '')
+  if (!picked) return
+  if (picked === PASTE_INPUT) {
+    draft.value.pasteInput = true
+    inputMsg.value = ''
+    return
+  }
+  draft.value.pasteInput = false
+  inputPath.value = picked
+}
 
 function pickStrategy(opt: StrategyOption) {
   if (opt.kind === 'combo') draft.value.comboId = opt.id
@@ -339,10 +401,24 @@ async function loadTable(path: string, force = false) {
   tableLoading.value = false
 }
 
+async function loadLookback() {
+  if (!isComputeToday.value) {
+    lookbackData.value = null
+    lookbackDate.value = ''
+    return
+  }
+  const data = await fetchWorkspaceTable(LOOKBACK_CSV, 2000)
+  lookbackData.value = data.exists ? data : null
+  if (lookbackDate.value && !lookbackDates.value.includes(lookbackDate.value)) {
+    lookbackDate.value = ''
+  }
+}
+
 async function loadRecentPreview(force = false) {
   if (!tableExpanded.value) return
   const first = tabularOutputs.value[0] ?? tableOutputs.value[0]
   if (first && isPathOutput(first)) await loadTable(first.path, force)
+  if (isComputeToday.value) await loadLookback()
 }
 
 function resetTablePreview() {
@@ -351,6 +427,8 @@ function resetTablePreview() {
   activeOutputPath.value = ''
   tableVisible.value = false
   showAllColumns.value = false
+  lookbackData.value = null
+  lookbackDate.value = ''
   if (!props.focused) tableExpanded.value = false
 }
 
@@ -407,7 +485,12 @@ async function onRun() {
   if (result && 'exit_code' in result && result.exit_code === 0) {
     tableExpanded.value = true
     tableVisible.value = true
-    await loadRecentPreview(true)
+    const pasteOut = props.step.symbolsPasteOutput
+    if (pasteMode.value && normalizeSymbols(draft.value.symbolsText) && pasteOut) {
+      await loadTable(pasteOut, true)
+    } else {
+      await loadRecentPreview(true)
+    }
   }
 }
 
@@ -435,9 +518,11 @@ function openOutputInReport(path: string) {
 }
 
 async function onPickAttachment(path: string) {
+  if (isTodayHighLowTable(path)) lookbackDate.value = ''
   tableExpanded.value = true
   tableVisible.value = true
   await loadTable(path, true)
+  if (isComputeToday.value) await loadLookback()
 }
 
 watch(
@@ -759,7 +844,8 @@ watch([tableHost, tableExpanded], () => {
       <div class="flex min-w-0 items-center justify-between gap-2">
         <p class="min-w-0 truncate text-xs font-medium text-muted-foreground">
           候选结果
-          <span v-if="activeOutputPath && tableExpanded" class="font-mono font-normal">
+          <span v-if="viewingLookback" class="font-normal">· 回溯 {{ lookbackDate }}</span>
+          <span v-else-if="activeOutputPath && tableExpanded" class="font-mono font-normal">
             · {{ activeOutputPath }}
           </span>
         </p>
@@ -795,6 +881,32 @@ watch([tableHost, tableExpanded], () => {
       </div>
 
       <div v-if="tableExpanded" ref="tableHost" class="min-w-0 space-y-2">
+        <div
+          v-if="isComputeToday && lookbackDates.length && (isTodayHighLowPreview || viewingLookback)"
+          class="flex flex-wrap items-center gap-1.5"
+        >
+          <span class="text-xs text-muted-foreground">回溯</span>
+          <Button
+            size="sm"
+            class="h-7 text-xs"
+            :variant="lookbackDate ? 'outline' : 'default'"
+            @click="lookbackDate = ''"
+          >
+            当日
+          </Button>
+          <Button
+            v-for="day in lookbackDates"
+            :key="day"
+            size="sm"
+            class="h-7 text-xs"
+            :variant="lookbackDate === day ? 'default' : 'outline'"
+            :title="day"
+            @click="lookbackDate = day"
+          >
+            {{ day.slice(5) }}
+          </Button>
+          <span class="text-[11px] text-muted-foreground">前三个交易日来自本次 walk-forward</span>
+        </div>
         <p v-if="tableLoading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
         <div
           v-else-if="tableData?.exists && displayColumns.length"
@@ -814,21 +926,21 @@ watch([tableHost, tableExpanded], () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="(row, ri) in tableData.rows" :key="ri">
+                <TableRow v-for="(row, ri) in viewRows" :key="ri">
                   <TableCell
                     v-for="col in displayColumns"
                     :key="col.key"
                     class="max-w-[220px] truncate whitespace-nowrap font-mono text-xs"
-                    :title="formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '')"
+                    :title="formatPreviewCell(viewHeaders[col.index] || col.label, row[col.index], viewPath)"
                   >
-                    {{ formatPreviewCell(tableData.headers[col.index] || col.label, row[col.index], tableLoadedPath || '') }}
+                    {{ formatPreviewCell(viewHeaders[col.index] || col.label, row[col.index], viewPath) }}
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
           <ConditionalOrdersTable
-            v-if="isTodayHighLowPreview"
+            v-if="isTodayHighLowPreview && !viewingLookback"
             :headers="tableData.headers"
             :rows="tableData.rows"
             :truncated="tableData.truncated"
@@ -853,7 +965,7 @@ watch([tableHost, tableExpanded], () => {
         </SheetHeader>
 
         <div class="flex-1 space-y-4 overflow-y-auto px-4 pb-2">
-          <div v-if="step.symbolsPaste" class="space-y-1.5">
+          <div v-if="step.symbolsPaste && !step.symbolsPasteAsInput" class="space-y-1.5">
             <Label class="text-xs text-muted-foreground">
               {{ step.symbolsPasteHint || '可选粘贴股票代码' }}
             </Label>
@@ -884,13 +996,16 @@ watch([tableHost, tableExpanded], () => {
           <div v-if="step.workspaceInputs?.length" class="space-y-1.5">
             <Label class="text-xs text-muted-foreground">输入文件</Label>
             <Select
-              :model-value="inputPath || undefined"
-              @update:model-value="(v) => v && (inputPath = String(v))"
+              :model-value="pasteMode ? PASTE_INPUT : inputPath || undefined"
+              @update:model-value="onInputChoice"
             >
               <SelectTrigger class="h-9 w-full">
                 <SelectValue placeholder="选择输入…" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem v-if="step.symbolsPasteAsInput" :value="PASTE_INPUT">
+                  粘贴代码
+                </SelectItem>
                 <SelectItem
                   v-for="inp in step.workspaceInputs"
                   :key="inp.path"
@@ -900,7 +1015,18 @@ watch([tableHost, tableExpanded], () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="pasteMode" class="text-[11px] text-muted-foreground">
+              {{ step.symbolsPasteHint || '每行一个代码，或用逗号分隔' }}
+            </p>
             <Textarea
+              v-if="pasteMode"
+              v-model="draft.symbolsText"
+              class="field-sizing-fixed h-36 max-h-56 min-h-28 w-full resize-y overflow-y-auto font-mono text-xs leading-relaxed"
+              placeholder="600519&#10;000001&#10;002821 或逗号分隔"
+              spellcheck="false"
+            />
+            <Textarea
+              v-else
               v-model="inputContent"
               :disabled="inputLoading || !inputPath"
               class="field-sizing-fixed h-36 max-h-56 min-h-28 w-full resize-y overflow-y-auto font-mono text-xs leading-relaxed"
@@ -908,7 +1034,13 @@ watch([tableHost, tableExpanded], () => {
               spellcheck="false"
             />
             <p class="truncate font-mono text-[10px] text-muted-foreground">
-              {{ inputMsg || inputPath || '—' }}
+              {{
+                pasteMode
+                  ? pastedCount
+                    ? `已粘贴 ${pastedCount} 只 → 运行后写入独立排序表`
+                    : step.symbolsPasteEmptyHint || '留空则仍按上游文件排序'
+                  : inputMsg || inputPath || '—'
+              }}
             </p>
           </div>
 
@@ -917,7 +1049,7 @@ watch([tableHost, tableExpanded], () => {
 
         <SheetFooter class="flex-row justify-end gap-2 sm:space-x-0">
           <Button
-            v-if="step.workspaceInputs?.length"
+            v-if="step.workspaceInputs?.length && !pasteMode"
             variant="outline"
             size="sm"
             :disabled="inputSaving || inputLoading || !inputPath"

@@ -23,7 +23,8 @@ from capm.sources import (
     load_closes,
     load_market,
     load_ohlc,
-    load_theme_universe,
+    STOCK_WATCH_FILES,
+    WATCH_FILES,
     load_watch,
     nav_to_returns,
     parse_symbols,
@@ -120,7 +121,7 @@ def stocks_payload(
         f"本次请求 {len(picked)} 只，其中 {ready} 只能做出 120 日或 250 日窗口。",
     ]
     if _universe_name(universe) == "vp6":
-        extra.append("个股名单来自形态建仓和回测对比的题材全表，不按排名截取。")
+        extra.append("个股名单来自 4+6 与 2+3 观察表，合并去重，不按排名截取。")
         if missing:
             extra.append("未读到：" + "、".join(missing))
     if truncated:
@@ -203,37 +204,30 @@ def _resolve_universe(
     scan_path: Path | None,
     theme_rank_paths: tuple[Path, ...] | None,
 ) -> tuple[list[str], bool, dict[str, str], list[str]]:
+    del scan_path, theme_rank_paths
     if universe == "paste":
         codes, truncated = parse_symbols(symbols, SYMBOL_LIMIT)
-        names, _missing = _known_names(watch_paths, scan_path, theme_rank_paths)
-        return codes, truncated, names, []
-    if universe == "watch46":
-        watch = load_watch(watch_paths)
-        return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}, []
-    scanned, missing = load_theme_universe(theme_rank_paths, scan_path)
-    return [item["symbol"] for item in scanned], False, {item["symbol"]: item["stock_name"] for item in scanned}, missing
+        return codes, truncated, _known_names(watch_paths), []
+    files = watch_paths if watch_paths is not None else (WATCH_FILES if universe == "watch46" else STOCK_WATCH_FILES)
+    watch, missing = _watch_rows(files)
+    return [item["symbol"] for item in watch], False, {item["symbol"]: item["stock_name"] for item in watch}, missing
 
 
-def _known_names(
-    watch_paths: tuple[Path, ...] | None,
-    scan_path: Path | None,
-    theme_rank_paths: tuple[Path, ...] | None,
-) -> tuple[dict[str, str], list[str]]:
+def _watch_rows(files: tuple[Path, ...]) -> tuple[list[dict[str, str]], list[str]]:
+    missing = [path.name for path in files if not path.is_file()]
+    return load_watch(files), missing
+
+
+def _known_names(watch_paths: tuple[Path, ...] | None) -> dict[str, str]:
     names: dict[str, str] = {}
-    missing: list[str] = []
     try:
-        for item in load_theme_universe(theme_rank_paths, scan_path)[0]:
-            if item["stock_name"]:
-                names[item["symbol"]] = item["stock_name"]
-    except (FileNotFoundError, ValueError):
-        names = {}
-    try:
-        for item in load_watch(watch_paths):
+        files = watch_paths if watch_paths is not None else STOCK_WATCH_FILES
+        for item in load_watch(files):
             if item["stock_name"]:
                 names[item["symbol"]] = item["stock_name"]
     except FileNotFoundError:
-        pass
-    return names, missing
+        return {}
+    return names
 
 
 def _universe_name(universe: str) -> str:

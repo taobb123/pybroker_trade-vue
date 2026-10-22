@@ -107,6 +107,7 @@ function seedDemoHistory(): RunRecord[] {
       outputs: [
         { path: 'prediction_kline_compare.json', label: '预测 K 线' },
         { path: 'today_high_low_result.csv', label: '当日高低价' },
+        { path: 'today_high_low_lookback.csv', label: '近三日预测' },
       ],
     },
     {

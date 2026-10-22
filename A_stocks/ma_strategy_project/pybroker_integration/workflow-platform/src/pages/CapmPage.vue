@@ -254,7 +254,7 @@ onMounted(() => {
         用沪深300拆开市场贝塔和超额。主列是最近 250 个交易日，旁边是 120 日。无风险利率按 0。
         象限只用最近 120 日的年化 α、t(α) 和 β。高 α 要年化 α 为正且 t(α) ≥ 1，高 β 是 β > 1。
         250 日数字仍显示，不决定象限。
-        个股默认用形态建仓和回测对比里各题材的全部股票，不按排名截取。粘贴代码仍可单独计算。
+        个股默认用 4+6 与 2+3 观察表，合并去重，不按排名截取。粘贴代码仍可单独计算。
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
@@ -364,14 +364,14 @@ onMounted(() => {
           <CardHeader>
             <CardTitle>个股贝塔对照</CardTitle>
             <CardDescription>
-              默认读形态建仓的 M加、G·4+6 全表和全部确认建仓，以及回测对比的 Q、G·2+3 全表，合并去重。粘贴代码用同一套象限。只在本页筛选，不改观察池。
+              默认读 4+6 观察表（上涨放量突破、下跌放量）和 2+3 观察表（底部放量上涨、上涨缩量整理），合并去重。不使用题材全表。粘贴代码用同一套象限。只在本页筛选，不改观察池。
               250 日区间取最近 250 个重叠交易日，终点跟着本地行情的最后一天。
               「补到最新交易日」会把沪深300和个股日线补到最近一个已收盘交易日，并写入本页缓存。
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
             <div class="flex flex-wrap gap-2">
-              <Button size="sm" :disabled="loadingStocks" @click="loadStocks('vp6')">计算量价六组合</Button>
+              <Button size="sm" :disabled="loadingStocks" @click="loadStocks('vp6')">计算 4+6 与 2+3</Button>
               <Button size="sm" variant="outline" :disabled="loadingStocks" @click="loadStocks('paste')">计算粘贴代码</Button>
               <Button size="sm" variant="outline" :disabled="loadingStocks" @click="fillBars">
                 {{ loadingStocks ? '计算中' : '补到最新交易日' }}

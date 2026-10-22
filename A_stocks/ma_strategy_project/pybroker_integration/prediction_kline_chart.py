@@ -23,6 +23,135 @@ MODEL_LABEL = MODEL_LABEL_COMBINED
 COMBINED_HIGHLOW_HISTORY_CSV = "combined_highlow_history.csv"
 RESULT1_WALKFORWARD_CSV = "result1_walkforward.csv"
 RESULT2_WALKFORWARD_CSV = "result2_walkforward.csv"
+LOOKBACK_TRADING_DAYS = 3
+LOOKBACK_CSV_NAME = "today_high_low_lookback.csv"
+LOOKBACK_DATE_COL = "预测日"
+HIGH_CHANGE_MEDIAN_COL = "预测高价日变动中位数"
+T_LEVEL_COLUMNS = [
+    "卖三",
+    "卖二",
+    "卖一",
+    "today_high",
+    "high_low_diff",
+    "today_low",
+    "买一",
+    "买二",
+    "买三",
+]
+
+
+def t_levels_from_high_low(high: pd.Series, low: pd.Series) -> pd.DataFrame:
+    """由预测高/低价得到与当日结果表相同的买卖档（四舍五入到分）。"""
+    hi = pd.to_numeric(high, errors="coerce").round(2)
+    lo = pd.to_numeric(low, errors="coerce").round(2)
+    width = (hi - lo).round(2)
+    return pd.DataFrame(
+        {
+            "卖三": (hi + 3 * width).round(2),
+            "卖二": (hi + 2 * width).round(2),
+            "卖一": (hi + width).round(2),
+            "today_high": hi,
+            "high_low_diff": width,
+            "today_low": lo,
+            "买一": (lo - width).round(2),
+            "买二": (lo - 2 * width).round(2),
+            "买三": (lo - 3 * width).round(2),
+        }
+    )
+
+
+def _future_mask(df: pd.DataFrame) -> pd.Series:
+    if "is_future" not in df.columns:
+        return pd.Series(False, index=df.index)
+    col = df["is_future"]
+    if col.dtype == bool:
+        return col.fillna(False)
+    return col.astype(str).str.strip().str.lower().isin(["true", "1", "yes"])
+
+
+def predicted_high_change_medians(history_csv: str) -> dict[str, float]:
+    """每只股票：预测高价逐日绝对变动的中位数（含本次未来一根）。"""
+    if not history_csv or not os.path.isfile(history_csv):
+        return {}
+    df = pd.read_csv(history_csv, encoding="utf-8-sig", dtype={"symbol": str})
+    if df.empty or not {"symbol", "date", "high"}.issubset(df.columns):
+        return {}
+    df = df.copy()
+    df["symbol"] = df["symbol"].map(normalize_a_share_symbol)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["high"] = pd.to_numeric(df["high"], errors="coerce")
+    df = df.dropna(subset=["symbol", "date", "high"])
+    out: dict[str, float] = {}
+    for sym, grp in df.groupby("symbol"):
+        diffs = grp.sort_values("date")["high"].diff().abs().dropna()
+        if diffs.empty:
+            continue
+        med = float(diffs.median())
+        if pd.notna(med):
+            out[str(sym)] = float(pd.Series([med]).round(2).iloc[0])
+    return out
+
+
+def build_lookback_highlow_csv(
+    history_csv: str,
+    out_csv: str,
+    *,
+    symbol_names: dict[str, str] | None = None,
+    symbol_order: list[str] | None = None,
+    medians: dict[str, float] | None = None,
+    lookback_n: int = LOOKBACK_TRADING_DAYS,
+) -> int:
+    """从综合高低历史取未来棒之前的最近 N 个交易日，写成与当日表同结构的回溯表。"""
+    if not history_csv or not os.path.isfile(history_csv):
+        return 0
+    df = pd.read_csv(history_csv, encoding="utf-8-sig", dtype={"symbol": str})
+    if df.empty or not {"symbol", "date", "high", "low"}.issubset(df.columns):
+        return 0
+    df = df.copy()
+    df["symbol"] = df["symbol"].map(normalize_a_share_symbol)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df = df.dropna(subset=["symbol", "date", "high", "low"])
+    past = df.loc[~_future_mask(df)].copy()
+    if past.empty:
+        return 0
+    past["date_str"] = past["date"].dt.strftime("%Y-%m-%d")
+    keep_dates = sorted(past["date_str"].unique())[-max(1, int(lookback_n)) :]
+    past = past[past["date_str"].isin(keep_dates)].copy()
+    names = {
+        normalize_a_share_symbol(str(k)): str(v)
+        for k, v in (symbol_names or {}).items()
+        if str(v).strip()
+    }
+    if symbol_order:
+        allowed = [normalize_a_share_symbol(str(s)) for s in symbol_order]
+    else:
+        allowed = sorted(past["symbol"].unique())
+    allowed_set = set(allowed)
+    past = past[past["symbol"].isin(allowed_set)].copy()
+    if past.empty:
+        return 0
+    if medians is None:
+        medians = predicted_high_change_medians(history_csv)
+    levels = t_levels_from_high_low(past["high"], past["low"]).reset_index(drop=True)
+    out = pd.concat(
+        [
+            past[["date_str", "symbol"]].reset_index(drop=True),
+            levels,
+        ],
+        axis=1,
+    )
+    out = out.rename(columns={"date_str": LOOKBACK_DATE_COL})
+    out["stock_name"] = out["symbol"].map(lambda s: names.get(str(s), str(s)))
+    out[HIGH_CHANGE_MEDIAN_COL] = out["symbol"].map(medians)
+    date_rank = {d: i for i, d in enumerate(reversed(keep_dates))}
+    sym_rank = {s: i for i, s in enumerate(allowed)}
+    out["_d"] = out[LOOKBACK_DATE_COL].map(date_rank)
+    out["_s"] = out["symbol"].map(lambda s: sym_rank.get(str(s), 10**9))
+    out = out.sort_values(["_d", "_s"])
+    cols = [LOOKBACK_DATE_COL, "卖三", "卖二", "卖一", "stock_name", "today_high", "high_low_diff", "today_low", "买一", "买二", "买三", HIGH_CHANGE_MEDIAN_COL]
+    os.makedirs(os.path.dirname(os.path.abspath(out_csv)) or ".", exist_ok=True)
+    out[cols].to_csv(out_csv, index=False, encoding="utf-8-sig")
+    return int(len(out))
 
 
 def compute_high_low_from_preds(

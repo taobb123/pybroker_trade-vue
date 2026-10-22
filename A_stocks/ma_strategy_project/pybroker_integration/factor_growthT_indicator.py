@@ -641,6 +641,9 @@ DEFAULT_VOLUME_GROWTH_CSV = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "pattern_entry_volume_growth_rank.csv"
 )
 VOLUME_GROUP_NAME = "量能"
+DEFAULT_PASTE_GROWTH_CSV = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "factor_growth_paste_rank.csv"
+)
 _EMPTY_GROWTH_COLUMNS = (
     "分组",
     "排名",
@@ -916,30 +919,107 @@ def rank_yoy_top_by_growth(
     return ranked, notes
 
 
+GROWTH_GROUP_ORDER = ("M加", "Q", "G·4+6", "G·2+3", VOLUME_GROUP_NAME)
+_GROWTH_GROUP_ALIASES = {
+    "m+": "M加",
+    "m加": "M加",
+    "q": "Q",
+    "g·4+6": "G·4+6",
+    "g4+6": "G·4+6",
+    "4+6": "G·4+6",
+    "g·2+3": "G·2+3",
+    "g2+3": "G·2+3",
+    "2+3": "G·2+3",
+    "量能": VOLUME_GROUP_NAME,
+    "volume": VOLUME_GROUP_NAME,
+}
+
+
+def parse_group_filter(raw: str) -> Optional[List[str]]:
+    """解析 --groups。未填写返回 None（五组都跑）；填写后只保留合法分组，可为空列表。"""
+    text = str(raw or "").replace("，", ",").strip()
+    if not text:
+        return None
+    known = set(GROWTH_GROUP_ORDER)
+    picked: List[str] = []
+    unknown: List[str] = []
+    for part in text.split(","):
+        key = part.strip()
+        if not key:
+            continue
+        name = _GROWTH_GROUP_ALIASES.get(key.lower(), _GROWTH_GROUP_ALIASES.get(key, key))
+        if name not in known:
+            unknown.append(key)
+            continue
+        if name not in picked:
+            picked.append(name)
+    if unknown:
+        print("[warn] 忽略未知分组: " + "、".join(unknown))
+    return [g for g in GROWTH_GROUP_ORDER if g in picked]
+
+
+def _merge_kept_group_rows(
+    new_rows: List[dict],
+    ranking_file: str,
+    replaced_groups: Sequence[str],
+) -> List[dict]:
+    """部分分组重跑时，保留未重算分组在合并表里的旧行。"""
+    replaced = {str(g).strip() for g in replaced_groups if str(g).strip()}
+    if not os.path.isfile(ranking_file):
+        return list(new_rows)
+    old = _read_csv_flexible(ranking_file)
+    if old is None or old.empty or "分组" not in {str(c).strip() for c in old.columns}:
+        return list(new_rows)
+    cols = {str(c).strip(): c for c in old.columns}
+    group_col = cols.get("分组")
+    if group_col is None:
+        return list(new_rows)
+    kept: List[dict] = []
+    for rec in old.to_dict(orient="records"):
+        if str(rec.get(group_col) or "").strip() not in replaced:
+            kept.append(rec)
+    return kept + list(new_rows)
+
+
 def run_from_upstream_top13(
     *,
     top_n: int = GROWTH_TOP_N_DEFAULT,
     skip_push: bool = True,
     ranking_file: Optional[str] = None,
+    groups: Optional[Sequence[str]] = None,
 ) -> int:
     """单独点「成长因子」：M+、Q、G 各取上游前 N；量能取信号表全部确认建仓。组内独立排序写 CSV。暂不推东财。"""
     n = max(1, int(top_n))
     combined = ranking_file or DEFAULT_COMBINED_GROWTH_CSV
+    wanted = None if groups is None else {str(g).strip() for g in groups if str(g).strip()}
+    specs = [
+        spec for spec in UPSTREAM_GROWTH_SPECS if wanted is None or spec[0] in wanted
+    ]
+    run_volume = wanted is None or VOLUME_GROUP_NAME in wanted
+    partial = wanted is not None
     print("=" * 80)
-    print("成长因子排序 · 上游前13 + 量能确认建仓全部（不读东财导出 txt，暂不推东财）")
-    for group, src, out_csv in UPSTREAM_GROWTH_SPECS:
+    head = f"成长因子排序 · 上游前{n}"
+    if run_volume:
+        head += " + 量能确认建仓全部"
+    print(head + "（不读东财导出 txt，暂不推东财）")
+    if wanted is not None:
+        chosen = [g for g in GROWTH_GROUP_ORDER if g in wanted]
+        print("本次分组: " + "、".join(f"「{g}」" for g in chosen))
+    for group, src, out_csv in specs:
         print(
             f"{group} ← {os.path.basename(src)}  Top{n} → {os.path.basename(out_csv)}"
         )
-    print(
-        f"{VOLUME_GROUP_NAME} ← {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}  "
-        f"确认建仓全部 → {os.path.basename(DEFAULT_VOLUME_GROWTH_CSV)}"
-    )
+    if run_volume:
+        print(
+            f"{VOLUME_GROUP_NAME} ← {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}  "
+            f"确认建仓全部 → {os.path.basename(DEFAULT_VOLUME_GROWTH_CSV)}"
+        )
     print("=" * 80)
 
     all_rows: List[dict] = []
+    replaced_groups: List[str] = []
     any_ok = False
-    for group, src, out_csv in UPSTREAM_GROWTH_SPECS:
+    for group, src, out_csv in specs:
         print("-" * 72)
         current = top_symbols_from_rank_csv(src, n)
         if not current:
@@ -957,40 +1037,46 @@ def run_from_upstream_top13(
         if ranked is None:
             continue
         any_ok = True
+        replaced_groups.append(group)
         names = get_stock_names(ranked)
         industries = get_stock_industries(ranked)
         all_rows.extend(_ranking_rows(group, ranked, details, names, industries))
 
-    print("-" * 72)
-    vol_syms, vol_names, vol_status = load_confirmed_entry_symbols(DEFAULT_PATTERN_SCAN_CSV)
-    if vol_status == "missing":
-        print(
-            f"  跳过「{VOLUME_GROUP_NAME}」：无 {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}（请先跑形态建仓）"
-        )
-    else:
-        print(f"  信号表确认建仓 {len(vol_syms)} 只（不截前13）")
-        vol_ranked, vol_notes, vol_details = rank_volume_confirmed_entries(
-            vol_syms,
-            name_map=vol_names,
-        )
-        for line in vol_notes:
-            print(f"  {line}")
-        if vol_ranked:
-            any_ok = True
-            names = get_stock_names(vol_ranked)
-            industries = get_stock_industries(vol_ranked)
-            all_rows.extend(
-                _ranking_rows(VOLUME_GROUP_NAME, vol_ranked, vol_details, names, industries)
+    if run_volume:
+        print("-" * 72)
+        vol_syms, vol_names, vol_status = load_confirmed_entry_symbols(DEFAULT_PATTERN_SCAN_CSV)
+        if vol_status == "missing":
+            print(
+                f"  跳过「{VOLUME_GROUP_NAME}」：无 {os.path.basename(DEFAULT_PATTERN_SCAN_CSV)}（请先跑形态建仓）"
             )
+        else:
+            print(f"  信号表确认建仓 {len(vol_syms)} 只（不截前{n}）")
+            vol_ranked, vol_notes, vol_details = rank_volume_confirmed_entries(
+                vol_syms,
+                name_map=vol_names,
+            )
+            for line in vol_notes:
+                print(f"  {line}")
+            replaced_groups.append(VOLUME_GROUP_NAME)
+            if vol_ranked:
+                any_ok = True
+                names = get_stock_names(vol_ranked)
+                industries = get_stock_industries(vol_ranked)
+                all_rows.extend(
+                    _ranking_rows(VOLUME_GROUP_NAME, vol_ranked, vol_details, names, industries)
+                )
 
-    if all_rows:
+    rows_to_save = all_rows
+    if partial:
+        rows_to_save = _merge_kept_group_rows(all_rows, combined, replaced_groups)
+    if rows_to_save:
         try:
-            _save_ranking_csv(all_rows, combined)
+            _save_ranking_csv(rows_to_save, combined)
         except Exception as save_err:
             print(f"[warn] 保存合并成长表失败: {save_err}")
     else:
         _save_ranking_csv([], combined)
-        print("成长表为空（上游前13与量能确认建仓均不可用或打分失败）")
+        print("成长表为空（上游前N与量能确认建仓均不可用或打分失败）")
 
     return 0 if any_ok else 2
 
@@ -1056,8 +1142,66 @@ def run_mx_group_growth_rank(
     return 0 if any_ok else 2
 
 
+def run_pasted_symbols(
+    symbols: Sequence[str],
+    ranking_file: Optional[str] = None,
+) -> int:
+    """粘贴代码：单独排序并写一张表。不写入 M加 / Q / G / 量能，也不改综合表。"""
+    current = [str(s).strip() for s in symbols if str(s).strip()]
+    if not current:
+        print("[fail] 粘贴代码为空")
+        return 2
+    out_csv = str(ranking_file or "").strip() or DEFAULT_PASTE_GROWTH_CSV
+    print(f"粘贴代码 · 独立排序 {len(current)} 只（不写入分组，不改综合表）")
+    try:
+        ranked, details, scores = rank_symbols_by_growth(current)
+    except GrowthRankError as exc:
+        print(f"[fail] 粘贴代码排序失败（{exc}）")
+        return 2
+    except Exception as exc:
+        print(f"[fail] 粘贴代码排序异常（{exc}）")
+        return 2
+    names: Dict[str, str] = {}
+    industries: Dict[str, str] = {}
+    try:
+        names = get_stock_names(ranked)
+    except Exception as exc:
+        print(f"[warn] 粘贴代码补名称失败: {exc}")
+    try:
+        industries = get_stock_industries(ranked)
+    except Exception as exc:
+        print(f"[warn] 粘贴代码补行业失败: {exc}")
+    rows = []
+    for i, symbol in enumerate(ranked, 1):
+        detail = details.get(symbol, {}) or {}
+        score = scores.get(symbol)
+        score_text = (
+            f"{float(score):.4f}" if score is not None and score == score else "无财务分"
+        )
+        print(f"  {i}. {names.get(symbol) or symbol} {symbol}  {score_text}")
+        rows.append(
+            {
+                "排名": i,
+                "股票代码": symbol,
+                "股票名称": names.get(symbol, symbol),
+                "行业": industries.get(symbol, ""),
+                "总分": detail.get("total_score"),
+                "资产安全得分": detail.get("layer1_score"),
+                "现金流质量得分": detail.get("layer2_score"),
+                "盈利质量得分": detail.get("layer3_score"),
+                "运营效率得分": detail.get("layer4_score"),
+            }
+        )
+    try:
+        _save_ranking_csv(rows, out_csv)
+    except Exception as exc:
+        print(f"[warn] 粘贴代码排序表写入失败（{exc}）")
+        return 2
+    return 0 if ranked else 2
+
+
 def main():
-    """默认：上游 M+/Q/G 前13 成长排序写 CSV。--symbols+--group 供形态建仓/回测对比调用。"""
+    """默认：上游 M+/Q/G 前13 成长排序写 CSV。仅 --symbols 时写独立排序表。"""
     parser = argparse.ArgumentParser(description="稳健高质量成长因子")
     parser.add_argument(
         "--from-upstream-top13",
@@ -1067,12 +1211,12 @@ def main():
     parser.add_argument(
         "--symbols",
         default="",
-        help="逗号/空白分隔代码；与 --group 联用时只排这一组（形态建仓/回测对比调用）",
+        help="逗号/空白分隔代码。不带 --group 时写入独立排序表，不并入分组",
     )
     parser.add_argument(
         "--group",
         default="",
-        help="分组标签（M加、Q、G·4+6 或 G·2+3，仅用于 CSV）",
+        help="分组标签（M加、Q、G·4+6、G·2+3 或 量能）。与 --symbols 联用时只排这一组",
     )
     parser.add_argument(
         "--ranking-file",
@@ -1083,7 +1227,12 @@ def main():
         "--top-n",
         type=int,
         default=GROWTH_TOP_N_DEFAULT,
-        help="上游排名表取前几只（默认 13）",
+        help="上游排名表取前几只（默认 13）。量能组不受此限制。",
+    )
+    parser.add_argument(
+        "--groups",
+        default="",
+        help="只跑这些分组，逗号分隔：M加,Q,G·4+6,G·2+3,量能。空则五组都跑。",
     )
     parser.add_argument(
         "--from-mx-groups",
@@ -1112,9 +1261,12 @@ def main():
     ranking_file = str(args.ranking_file or "").strip() or None
     skip_push = True
 
+    if symbols and not group:
+        raise SystemExit(run_pasted_symbols(symbols, ranking_file=ranking_file))
+
     if symbols or group:
         if not symbols or not group:
-            print("[fail] 指定 --symbols 时必须同时给 --group（M加、Q、G·4+6 或 G·2+3）")
+            print("[fail] 指定 --group 时必须同时给 --symbols")
             raise SystemExit(2)
         ranked, notes, _details = rank_and_push_symbols(
             symbols,
@@ -1128,12 +1280,17 @@ def main():
 
     if not bool(args.backtest):
         if str(args.from_mx_groups or "").strip():
-            print("[warn] --from-mx-groups 已停用。改走上游 M+/Q/G 前13，量能改读信号表确认建仓。")
+            print("[warn] --from-mx-groups 已停用。改走上游 M+/Q/G 前N，量能改读信号表确认建仓。")
+        groups = parse_group_filter(str(args.groups or ""))
+        if groups is not None and not groups:
+            print("[fail] --groups 没有可用分组。可选：M加,Q,G·4+6,G·2+3,量能")
+            raise SystemExit(2)
         raise SystemExit(
             run_from_upstream_top13(
                 top_n=int(args.top_n),
                 skip_push=skip_push,
                 ranking_file=ranking_file,
+                groups=groups,
             )
         )
 

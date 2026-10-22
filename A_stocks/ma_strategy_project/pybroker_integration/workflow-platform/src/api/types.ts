@@ -28,6 +28,25 @@ export type ComboOption = {
   label: string
 }
 
+export type CustomParamOption = {
+  value: string
+  label: string
+}
+
+export type CustomParam = {
+  id: string
+  label: string
+  hint?: string
+  /** 传给脚本的参数名，如 --top-n */
+  flag: string
+  type: 'select' | 'multi'
+  /** select 为单个值；multi 为逗号拼接 */
+  default: string
+  options: CustomParamOption[]
+  /** int 时运行前校验为正整数 */
+  valueType?: 'int' | 'text'
+}
+
 export type WorkflowStep = {
   id: string
   title: string
@@ -46,9 +65,14 @@ export type WorkflowStep = {
   symbolsPaste?: boolean
   symbolsPasteHint?: string
   symbolsPasteEmptyHint?: string
+  /** 粘贴代码出现在「输入文件」下拉里，而不是单独一块 */
+  symbolsPasteAsInput?: boolean
+  /** 粘贴代码的独立结果表，相对项目根 */
+  symbolsPasteOutput?: string
   symbolsPasteComboOptions?: ComboOption[]
   runModes?: RunMode[]
   poolPresets?: PoolPreset[]
+  customParams?: CustomParam[]
   workspaceInputs?: WorkspacePathRef[]
   workspaceOutputs?: WorkspaceOutput[]
   runnable: boolean
@@ -56,10 +80,16 @@ export type WorkflowStep = {
 
 export type StepDraft = {
   symbolsText: string
+  /** 输入文件下拉里选了「粘贴代码」 */
+  pasteInput: boolean
   comboId: string
   runMode: string
   poolPath: string
   poolCustom: string
+  /** 自定义参数当前选项；multi 为逗号拼接 */
+  paramValues: Record<string, string>
+  /** select 选「自定义」时的手填值 */
+  paramCustom: Record<string, string>
 }
 
 export type RunPayload = {
@@ -111,15 +141,53 @@ export function collectRunPayload(step: WorkflowStep, draft: StepDraft): RunPayl
     extra.push('--pool', path)
   }
 
+  if (step.customParams?.length) {
+    for (const param of step.customParams) {
+      const selected = (draft.paramValues?.[param.id] ?? param.default).trim()
+      if (param.type === 'multi') {
+        const picked = selected.split(',').map((s) => s.trim()).filter(Boolean)
+        const defaults = param.default.split(',').map((s) => s.trim()).filter(Boolean)
+        if (!picked.length) {
+          alert(`请至少选择一项：${param.label}`)
+          return null
+        }
+        const same =
+          picked.length === defaults.length && picked.every((v) => defaults.includes(v))
+        if (same) continue
+        extra.push(param.flag, picked.join(','))
+        continue
+      }
+      const value =
+        selected === '__custom__' ? (draft.paramCustom?.[param.id] ?? '').trim() : selected
+      if (!value) {
+        alert(`请填写${param.label}`)
+        return null
+      }
+      if (param.valueType === 'int') {
+        const n = Number(value)
+        if (!Number.isInteger(n) || n < 1) {
+          alert(`${param.label}须为正整数`)
+          return null
+        }
+      }
+      if (value === param.default) continue
+      extra.push(param.flag, value)
+    }
+  }
+
   if (step.symbolsPaste) {
+    const usePaste = !step.symbolsPasteAsInput || Boolean(draft.pasteInput)
     const symbols = normalizeSymbols(draft.symbolsText)
-    if (symbols) {
+    if (usePaste && symbols) {
       if (step.symbolsPasteComboOptions?.length && !draft.comboId) {
         alert('粘贴列表时请先选择形态 ID')
         return null
       }
       if (draft.comboId) {
         extra.push('--combo-id', draft.comboId)
+      }
+      if (step.symbolsPasteOutput) {
+        extra.push('--ranking-file', step.symbolsPasteOutput)
       }
       extra.push('--symbols', symbols)
     }
@@ -134,9 +202,12 @@ export function collectRunPayload(step: WorkflowStep, draft: StepDraft): RunPayl
 export function emptyDraft(step: WorkflowStep): StepDraft {
   return {
     symbolsText: '',
+    pasteInput: false,
     comboId: '',
     runMode: step.runModes?.[0]?.id ?? '',
     poolPath: step.poolPresets?.[0]?.path ?? '',
     poolCustom: '',
+    paramValues: Object.fromEntries((step.customParams ?? []).map((p) => [p.id, p.default])),
+    paramCustom: {},
   }
 }

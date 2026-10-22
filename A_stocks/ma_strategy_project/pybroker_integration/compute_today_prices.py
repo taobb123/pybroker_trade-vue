@@ -40,13 +40,19 @@ from prediction_kline_chart import (
     CHART_SYMBOL_COUNT,
     COMBINED_HIGHLOW_HISTORY_CSV,
     COMPARE_JSON_NAME,
+    HIGH_CHANGE_MEDIAN_COL,
     HISTORY_DAYS,
+    LOOKBACK_CSV_NAME,
     MODEL_LABEL_COMBINED,
     RESULT1_WALKFORWARD_CSV,
     RESULT2_WALKFORWARD_CSV,
+    T_LEVEL_COLUMNS,
     build_charts_json,
     build_combined_highlow_history_csv,
+    build_lookback_highlow_csv,
     compute_high_low_from_preds,
+    predicted_high_change_medians,
+    t_levels_from_high_low,
 )
 from stock_names import resolve_stock_names
 from prediction_kline_signal import SIGNAL_CSV_NAME, run_signal_pipeline
@@ -307,22 +313,12 @@ def main():
     # 最终结果：仅股票名称与高低价及买卖档（不含 symbol 列）
     # 列序从高到低：卖三→卖一 | 名称/高价/差价/低价 | 买一→买三
     # 区间宽度固定用 high_low_diff；为 0 时各档重合（不区分档位）
-    final = merge_df[['stock_name', 'today_high', 'today_low']].copy()
-    final['today_high'] = final['today_high'].round(2)
-    final['today_low'] = final['today_low'].round(2)
-    final['high_low_diff'] = (final['today_high'] - final['today_low']).round(2)
-    hi = final['today_high']
-    lo = final['today_low']
-    w = final['high_low_diff']
-    final['卖一'] = (hi + w).round(2)
-    final['卖二'] = (hi + 2 * w).round(2)
-    final['卖三'] = (hi + 3 * w).round(2)
-    final['买一'] = (lo - w).round(2)
-    final['买二'] = (lo - 2 * w).round(2)
-    final['买三'] = (lo - 3 * w).round(2)
-    final = final[
-        ['卖三', '卖二', '卖一', 'stock_name', 'today_high', 'high_low_diff', 'today_low', '买一', '买二', '买三']
-    ]
+    levels = t_levels_from_high_low(merge_df['today_high'], merge_df['today_low'])
+    final = pd.concat(
+        [merge_df[['stock_name']].reset_index(drop=True), levels.reset_index(drop=True)],
+        axis=1,
+    )
+    final = final[['卖三', '卖二', '卖一', 'stock_name', *T_LEVEL_COLUMNS[3:]]]
     high_low_override = {
         normalize_a_share_symbol(str(s)): (float(h), float(l))
         for s, h, l in zip(merge_df['symbol'], merge_df['today_high'], merge_df['today_low'])
@@ -360,6 +356,31 @@ def main():
         )
         if n_combined:
             print(f"综合预测高低 K 线 CSV 已写入: {combined_history}（{n_combined} 行）")
+        medians = predicted_high_change_medians(combined_history)
+        symbol_order = [
+            normalize_a_share_symbol(str(s)) for s in merge_df['symbol'].astype(str).tolist()
+        ]
+        name_by_symbol = {
+            normalize_a_share_symbol(str(s)): str(n)
+            for s, n in zip(merge_df['symbol'].astype(str), merge_df['stock_name'].astype(str))
+        }
+        lookback_path = os.path.join(script_dir, LOOKBACK_CSV_NAME)
+        n_lookback = build_lookback_highlow_csv(
+            combined_history,
+            lookback_path,
+            symbol_names=name_by_symbol,
+            symbol_order=symbol_order,
+            medians=medians,
+        )
+        if n_lookback:
+            print(f"近三日预测回溯已写入: {lookback_path}（{n_lookback} 行）")
+        else:
+            print(f"未生成近三日预测回溯（{combined_history} 中无历史交易日）")
+        final[HIGH_CHANGE_MEDIAN_COL] = [
+            medians.get(sym) for sym in symbol_order
+        ]
+        final.to_csv(final_path, index=False, encoding='utf-8-sig')
+        print(f"已写入{HIGH_CHANGE_MEDIAN_COL}: {final_path}")
         chart_symbols = load_train_model_shift_symbols()[:CHART_SYMBOL_COUNT]
         chart_names = resolve_display_names(chart_symbols, symbol_names_path)
         payload = build_charts_json(

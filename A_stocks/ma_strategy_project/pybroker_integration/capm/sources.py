@@ -21,6 +21,12 @@ WATCH_FILES = (
     PROJECT_ROOT / "vp_combo_watch_4.csv",
     PROJECT_ROOT / "vp_combo_watch_6.csv",
 )
+STOCK_WATCH_FILES = (
+    PROJECT_ROOT / "vp_combo_watch_4.csv",
+    PROJECT_ROOT / "vp_combo_watch_6.csv",
+    PROJECT_ROOT / "vp_combo_watch_2.csv",
+    PROJECT_ROOT / "vp_combo_watch_3.csv",
+)
 THEME_RANK_FILES = (
     PROJECT_ROOT / "pattern_entry_mplus_rank.csv",
     PROJECT_ROOT / "pattern_entry_g_rank.csv",
@@ -209,7 +215,8 @@ def load_watch(paths: tuple[Path, ...] | None = None) -> list[dict[str, str]]:
             seen.add(code)
             rows.append({"symbol": code, "stock_name": "" if pd.isna(name) else str(name)})
     if not found:
-        raise FileNotFoundError("缺少观察池 vp_combo_watch_4.csv / vp_combo_watch_6.csv")
+        names = "、".join(path.name for path in files)
+        raise FileNotFoundError(f"缺少观察表 {names}")
     return rows
 
 
