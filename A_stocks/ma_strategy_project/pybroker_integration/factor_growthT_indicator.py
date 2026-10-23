@@ -730,6 +730,14 @@ def _entry_flag(raw) -> bool:
     return text in {"1", "true", "yes", "y"}
 
 
+def load_combined_growth_symbols(path: Optional[str] = None) -> List[str]:
+    """成长综合得分表里的代码，跨分组去重。文件不存在时返回空列表。"""
+    p = str(path or "").strip() or DEFAULT_COMBINED_GROWTH_CSV
+    if not os.path.isfile(p):
+        return []
+    return top_symbols_from_rank_csv(p, top_n=10**6)
+
+
 def load_confirmed_entry_symbols(path: str) -> Tuple[List[str], Dict[str, str], str]:
     """
     读形态建仓信号表里的确认建仓（state_code=entry / 待选后通过）。
@@ -1142,43 +1150,83 @@ def run_mx_group_growth_rank(
     return 0 if any_ok else 2
 
 
+def _finite_score(score) -> bool:
+    return score is not None and score == score
+
+
 def run_pasted_symbols(
     symbols: Sequence[str],
     ranking_file: Optional[str] = None,
+    reference_file: Optional[str] = None,
 ) -> int:
-    """粘贴代码：单独排序并写一张表。不写入 M加 / Q / G / 量能，也不改综合表。"""
-    current = [str(s).strip() for s in symbols if str(s).strip()]
-    if not current:
+    """粘贴代码：与成长综合得分表一起标准化，只把粘贴结果写入独立表。
+
+    不写入 M加 / Q / G / 量能，也不改综合表。综合表缺失时退回只排粘贴代码。
+    """
+    pasted: List[str] = []
+    seen = set()
+    for raw in symbols:
+        sym = _norm_code(raw)
+        if sym and sym not in seen:
+            seen.add(sym)
+            pasted.append(sym)
+    if not pasted:
         print("[fail] 粘贴代码为空")
         return 2
     out_csv = str(ranking_file or "").strip() or DEFAULT_PASTE_GROWTH_CSV
-    print(f"粘贴代码 · 独立排序 {len(current)} 只（不写入分组，不改综合表）")
+    reference = load_combined_growth_symbols(reference_file)
+    universe: List[str] = []
+    universe_seen = set()
+    for sym in list(reference) + pasted:
+        if sym not in universe_seen:
+            universe_seen.add(sym)
+            universe.append(sym)
+    compared = bool(reference)
+    if compared:
+        print(
+            f"粘贴代码 · 对照成长综合得分表 {len(reference)} 只一起标准化，"
+            f"写出 {len(pasted)} 只（不写入分组，不改综合表）"
+        )
+        if len(universe) < 2:
+            print("[warn] 可对照股票不足 2 只，标准化后得分仍可能为 0")
+    else:
+        print(
+            f"[warn] 未找到成长综合得分表，粘贴代码单独排序 {len(pasted)} 只"
+            "（不写入分组，不改综合表）"
+        )
     try:
-        ranked, details, scores = rank_symbols_by_growth(current)
+        ranked, details, scores = rank_symbols_by_growth(universe)
     except GrowthRankError as exc:
         print(f"[fail] 粘贴代码排序失败（{exc}）")
         return 2
     except Exception as exc:
         print(f"[fail] 粘贴代码排序异常（{exc}）")
         return 2
+    rank_of: Dict[str, int] = {}
+    n_scored = 0
+    for sym in ranked:
+        if _finite_score(scores.get(sym)):
+            n_scored += 1
+            rank_of[sym] = n_scored
+    show = sorted(pasted, key=lambda s: (rank_of.get(s, 10**9), pasted.index(s)))
     names: Dict[str, str] = {}
     industries: Dict[str, str] = {}
     try:
-        names = get_stock_names(ranked)
+        names = get_stock_names(show)
     except Exception as exc:
         print(f"[warn] 粘贴代码补名称失败: {exc}")
     try:
-        industries = get_stock_industries(ranked)
+        industries = get_stock_industries(show)
     except Exception as exc:
         print(f"[warn] 粘贴代码补行业失败: {exc}")
     rows = []
-    for i, symbol in enumerate(ranked, 1):
+    for i, symbol in enumerate(show, 1):
         detail = details.get(symbol, {}) or {}
         score = scores.get(symbol)
-        score_text = (
-            f"{float(score):.4f}" if score is not None and score == score else "无财务分"
-        )
-        print(f"  {i}. {names.get(symbol) or symbol} {symbol}  {score_text}")
+        score_text = f"{float(score):.4f}" if _finite_score(score) else "无财务分"
+        place = rank_of.get(symbol)
+        place_text = f"{place}/{n_scored}" if place else "无财务分"
+        print(f"  {i}. {names.get(symbol) or symbol} {symbol}  {score_text}  综合对照排名 {place_text}")
         rows.append(
             {
                 "排名": i,
@@ -1190,6 +1238,8 @@ def run_pasted_symbols(
                 "现金流质量得分": detail.get("layer2_score"),
                 "盈利质量得分": detail.get("layer3_score"),
                 "运营效率得分": detail.get("layer4_score"),
+                "综合对照排名": place if place else "",
+                "对照样本": n_scored,
             }
         )
     try:
@@ -1197,7 +1247,7 @@ def run_pasted_symbols(
     except Exception as exc:
         print(f"[warn] 粘贴代码排序表写入失败（{exc}）")
         return 2
-    return 0 if ranked else 2
+    return 0 if show else 2
 
 
 def main():

@@ -1037,7 +1037,7 @@ watch([tableHost, tableExpanded], () => {
               {{
                 pasteMode
                   ? pastedCount
-                    ? `已粘贴 ${pastedCount} 只 → 运行后写入独立排序表`
+                    ? `已粘贴 ${pastedCount} 只 → 对照成长综合得分后写入独立排序表`
                     : step.symbolsPasteEmptyHint || '留空则仍按上游文件排序'
                   : inputMsg || inputPath || '—'
               }}
