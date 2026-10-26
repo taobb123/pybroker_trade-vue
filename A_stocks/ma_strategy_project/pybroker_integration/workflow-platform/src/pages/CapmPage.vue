@@ -21,6 +21,7 @@ import {
   type CapmRow,
   type CapmWindow,
 } from '@/api/capm'
+import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 
 const tab = ref('sleeves')
 const sleeves = ref<CapmReport | null>(null)
@@ -35,10 +36,14 @@ const pasted = ref('')
 const universe = ref<'vp6' | 'paste'>('vp6')
 const band = ref('all')
 const actBand = ref('all')
+const alphaAnnNeg = ref(false)
+const alpha120Neg = ref(false)
 const sleeveQuadrant = ref('all')
 const stockQuadrant = ref('all')
-const sortKey = ref<'beta' | 'alpha' | 'r2' | 'name' | 'session'>('session')
+const sortKey = ref<'beta' | 'alpha' | 'r2' | 'excess' | 'name' | 'session'>('session')
 const sortDir = ref<-1 | 1>(-1)
+const codeCopyFlash = ref('')
+let codeCopyTimer: ReturnType<typeof setTimeout> | undefined
 
 const quadrantCards = [
   {
@@ -135,6 +140,16 @@ function matchesActBand(row: CapmRow, id: string): boolean {
   return false
 }
 
+function negativeAlpha(value: number | null | undefined): boolean {
+  return value != null && !Number.isNaN(value) && value < 0
+}
+
+function matchesAlpha(row: CapmRow): boolean {
+  if (alphaAnnNeg.value && !negativeAlpha(row.w250?.alphaAnn)) return false
+  if (alpha120Neg.value && !negativeAlpha(row.w120?.alphaAnn)) return false
+  return true
+}
+
 function sessionSortable(row: CapmRow): boolean {
   if (row.actLabel !== '震仓洗盘' && row.actLabel !== '释放套牢盘') return false
   return row.sessionReturn != null && !Number.isNaN(row.sessionReturn)
@@ -145,6 +160,7 @@ function sortValue(row: CapmRow): number | string {
   if (sortKey.value === 'session') return row.sessionReturn ?? Number.NEGATIVE_INFINITY
   if (sortKey.value === 'alpha') return row.w250?.alphaAnn ?? row.w120?.alphaAnn ?? Number.NEGATIVE_INFINITY
   if (sortKey.value === 'r2') return row.w250?.r2 ?? row.w120?.r2 ?? Number.NEGATIVE_INFINITY
+  if (sortKey.value === 'excess') return row.w250?.excess ?? Number.NEGATIVE_INFINITY
   return betaOf(row) ?? Number.NEGATIVE_INFINITY
 }
 
@@ -162,7 +178,7 @@ const visibleSleeves = computed(() => applyQuadrant(sleeves.value?.rows ?? [], s
 const visibleStocks = computed(() => {
   const rows = applyQuadrant(stocks.value?.rows ?? [], stockQuadrant.value)
   const byBeta = band.value === 'all' ? rows : rows.filter((row) => bandOf(betaOf(row)) === band.value)
-  const filtered = byBeta.filter((row) => matchesActBand(row, actBand.value))
+  const filtered = byBeta.filter((row) => matchesActBand(row, actBand.value) && matchesAlpha(row))
   return [...filtered].sort((a, b) => {
     if (sortKey.value === 'session') {
       const leftOn = sessionSortable(a)
@@ -184,7 +200,28 @@ const visibleStocks = computed(() => {
   })
 })
 
-function toggleSort(key: 'beta' | 'alpha' | 'r2' | 'name' | 'session') {
+function flashCodeCopy(text: string) {
+  codeCopyFlash.value = text
+  if (codeCopyTimer) clearTimeout(codeCopyTimer)
+  codeCopyTimer = setTimeout(() => {
+    codeCopyFlash.value = ''
+  }, 1600)
+}
+
+async function copySortedCodes() {
+  const text = stockCodesToCopyText(
+    ['代码'],
+    visibleStocks.value.map((row) => [row.symbol]),
+  )
+  if (!text) {
+    flashCodeCopy('无代码')
+    return
+  }
+  const ok = await copyTextToClipboard(text)
+  flashCodeCopy(ok ? '已复制' : '复制失败')
+}
+
+function toggleSort(key: 'beta' | 'alpha' | 'r2' | 'excess' | 'name' | 'session') {
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 1 ? -1 : 1
     return
@@ -414,6 +451,22 @@ onMounted(() => {
             </div>
             <div class="flex flex-wrap gap-1">
               <Button
+                size="sm"
+                :variant="alphaAnnNeg ? 'default' : 'outline'"
+                @click="alphaAnnNeg = !alphaAnnNeg"
+              >
+                年化 α&lt;0
+              </Button>
+              <Button
+                size="sm"
+                :variant="alpha120Neg ? 'default' : 'outline'"
+                @click="alpha120Neg = !alpha120Neg"
+              >
+                120 日 α&lt;0
+              </Button>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <Button
                 v-for="item in actBands"
                 :key="item.id"
                 size="sm"
@@ -427,6 +480,7 @@ onMounted(() => {
               样本 {{ stocks.sampleStart || '—' }} 至 {{ stocks.sampleEnd || '—' }}。
               请求 {{ stocks.requested ?? stocks.rows.length }} 只，能估计窗口的 {{ stocks.ready ?? '—' }} 只。
               当前显示 {{ visibleStocks.length }} 只。分档用 250 日 β，没有则用 120 日 β。
+              年化 α&lt;0 只保留 250 日年化 α 小于 0 的股票。120 日 α&lt;0 只保留 120 日 α 小于 0 的股票。两个可以同时打开，再点一次取消。没有对应数字的不进入。
               主力表演按走完后 3 个交易日的涨跌筛选。震仓洗盘只看跌幅大于 2% 且小于 5%（涨跌在 -5% 和 -2% 之间）。释放套牢盘只看大于 0%。刚好等于 -2%、-5%、0%，以及没有这段收益的，只留在「表演全部」。
               当日涨幅是该股票最近一根收盘相对前一交易日收盘的涨跌。默认把全部震仓洗盘和全部释放套牢盘按这个涨幅从高到低排在前面。打断、未走完、无，以及没有当日涨幅的，留在后面。
             </p>
@@ -438,6 +492,14 @@ onMounted(() => {
                   <TableRow>
                     <TableHead>
                       <button type="button" class="hover:underline" @click="toggleSort('name')">代码</button>
+                      <button
+                        type="button"
+                        class="ml-1 text-xs text-muted-foreground hover:underline"
+                        title="复制当前表格里排好序的股票代码，每行一个"
+                        @click="copySortedCodes"
+                      >
+                        {{ codeCopyFlash || '复制' }}
+                      </button>
                     </TableHead>
                     <TableHead>名称</TableHead>
                     <TableHead>主力表演</TableHead>
@@ -455,7 +517,9 @@ onMounted(() => {
                     <TableHead>
                       <button type="button" class="hover:underline" @click="toggleSort('r2')">R²</button>
                     </TableHead>
-                    <TableHead class="text-right">超额</TableHead>
+                    <TableHead class="text-right">
+                      <button type="button" class="hover:underline" @click="toggleSort('excess')">超额</button>
+                    </TableHead>
                     <TableHead class="text-right">120 日 β</TableHead>
                     <TableHead class="text-right">120 日 α</TableHead>
                     <TableHead>说明</TableHead>
