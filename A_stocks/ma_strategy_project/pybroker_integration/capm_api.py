@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
+from capm.desk import desk_payload
 from capm.service import sleeves_payload, stocks_payload
 from capm.sources import fetch_act_bars, fetch_benchmark, latest_trading_day
 
@@ -20,6 +21,11 @@ class StockBody(BaseModel):
 @router.get("/sleeves")
 def sleeves() -> dict:
     return sleeves_payload()
+
+
+@router.get("/desk")
+def desk() -> dict:
+    return desk_payload()
 
 
 @router.get("/stocks")

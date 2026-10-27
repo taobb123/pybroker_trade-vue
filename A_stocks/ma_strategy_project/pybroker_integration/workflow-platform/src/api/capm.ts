@@ -167,6 +167,158 @@ export async function fetchCapmStocks(universe: 'vp6' | 'paste' | 'watch46', sym
   return readBody(response)
 }
 
+export type DeskRow = {
+  symbol: string
+  stockName: string
+  state: string
+  stateLabel: string
+  current: boolean
+  signalDate: string | null
+  buyDate: string | null
+  beta250: number | null
+  alpha250: number | null
+  alpha120: number | null
+  delta120: number | null
+  speed: number | null
+  persisted: boolean
+  noNewLow: boolean
+  breakout: boolean
+  volumeOk: boolean
+  closeAboveOpen: boolean
+  openMissing: boolean
+  reason: string
+}
+
+export type DeskGroup = {
+  id: string
+  label: string
+  n: number
+  hitRate: number | null
+  meanExcess: number | null
+}
+
+export type DeskHypothesis = {
+  supported: boolean
+  hitMonotone: boolean
+  meanMonotone: boolean
+  nDates: number
+  nSkippedDates: number
+  nObs: number
+  nNames: number
+  sampleStart: string | null
+  sampleEnd: string | null
+  groups: DeskGroup[]
+  verdict: string
+}
+
+export type DeskReport = {
+  schemaVersion: string
+  benchmark: string
+  asOf: string | null
+  counts: Record<string, number>
+  openMissing: boolean
+  rows: DeskRow[]
+  buys: DeskRow[]
+  hypothesis: DeskHypothesis | null
+  notes: string[]
+  createdAt: string
+}
+
+export type DeskResponse = {
+  ok: boolean
+  empty: boolean
+  error: string | null
+  message: string | null
+  report: DeskReport | null
+}
+
+function mapDeskRow(value: unknown): DeskRow {
+  const line = (value ?? {}) as Raw
+  return {
+    symbol: str(line.symbol),
+    stockName: str(line.stock_name),
+    state: str(line.state),
+    stateLabel: str(line.state_label),
+    current: Boolean(line.current),
+    signalDate: line.signal_date == null || line.signal_date === '' ? null : str(line.signal_date),
+    buyDate: line.buy_date == null || line.buy_date === '' ? null : str(line.buy_date),
+    beta250: num(line.beta250),
+    alpha250: num(line.alpha250),
+    alpha120: num(line.alpha120),
+    delta120: num(line.delta120),
+    speed: num(line.speed),
+    persisted: Boolean(line.persisted),
+    noNewLow: Boolean(line.no_new_low),
+    breakout: Boolean(line.breakout),
+    volumeOk: Boolean(line.volume_ok),
+    closeAboveOpen: Boolean(line.close_above_open),
+    openMissing: Boolean(line.open_missing),
+    reason: str(line.reason),
+  }
+}
+
+function mapDesk(value: unknown): DeskReport | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Raw
+  const counts = (row.counts ?? {}) as Raw
+  const hypothesis = (row.hypothesis ?? null) as Raw | null
+  const groups = hypothesis && Array.isArray(hypothesis.groups) ? hypothesis.groups : []
+  return {
+    schemaVersion: str(row.schema_version),
+    benchmark: str(row.benchmark),
+    asOf: row.as_of == null || row.as_of === '' ? null : str(row.as_of),
+    counts: {
+      S2: num(counts.S2) ?? 0,
+      S1: num(counts.S1) ?? 0,
+      S0: num(counts.S0) ?? 0,
+      excluded: num(counts.excluded) ?? 0,
+      insufficient: num(counts.insufficient) ?? 0,
+    },
+    openMissing: Boolean(row.open_missing),
+    rows: Array.isArray(row.rows) ? row.rows.map((item) => mapDeskRow(item)) : [],
+    buys: Array.isArray(row.buys) ? row.buys.map((item) => mapDeskRow(item)) : [],
+    hypothesis: hypothesis
+      ? {
+          supported: Boolean(hypothesis.supported),
+          hitMonotone: Boolean(hypothesis.hit_monotone),
+          meanMonotone: Boolean(hypothesis.mean_monotone),
+          nDates: num(hypothesis.n_dates) ?? 0,
+          nSkippedDates: num(hypothesis.n_skipped_dates) ?? 0,
+          nObs: num(hypothesis.n_obs) ?? 0,
+          nNames: num(hypothesis.n_names) ?? 0,
+          sampleStart: hypothesis.sample_start == null ? null : str(hypothesis.sample_start),
+          sampleEnd: hypothesis.sample_end == null ? null : str(hypothesis.sample_end),
+          groups: groups.map((item) => {
+            const group = item as Raw
+            return {
+              id: str(group.id),
+              label: str(group.label),
+              n: num(group.n) ?? 0,
+              hitRate: num(group.hit_rate),
+              meanExcess: num(group.mean_excess),
+            }
+          }),
+          verdict: str(hypothesis.verdict),
+        }
+      : null,
+    notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],
+    createdAt: str(row.created_at),
+  }
+}
+
+export async function fetchCapmDesk(): Promise<DeskResponse> {
+  const response = await fetch(apiUrl('/api/capm/desk'))
+  if (!response.ok) throw new Error(`读取交易部门失败 (${response.status})`)
+  const raw = (await response.json()) as Raw
+  return {
+    ok: Boolean(raw.ok),
+    empty: Boolean(raw.empty),
+    error: raw.error == null ? null : str(raw.error),
+    message: raw.message == null ? null : str(raw.message),
+    report: mapDesk(raw.report),
+  }
+}
+
 export async function refreshCapmStocks(universe: 'vp6' | 'paste' | 'watch46', symbols = ''): Promise<CapmResponse> {
   const response = await fetch(apiUrl('/api/capm/stocks'), {
     method: 'POST',

@@ -2,10 +2,12 @@
 """只读沪深300净值、信号组日收益和本地日线。补齐日线只写 capm/cache。"""
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +42,10 @@ _NAME_COLUMNS = ("stock_name", "股票名称", "名称")
 SLEEVES = ("W2+W3", "W4+W6", "M+", "Q", "G")
 GROUP_COLUMNS = ("W2+W3", "W4+W6")
 SLEEVE_COLUMNS = ("M+", "Q", "G")
-FETCH_PAD_START = "2025-06-01"
+HISTORY_START = "2024-01-02"
+FETCH_PAD_START = HISTORY_START
+HISTORY_LEDGER = PROJECT_ROOT / "capm" / "cache" / "close_history.json"
+OPEN_LEDGER = PROJECT_ROOT / "capm" / "cache" / "open_history.json"
 
 
 def nav_to_returns(frame: pd.DataFrame) -> pd.Series:
@@ -340,24 +345,29 @@ def load_vp6(path: Path | None = None) -> list[dict[str, str]]:
 
 
 def load_ohlc(
-    symbols: set[str],
+    symbols: set[str] | None = None,
     *,
     cache_path: Path | None = None,
 ) -> pd.DataFrame:
+    """symbols 为 None 时读缓存里的全部代码。开盘价可缺，缺了补成空列。"""
     file = Path(cache_path or OHLC_CACHE)
     columns = ["date", "symbol", "high", "low", "close", "volume"]
+    empty_cols = ["date", "symbol", "open", "high", "low", "close", "volume"]
     if not file.is_file():
-        return pd.DataFrame(columns=columns)
+        return pd.DataFrame(columns=empty_cols)
     frame = pd.read_csv(file, dtype={"symbol": str})
     if not set(columns).issubset(frame.columns):
-        return pd.DataFrame(columns=columns)
-    frame = frame[columns].copy()
+        return pd.DataFrame(columns=empty_cols)
+    if "open" not in frame.columns:
+        frame["open"] = np.nan
+    frame = frame[empty_cols].copy()
     frame["symbol"] = frame["symbol"].map(_code)
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
-    for col in ("high", "low", "close", "volume"):
+    for col in ("open", "high", "low", "close", "volume"):
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
     frame = frame.dropna(subset=["symbol", "date", "high", "low", "close", "volume"])
-    frame = frame[frame["symbol"].isin(symbols)]
+    if symbols is not None:
+        frame = frame[frame["symbol"].isin(symbols)]
     return frame.drop_duplicates(["symbol", "date"], keep="last").sort_values(["symbol", "date"])
 
 
@@ -367,6 +377,7 @@ def store_ohlc(new_rows: pd.DataFrame, cache_path: Path) -> None:
         return
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     fresh = new_rows[list(needed)].copy()
+    fresh["open"] = pd.to_numeric(new_rows["open"], errors="coerce") if "open" in new_rows.columns else np.nan
     fresh["symbol"] = fresh["symbol"].map(_code)
     fresh["date"] = pd.to_datetime(fresh["date"], errors="coerce").dt.normalize()
     for col in ("high", "low", "close", "volume"):
@@ -384,9 +395,10 @@ def store_ohlc(new_rows: pd.DataFrame, cache_path: Path) -> None:
 
 
 def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
-    """补齐主力表演所需的高低收和成交量。失败的代码跳过。"""
+    """补齐主力表演所需的开高低收和成交量。失败的代码跳过。"""
     from backtest_sy_002028_threshold import fetch_ohlc_qfq
 
+    columns = ["date", "symbol", "open", "high", "low", "close", "volume"]
     frames: list[pd.DataFrame] = []
     for index, symbol in enumerate(symbols):
         try:
@@ -394,11 +406,13 @@ def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
         except Exception:
             raw = None
         if raw is not None and not raw.empty and {"date", "high", "low", "close", "volume"}.issubset(raw.columns):
+            opened = pd.to_numeric(raw["open"], errors="coerce") if "open" in raw.columns else np.nan
             frames.append(
                 pd.DataFrame(
                     {
                         "date": pd.to_datetime(raw["date"], errors="coerce"),
                         "symbol": symbol,
+                        "open": opened,
                         "high": pd.to_numeric(raw["high"], errors="coerce"),
                         "low": pd.to_numeric(raw["low"], errors="coerce"),
                         "close": pd.to_numeric(raw["close"], errors="coerce"),
@@ -409,7 +423,7 @@ def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
         if index + 1 < len(symbols):
             time.sleep(0.12)
     if not frames:
-        return pd.DataFrame(columns=["date", "symbol", "high", "low", "close", "volume"])
+        return pd.DataFrame(columns=columns)
     return pd.concat(frames, ignore_index=True).dropna(subset=["date", "close", "high", "low", "volume"])
 
 
@@ -446,7 +460,7 @@ def parse_symbols(text: str, limit: int = 80) -> tuple[list[str], bool]:
 
 
 def load_closes(
-    symbols: set[str],
+    symbols: set[str] | None = None,
     *,
     cache_path: Path | None = None,
     fallback_path: Path | None = None,
@@ -463,7 +477,8 @@ def load_closes(
         if not {"date", "symbol", "close"}.issubset(frame.columns):
             continue
         frame["symbol"] = frame["symbol"].map(_code)
-        frame = frame[frame["symbol"].isin(symbols)]
+        if symbols is not None:
+            frame = frame[frame["symbol"].isin(symbols)]
         if frame.empty:
             continue
         frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
@@ -536,6 +551,183 @@ def fetch_closes(symbols: list[str], start: str, end: str) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame(columns=["date", "symbol", "close"])
     return pd.concat(frames, ignore_index=True).dropna(subset=["date", "close"])
+
+
+def _load_ledger(path: Path, start: str) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(data, dict) or data.get("start") != start:
+        return set()
+    symbols = data.get("symbols")
+    if not isinstance(symbols, list):
+        return set()
+    return {code for code in (_code(item) for item in symbols) if code}
+
+
+def _save_ledger(path: Path, start: str, symbols: set[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"start": start, "symbols": sorted(symbols)}
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def _price_min(path: Path) -> pd.Timestamp | None:
+    if not path.is_file():
+        return None
+    frame = pd.read_csv(path, usecols=lambda col: col == "date")
+    if "date" not in frame.columns or frame.empty:
+        return None
+    dates = pd.to_datetime(frame["date"], errors="coerce").dropna()
+    if dates.empty:
+        return None
+    return pd.Timestamp(dates.min()).normalize()
+
+
+def backfill_benchmark(
+    *,
+    start: str = HISTORY_START,
+    bench_path: Path | None = None,
+    cache_path: Path | None = None,
+    fetcher=None,
+) -> str:
+    """把沪深300收盘补到 start。只写收益归因缓存，不改市场中性净值文件。"""
+    base = Path(bench_path) if bench_path is not None else BENCH_CSV
+    cache = Path(cache_path) if cache_path is not None else BENCH_CACHE
+    target = pd.Timestamp(start).normalize()
+    earliest = None
+    for path in (base, cache):
+        found = _price_min(path)
+        if found is not None and (earliest is None or found < earliest):
+            earliest = found
+    if earliest is not None and earliest <= target:
+        return ""
+    end_candidates = []
+    for path in (base, cache):
+        if not path.is_file():
+            continue
+        frame = pd.read_csv(path, usecols=lambda col: col == "date")
+        if "date" not in frame.columns or frame.empty:
+            continue
+        dates = pd.to_datetime(frame["date"], errors="coerce").dropna()
+        if not dates.empty:
+            end_candidates.append(pd.Timestamp(dates.max()).normalize())
+    end = max(end_candidates).date().isoformat() if end_candidates else pd.Timestamp.today().date().isoformat()
+    pull = fetcher or fetch_benchmark
+    fresh = pull(target.date().isoformat(), end)
+    if fresh is None or getattr(fresh, "empty", True):
+        return f"沪深300在 {target.date().isoformat()} 之前的收盘没有补到，下次会再试。"
+    store_benchmark(fresh, cache)
+    return f"沪深300收盘已从 {target.date().isoformat()} 补进缓存。"
+
+
+def backfill_earlier_closes(
+    *,
+    start: str = HISTORY_START,
+    end: str | None = None,
+    cache_path: Path | None = None,
+    fallback_path: Path | None = None,
+    ledger_path: Path | None = None,
+    fetcher=None,
+    chunk: int = 20,
+) -> str:
+    """把本地收盘补到 start 之前。已请求过的代码不重复拉取。只写 capm 缓存。"""
+    cache = Path(cache_path) if cache_path is not None else BARS_CACHE
+    fallback = Path(fallback_path) if fallback_path is not None else BARS_FALLBACK
+    ledger_file = Path(ledger_path) if ledger_path is not None else HISTORY_LEDGER
+    target = pd.Timestamp(start).normalize()
+    closes = load_closes(None, cache_path=cache, fallback_path=fallback)
+    if closes.empty:
+        return ""
+    first = closes.groupby("symbol")["date"].min()
+    last = pd.Timestamp(closes["date"].max()).normalize()
+    horizon = end or last.date().isoformat()
+    done = _load_ledger(ledger_file, target.date().isoformat())
+    need = [
+        str(symbol)
+        for symbol, day in first.items()
+        if pd.Timestamp(day).normalize() > target and str(symbol) not in done
+    ]
+    if not need:
+        return ""
+    pull = fetcher or fetch_closes
+    stored = 0
+    asked = 0
+    for offset in range(0, len(need), max(int(chunk), 1)):
+        batch = need[offset : offset + max(int(chunk), 1)]
+        fresh = pull(batch, target.date().isoformat(), horizon)
+        if fresh is None or getattr(fresh, "empty", True):
+            if stored == 0 and asked == 0:
+                return f"有 {len(need)} 只缺少 {target.date().isoformat()} 之前的收盘，本次没有补到，下次会再试。"
+            done.update(batch)
+            _save_ledger(ledger_file, target.date().isoformat(), done)
+            asked += len(batch)
+            continue
+        store_closes(fresh, cache)
+        stored += len({code for code in (_code(item) for item in fresh["symbol"]) if code})
+        done.update(batch)
+        _save_ledger(ledger_file, target.date().isoformat(), done)
+        asked += len(batch)
+        print(f"收盘补齐 {asked}/{len(need)}", flush=True)
+    return f"收盘向前补到 {target.date().isoformat()}，请求 {len(need)} 只，写入 {stored} 只。"
+
+
+def backfill_opens(
+    *,
+    cache_path: Path | None = None,
+    ledger_path: Path | None = None,
+    fetcher=None,
+    chunk: int = 20,
+) -> str:
+    """给量价缓存补开盘价。最近一根已经有开盘价的代码不再请求。"""
+    cache = Path(cache_path) if cache_path is not None else OHLC_CACHE
+    ledger_file = Path(ledger_path) if ledger_path is not None else OPEN_LEDGER
+    frame = load_ohlc(None, cache_path=cache)
+    if frame.empty:
+        return ""
+    latest = frame.sort_values("date").groupby("symbol", sort=False).tail(1)
+    start = pd.Timestamp(frame["date"].min()).normalize().date().isoformat()
+    horizon = pd.Timestamp(frame["date"].max()).normalize().date().isoformat()
+    done = _load_ledger(ledger_file, f"{start}:{horizon}")
+    need = []
+    for symbol, opened in zip(latest["symbol"], latest["open"]):
+        code = str(symbol)
+        if code in done:
+            continue
+        try:
+            price = float(opened)
+        except (TypeError, ValueError):
+            price = float("nan")
+        if not np.isfinite(price):
+            need.append(code)
+    if not need:
+        return ""
+    pull = fetcher or fetch_act_bars
+    stored = 0
+    asked = 0
+    size = max(int(chunk), 1)
+    for offset in range(0, len(need), size):
+        batch = need[offset : offset + size]
+        fresh = pull(batch, start, horizon)
+        opened = None
+        if fresh is not None and not getattr(fresh, "empty", True) and "open" in fresh.columns:
+            opened = pd.to_numeric(fresh["open"], errors="coerce")
+        if opened is None or not bool(opened.notna().any()):
+            if stored == 0 and asked == 0:
+                return f"有 {len(need)} 只缺少开盘价，本次没有补到，下次会再试。"
+            done.update(batch)
+            _save_ledger(ledger_file, f"{start}:{horizon}", done)
+            asked += len(batch)
+            continue
+        store_ohlc(fresh, cache)
+        stored += len({code for code in (_code(item) for item in fresh["symbol"]) if code})
+        done.update(batch)
+        _save_ledger(ledger_file, f"{start}:{horizon}", done)
+        asked += len(batch)
+        print(f"开盘补齐 {asked}/{len(need)}", flush=True)
+    return f"开盘价已补进缓存，请求 {len(need)} 只，写入 {stored} 只。"
 
 
 def _code(value: object) -> str:

@@ -1,0 +1,7 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+002195,岩山科技,2026-10-26,2,底部放量上涨,6.05,2.3689,6.28,6.1,6.05,1466415.37,1.783,1.783,False,84.0,True,uptrend,
+600570,恒生电子,2026-10-26,2,底部放量上涨,20.84,1.5595,20.62,21.04,20.84,268186.79,1.576,1.576,True,88.0,True,uptrend,
+600797,浙大网新,2026-10-26,2,底部放量上涨,6.6,0.7634,6.84,6.89,6.6,257180.61,2.1402,2.1402,False,94.0,True,bottom,
+603039,泛微网络,2026-10-26,2,底部放量上涨,35.57,0.2537,39.99,36.79,35.57,202344.95,1.6852,1.6852,False,84.0,True,uptrend,
+603383,顶点软件,2026-10-26,2,底部放量上涨,28.4,1.0676,28.1,28.85,28.4,45062.82,2.0099,2.0099,True,88.0,True,uptrend,
+002605,姚记科技,2026-10-14,2,底部放量上涨,17.17,1.1786,17.65,17.29,17.17,80239.36,2.2527,2.2527,False,82.0,True,bottom,

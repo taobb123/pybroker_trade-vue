@@ -1,0 +1,6 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+002230,科大讯飞,2026-10-26,4,上涨放量突破,38.8,1.5707,39.37,38.89,38.8,345789.36,1.9815,1.9815,False,94.0,True,uptrend,
+002279,久其软件,2026-10-26,4,上涨放量突破,6.8,1.1905,7.26,7.05,6.8,428294.0,1.522,1.522,False,94.0,True,uptrend,
+002642,荣联科技,2026-10-26,4,上涨放量突破,7.12,1.7143,7.3,7.37,7.12,212476.01,1.9243,1.9243,False,94.0,True,uptrend,
+002777,久远银海,2026-10-26,4,上涨放量突破,13.75,1.8519,15.05,14.1,13.75,280797.56,2.0234,2.0234,False,94.0,True,uptrend,
+002995,天地在线,2026-10-26,4,上涨放量突破,17.97,1.2394,19.17,18.73,17.97,171154.85,1.6646,1.6646,False,94.0,True,uptrend,

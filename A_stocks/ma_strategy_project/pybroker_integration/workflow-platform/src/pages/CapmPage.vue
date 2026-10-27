@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  fetchCapmDesk,
   fetchCapmSleeves,
   fetchCapmStocks,
   refreshCapmStocks,
   type CapmReport,
   type CapmRow,
   type CapmWindow,
+  type DeskReport,
 } from '@/api/capm'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 
@@ -40,6 +42,33 @@ const alphaAnnNeg = ref(false)
 const alpha120Neg = ref(false)
 const sleeveQuadrant = ref('all')
 const stockQuadrant = ref('all')
+const desk = ref<DeskReport | null>(null)
+const deskMessage = ref('')
+const deskError = ref('')
+const loadingDesk = ref(false)
+const deskState = ref('pool')
+const deskReason = ref('all')
+const deskCopyFlash = ref('')
+let deskCopyTimer: ReturnType<typeof setTimeout> | undefined
+const deskX = ref<HTMLElement | null>(null)
+const deskBar = ref<HTMLElement | null>(null)
+const deskBarOn = ref(false)
+const deskScrollWidth = ref(0)
+const deskBarLeft = ref(0)
+const deskBarWidth = ref(0)
+let deskLock = false
+let deskScrollRoot: EventTarget | null = null
+let deskResize: ResizeObserver | null = null
+
+const deskReasonOrder = [
+  '改善还没连续两次',
+  '价格和回归不是同一天',
+  '仍在创新低',
+  '收盘没突破前 20 日最高价',
+  '量能没到 1.3 倍',
+  '缓存没有开盘价',
+  '收盘不高于开盘',
+]
 const sortKey = ref<'beta' | 'alpha' | 'r2' | 'excess' | 'name' | 'session'>('session')
 const sortDir = ref<-1 | 1>(-1)
 const codeCopyFlash = ref('')
@@ -90,6 +119,17 @@ const actBands = [
   { id: 'wash_drop_2_5', label: '震仓下跌 2%–5%' },
   { id: 'release_gt0', label: '释放套牢盘 > 0%' },
 ]
+
+const deskStates = [
+  { id: 'pool', label: '候选' },
+  { id: 'S2', label: '买入' },
+  { id: 'S1', label: '观察' },
+  { id: 'S0', label: '禁止买入' },
+  { id: 'excluded', label: '排除' },
+  { id: 'all', label: '全部' },
+]
+
+const stateRank: Record<string, number> = { S2: 0, S1: 1, S0: 2, excluded: 3, insufficient: 4 }
 
 function pct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'
@@ -168,6 +208,50 @@ function countQuadrant(rows: CapmRow[] | undefined, id: string): number {
   return (rows ?? []).filter((row) => row.quadrantId === id).length
 }
 
+function gateText(value: boolean, missing = false): string {
+  if (missing) return '无开盘'
+  return value ? '是' : '否'
+}
+
+function reasonClauses(reason: string): string[] {
+  const body = reason.includes('：') ? reason.split('：').slice(1).join('：') : reason
+  return body
+    .split('、')
+    .map((part) => part.replace(/。/g, '').trim())
+    .filter(Boolean)
+}
+
+const deskReasonOptions = computed(() => {
+  const seen = new Set<string>()
+  for (const row of desk.value?.rows ?? []) {
+    if (row.state !== 'S1') continue
+    for (const clause of reasonClauses(row.reason)) seen.add(clause)
+  }
+  const known = deskReasonOrder.filter((item) => seen.has(item))
+  const extra = [...seen].filter((item) => !deskReasonOrder.includes(item))
+  return [...known, ...extra]
+})
+
+const visibleDesk = computed(() => {
+  const rows = desk.value?.rows ?? []
+  const filtered = rows.filter((row) => {
+    if (deskState.value === 'all') return true
+    if (deskState.value === 'pool') return row.state === 'S0' || row.state === 'S1' || row.state === 'S2'
+    if (row.state !== deskState.value) return false
+    if (deskState.value === 'S1' && deskReason.value !== 'all') {
+      return reasonClauses(row.reason).includes(deskReason.value)
+    }
+    return true
+  })
+  return [...filtered].sort((a, b) => {
+    const rank = (stateRank[a.state] ?? 9) - (stateRank[b.state] ?? 9)
+    if (rank !== 0) return rank
+    return (b.speed ?? Number.NEGATIVE_INFINITY) - (a.speed ?? Number.NEGATIVE_INFINITY)
+  })
+})
+
+const todayBuys = computed(() => (desk.value?.buys ?? []).filter((row) => row.current))
+
 function applyQuadrant(rows: CapmRow[], quadrant: string): CapmRow[] {
   if (quadrant === 'all') return rows
   return rows.filter((row) => row.quadrantId === quadrant)
@@ -219,6 +303,105 @@ async function copySortedCodes() {
   }
   const ok = await copyTextToClipboard(text)
   flashCodeCopy(ok ? '已复制' : '复制失败')
+}
+
+function flashDeskCopy(text: string) {
+  deskCopyFlash.value = text
+  if (deskCopyTimer) clearTimeout(deskCopyTimer)
+  deskCopyTimer = setTimeout(() => {
+    deskCopyFlash.value = ''
+  }, 1600)
+}
+
+async function copyDeskCodes() {
+  const text = stockCodesToCopyText(
+    ['代码'],
+    visibleDesk.value.map((row) => [row.symbol]),
+  )
+  if (!text) {
+    flashDeskCopy('无代码')
+    return
+  }
+  const ok = await copyTextToClipboard(text)
+  flashDeskCopy(ok ? '已复制' : '复制失败')
+}
+
+function scrollParent(el: HTMLElement | null): EventTarget {
+  let node = el?.parentElement ?? null
+  while (node) {
+    const overflow = getComputedStyle(node).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') return node
+    node = node.parentElement
+  }
+  return window
+}
+
+function updateDeskBar() {
+  const el = deskX.value
+  if (!el || tab.value !== 'desk') {
+    deskBarOn.value = false
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  const overflows = el.scrollWidth > el.clientWidth + 1
+  const intersects = rect.bottom > 48 && rect.top < window.innerHeight - 8
+  deskScrollWidth.value = el.scrollWidth
+  const rightGap = Math.max(0, rect.right - (window.innerWidth - 72))
+  deskBarLeft.value = rect.left
+  deskBarWidth.value = Math.max(0, rect.width - rightGap)
+  const wasOn = deskBarOn.value
+  deskBarOn.value = overflows && intersects && deskBarWidth.value > 24
+  const syncBar = () => {
+    const bar = deskBar.value
+    const host = deskX.value
+    if (!bar || !host || !deskBarOn.value) return
+    deskLock = true
+    bar.scrollLeft = host.scrollLeft
+    deskLock = false
+  }
+  syncBar()
+  if (deskBarOn.value && !wasOn) void nextTick(syncBar)
+}
+
+function onDeskTableScroll() {
+  const el = deskX.value
+  const bar = deskBar.value
+  if (deskLock || !el || !bar) return
+  deskLock = true
+  bar.scrollLeft = el.scrollLeft
+  deskLock = false
+}
+
+function onDeskBarScroll() {
+  const el = deskX.value
+  const bar = deskBar.value
+  if (deskLock || !el || !bar) return
+  deskLock = true
+  el.scrollLeft = bar.scrollLeft
+  deskLock = false
+}
+
+function unbindDeskBar() {
+  if (deskScrollRoot) {
+    deskScrollRoot.removeEventListener('scroll', updateDeskBar)
+    deskScrollRoot = null
+  }
+  window.removeEventListener('resize', updateDeskBar)
+  deskResize?.disconnect()
+  deskResize = null
+  deskBarOn.value = false
+}
+
+function bindDeskBar() {
+  unbindDeskBar()
+  const el = deskX.value
+  if (!el || tab.value !== 'desk') return
+  deskScrollRoot = scrollParent(el)
+  deskScrollRoot.addEventListener('scroll', updateDeskBar, { passive: true })
+  window.addEventListener('resize', updateDeskBar)
+  deskResize = new ResizeObserver(() => updateDeskBar())
+  deskResize.observe(el)
+  updateDeskBar()
 }
 
 function toggleSort(key: 'beta' | 'alpha' | 'r2' | 'excess' | 'name' | 'session') {
@@ -277,9 +460,48 @@ async function fillBars() {
   }
 }
 
+async function loadDesk() {
+  loadingDesk.value = true
+  deskError.value = ''
+  deskMessage.value = ''
+  try {
+    const payload = await fetchCapmDesk()
+    desk.value = payload.report
+    if (payload.empty || !payload.report) deskMessage.value = payload.message || '没有可计算的交易部门。'
+  } catch (err) {
+    deskError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loadingDesk.value = false
+  }
+}
+
 onMounted(() => {
   void loadSleeves()
   void loadStocks('vp6')
+})
+
+onUnmounted(() => {
+  unbindDeskBar()
+  if (deskCopyTimer) clearTimeout(deskCopyTimer)
+})
+
+watch(tab, (value) => {
+  if (value === 'desk' && !desk.value && !loadingDesk.value) void loadDesk()
+})
+
+watch([tab, desk], async () => {
+  await nextTick()
+  if (tab.value === 'desk' && deskX.value) bindDeskBar()
+  else unbindDeskBar()
+})
+
+watch(visibleDesk, async () => {
+  await nextTick()
+  updateDeskBar()
+})
+
+watch(deskReasonOptions, (options) => {
+  if (deskReason.value !== 'all' && !options.includes(deskReason.value)) deskReason.value = 'all'
 })
 </script>
 
@@ -295,6 +517,7 @@ onMounted(() => {
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
+        交易部门只记下价格确认后的买入，不算止盈止损。
       </p>
     </div>
 
@@ -302,6 +525,7 @@ onMounted(() => {
       <TabsList>
         <TabsTrigger value="sleeves">信号组复盘</TabsTrigger>
         <TabsTrigger value="stocks">个股对比</TabsTrigger>
+        <TabsTrigger value="desk">交易部门</TabsTrigger>
       </TabsList>
 
       <TabsContent value="sleeves" class="space-y-3">
@@ -550,6 +774,191 @@ onMounted(() => {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="desk" class="space-y-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Alpha 状态机</CardTitle>
+            <CardDescription>
+              只做到买入的价格确认。候选是 250 日 β 在 0 到 0.5，并且 250 日、120 日 α 都为负。
+              120 日 α 比 20 个交易日前更高才离开「禁止买入」。连续两次改善，并且收盘突破前 20 日最高价、不再创新低、放量 1.3 倍、收盘高于开盘，才记下买入。
+              买入日记在下一交易日。不加仓，不止盈，不止损。
+              本地收盘若晚于 2024-01-02，打开这一页会自动把更早的收盘补进缓存。
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <div class="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" :disabled="loadingDesk" @click="loadDesk">
+                {{ loadingDesk ? '计算中' : '重新计算' }}
+              </Button>
+            </div>
+            <p v-if="deskError" class="text-xs text-destructive">{{ deskError }}</p>
+            <p v-else-if="deskMessage" class="text-xs text-muted-foreground">{{ deskMessage }}</p>
+            <p v-if="desk?.openMissing" class="text-xs text-muted-foreground">
+              当前量价缓存没有开盘价，收盘高于开盘这一关过不了，所以不会记下买入。
+            </p>
+            <div v-if="desk" class="grid gap-2 sm:grid-cols-5">
+              <div class="rounded-lg border px-3 py-2">
+                <p class="text-xs text-muted-foreground">买入</p>
+                <p class="text-sm font-semibold tabular-nums">{{ desk.counts.S2 ?? 0 }}</p>
+              </div>
+              <div class="rounded-lg border px-3 py-2">
+                <p class="text-xs text-muted-foreground">观察</p>
+                <p class="text-sm font-semibold tabular-nums">{{ desk.counts.S1 ?? 0 }}</p>
+              </div>
+              <div class="rounded-lg border px-3 py-2">
+                <p class="text-xs text-muted-foreground">禁止买入</p>
+                <p class="text-sm font-semibold tabular-nums">{{ desk.counts.S0 ?? 0 }}</p>
+              </div>
+              <div class="rounded-lg border px-3 py-2">
+                <p class="text-xs text-muted-foreground">排除</p>
+                <p class="text-sm font-semibold tabular-nums">{{ desk.counts.excluded ?? 0 }}</p>
+              </div>
+              <div class="rounded-lg border px-3 py-2">
+                <p class="text-xs text-muted-foreground">样本不足</p>
+                <p class="text-sm font-semibold tabular-nums">{{ desk.counts.insufficient ?? 0 }}</p>
+              </div>
+            </div>
+            <p v-if="desk" class="text-xs text-muted-foreground">
+              截止 {{ desk.asOf || '—' }}。今天记下的买入 {{ todayBuys.length }} 只。
+              <template v-if="todayBuys.length">
+                {{ todayBuys.map((row) => row.symbol).join('、') }}。成交看下一交易日。
+              </template>
+            </p>
+            <div class="flex flex-wrap gap-1">
+              <Button
+                v-for="item in deskStates"
+                :key="item.id"
+                size="sm"
+                :variant="deskState === item.id ? 'default' : 'outline'"
+                @click="deskState = item.id"
+              >
+                {{ item.label }}
+              </Button>
+            </div>
+            <div v-if="desk && deskState === 'S1'" class="flex flex-wrap items-center gap-1">
+              <Button
+                size="sm"
+                :variant="deskReason === 'all' ? 'default' : 'outline'"
+                @click="deskReason = 'all'"
+              >
+                全部说明
+              </Button>
+              <Button
+                v-for="item in deskReasonOptions"
+                :key="item"
+                size="sm"
+                :variant="deskReason === item ? 'default' : 'outline'"
+                @click="deskReason = deskReason === item ? 'all' : item"
+              >
+                {{ item }}
+              </Button>
+              <Button size="sm" variant="outline" @click="copyDeskCodes">
+                {{ deskCopyFlash || `复制代码（${visibleDesk.length}）` }}
+              </Button>
+            </div>
+            <div
+              v-if="desk"
+              ref="deskX"
+              class="w-full min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              @scroll.passive="onDeskTableScroll"
+            >
+              <Table bare>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>代码</TableHead>
+                    <TableHead>名称</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead class="text-right">β</TableHead>
+                    <TableHead class="text-right">250 日 α</TableHead>
+                    <TableHead class="text-right">120 日 α</TableHead>
+                    <TableHead class="text-right">20 日变化</TableHead>
+                    <TableHead class="text-right">速度</TableHead>
+                    <TableHead>连续改善</TableHead>
+                    <TableHead>不创新低</TableHead>
+                    <TableHead>突破</TableHead>
+                    <TableHead>放量</TableHead>
+                    <TableHead>收盘&gt;开盘</TableHead>
+                    <TableHead>信号日</TableHead>
+                    <TableHead>说明</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in visibleDesk" :key="row.symbol">
+                    <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
+                    <TableCell>{{ row.stockName || '—' }}</TableCell>
+                    <TableCell><Badge variant="secondary">{{ row.stateLabel }}</Badge></TableCell>
+                    <TableCell class="text-right tabular-nums">{{ num(row.beta250, 3) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.alpha250) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.alpha120) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.delta120) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.speed) }}</TableCell>
+                    <TableCell>{{ row.persisted ? '是' : '否' }}</TableCell>
+                    <TableCell>{{ gateText(row.noNewLow) }}</TableCell>
+                    <TableCell>{{ gateText(row.breakout) }}</TableCell>
+                    <TableCell>{{ gateText(row.volumeOk) }}</TableCell>
+                    <TableCell>{{ gateText(row.closeAboveOpen, row.openMissing) }}</TableCell>
+                    <TableCell class="whitespace-nowrap text-xs">{{ row.signalDate || '—' }}</TableCell>
+                    <TableCell class="max-w-64 text-xs text-muted-foreground">{{ row.reason }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <p v-if="desk && !visibleDesk.length" class="text-xs text-muted-foreground">这一档没有股票。</p>
+          </CardContent>
+        </Card>
+        <Teleport to="body">
+          <div
+            v-show="deskBarOn"
+            ref="deskBar"
+            class="fixed bottom-0 z-40 overflow-x-scroll overflow-y-hidden border-t bg-background"
+            :style="{ left: `${deskBarLeft}px`, width: `${deskBarWidth}px`, height: '18px' }"
+            aria-label="表格左右滚动"
+            @scroll.passive="onDeskBarScroll"
+          >
+            <div :style="{ width: `${deskScrollWidth}px`, height: '1px' }" />
+          </div>
+        </Teleport>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>收敛速度与未来 10 日超额</CardTitle>
+            <CardDescription v-if="desk?.hypothesis">
+              {{ desk.hypothesis.verdict }}
+              样本 {{ desk.hypothesis.sampleStart || '—' }} 至 {{ desk.hypothesis.sampleEnd || '—' }}，
+              {{ desk.hypothesis.nDates }} 个取样日，{{ desk.hypothesis.nNames }} 只股票，{{ desk.hypothesis.nObs }} 笔。
+            </CardDescription>
+            <CardDescription v-else>{{ loadingDesk ? '计算假设…' : '尚未载入' }}</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <div v-if="desk?.hypothesis" class="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>分组</TableHead>
+                    <TableHead class="text-right">样本</TableHead>
+                    <TableHead class="text-right">超额为正</TableHead>
+                    <TableHead class="text-right">平均超额</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="group in desk.hypothesis.groups" :key="group.id">
+                    <TableCell class="font-medium">
+                      {{ group.id }}<template v-if="group.label !== group.id"> {{ group.label }}</template>
+                    </TableCell>
+                    <TableCell class="text-right tabular-nums">{{ group.n }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(group.hitRate) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(group.meanExcess) }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <ul v-if="desk" class="space-y-1 text-xs text-muted-foreground">
+              <li v-for="note in desk.notes" :key="note">{{ note }}</li>
+            </ul>
           </CardContent>
         </Card>
       </TabsContent>

@@ -530,6 +530,7 @@ class ApiTests(unittest.TestCase):
         paths = {getattr(route, "path", "") for route in app.routes}
         self.assertIn("/api/capm/sleeves", paths)
         self.assertIn("/api/capm/stocks", paths)
+        self.assertIn("/api/capm/desk", paths)
 
     def test_live_sleeves_beta_near_existing_report(self) -> None:
         market = load_market()
