@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from capm.desk import desk_payload
+from capm.launch_match import launch_payload
 from capm.service import sleeves_payload, stocks_payload
 from capm.sources import fetch_act_bars, fetch_benchmark, latest_trading_day
 
@@ -18,6 +19,10 @@ class StockBody(BaseModel):
     refresh: bool = Field(default=False)
 
 
+class LaunchBody(BaseModel):
+    symbols: str = Field(default="")
+
+
 @router.get("/sleeves")
 def sleeves() -> dict:
     return sleeves_payload()
@@ -26,6 +31,17 @@ def sleeves() -> dict:
 @router.get("/desk")
 def desk() -> dict:
     return desk_payload()
+
+
+@router.get("/launch")
+def launch(symbols: str = Query(default="")) -> dict:
+    return launch_payload(symbols=symbols, fetch_missing=False)
+
+
+@router.post("/launch")
+def launch_refresh(body: LaunchBody | None = None) -> dict:
+    params = body or LaunchBody()
+    return launch_payload(symbols=params.symbols, fetch_missing=True)
 
 
 @router.get("/stocks")

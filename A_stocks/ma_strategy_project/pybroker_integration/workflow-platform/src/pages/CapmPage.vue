@@ -15,6 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import {
   fetchCapmDesk,
+  fetchCapmLaunch,
   fetchCapmSleeves,
   fetchCapmStocks,
   refreshCapmStocks,
@@ -22,6 +23,7 @@ import {
   type CapmRow,
   type CapmWindow,
   type DeskReport,
+  type LaunchReport,
 } from '@/api/capm'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 
@@ -46,6 +48,13 @@ const desk = ref<DeskReport | null>(null)
 const deskMessage = ref('')
 const deskError = ref('')
 const loadingDesk = ref(false)
+const launch = ref<LaunchReport | null>(null)
+const launchMessage = ref('')
+const launchError = ref('')
+const loadingLaunch = ref(false)
+const launchPasted = ref('')
+const launchCopyFlash = ref('')
+let launchCopyTimer: ReturnType<typeof setTimeout> | undefined
 const deskState = ref('pool')
 const deskReason = ref('all')
 const deskCopyFlash = ref('')
@@ -475,6 +484,39 @@ async function loadDesk() {
   }
 }
 
+async function loadLaunch(refresh = false) {
+  loadingLaunch.value = true
+  launchError.value = ''
+  launchMessage.value = ''
+  try {
+    const payload = await fetchCapmLaunch(launchPasted.value, refresh)
+    launch.value = payload.report
+    if (payload.empty || !payload.report) launchMessage.value = payload.message || '没有可对照的股票。'
+  } catch (err) {
+    launchError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loadingLaunch.value = false
+  }
+}
+
+async function copyLaunchCodes() {
+  const rows = launch.value?.rows ?? []
+  const text = stockCodesToCopyText(
+    ['代码'],
+    rows.map((row) => [row.symbol]),
+  )
+  if (!text) {
+    launchCopyFlash.value = '没有代码'
+    return
+  }
+  const ok = await copyTextToClipboard(text)
+  launchCopyFlash.value = ok ? '已复制' : '复制失败'
+  if (launchCopyTimer) clearTimeout(launchCopyTimer)
+  launchCopyTimer = setTimeout(() => {
+    launchCopyFlash.value = ''
+  }, 1600)
+}
+
 onMounted(() => {
   void loadSleeves()
   void loadStocks('vp6')
@@ -483,10 +525,12 @@ onMounted(() => {
 onUnmounted(() => {
   unbindDeskBar()
   if (deskCopyTimer) clearTimeout(deskCopyTimer)
+  if (launchCopyTimer) clearTimeout(launchCopyTimer)
 })
 
 watch(tab, (value) => {
   if (value === 'desk' && !desk.value && !loadingDesk.value) void loadDesk()
+  if (value === 'desk' && !launch.value && !loadingLaunch.value) void loadLaunch(false)
 })
 
 watch([tab, desk], async () => {
@@ -517,7 +561,7 @@ watch(deskReasonOptions, (options) => {
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
-        交易部门只记下价格确认后的买入，不算止盈止损。
+        交易部门只记下价格确认后的买入，不算止盈止损。百亚启动段只做形态对照。
       </p>
     </div>
 
@@ -925,6 +969,68 @@ watch(deskReasonOptions, (options) => {
             <div :style="{ width: `${deskScrollWidth}px`, height: '1px' }" />
           </div>
         </Teleport>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>百亚启动段</CardTitle>
+            <CardDescription v-if="launch">
+              模板 {{ launch.template.name }} {{ launch.template.symbol }}，放量日 {{ launch.template.ignition }}，
+              第三根阳线 {{ launch.template.third }}，放量 {{ launch.template.volume.toFixed(2) }} 倍。
+              截止 {{ launch.asOf || '—' }}。有相关性 {{ launch.relatedCount }} 只，其余 {{ launch.unrelatedCount }} 只没有相关性。
+            </CardDescription>
+            <CardDescription v-else>{{ loadingLaunch ? '对照启动段…' : '尚未载入' }}</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <Textarea
+              v-model="launchPasted"
+              class="min-h-16 font-mono text-xs"
+              placeholder="粘贴 6 位代码，用逗号、空格或换行分隔。和观察池一起对照，最多 80 只。"
+            />
+            <div class="flex flex-wrap gap-2">
+              <Button size="sm" :disabled="loadingLaunch" @click="loadLaunch(true)">
+                {{ loadingLaunch ? '对照中' : '对照' }}
+              </Button>
+              <Button size="sm" variant="outline" :disabled="!launch?.rows.length" @click="copyLaunchCodes">
+                {{ launchCopyFlash || `复制代码（${launch?.rows.length ?? 0}）` }}
+              </Button>
+            </div>
+            <p v-if="launchError" class="text-xs text-destructive">{{ launchError }}</p>
+            <p v-else-if="launchMessage" class="text-xs text-muted-foreground">{{ launchMessage }}</p>
+            <div v-if="launch?.rows.length" class="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>代码</TableHead>
+                    <TableHead>名称</TableHead>
+                    <TableHead class="text-right">相似度</TableHead>
+                    <TableHead>说明</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in launch.rows" :key="row.symbol">
+                    <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
+                    <TableCell>
+                      {{ row.stockName || '—' }}
+                      <span v-if="row.pasted" class="ml-1 text-xs text-muted-foreground">粘贴</span>
+                    </TableCell>
+                    <TableCell class="text-right tabular-nums">{{ num(row.similarity, 2) }}</TableCell>
+                    <TableCell class="max-w-xl text-xs text-muted-foreground">{{ row.reason }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <p v-else-if="launch" class="text-xs text-muted-foreground">观察池里没有和百亚启动段相近的股票。</p>
+            <p v-if="launch?.unrelatedPasted.length" class="text-xs text-muted-foreground">
+              粘贴里没有相关性：{{ launch.unrelatedPasted.join('、') }}
+            </p>
+            <p v-if="launch?.missingPasted.length" class="text-xs text-muted-foreground">
+              粘贴缺日线：{{ launch.missingPasted.join('、') }}
+            </p>
+            <ul v-if="launch" class="space-y-1 text-xs text-muted-foreground">
+              <li v-for="note in launch.notes" :key="note">{{ note }}</li>
+            </ul>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

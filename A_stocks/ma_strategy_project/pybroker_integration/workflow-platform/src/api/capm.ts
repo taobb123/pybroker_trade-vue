@@ -321,6 +321,118 @@ export async function fetchCapmDesk(): Promise<DeskResponse> {
   }
 }
 
+export type LaunchRow = {
+  symbol: string
+  stockName: string
+  similarity: number
+  spiral: number
+  price: number
+  volume: number
+  yang: number
+  yangCount: number
+  vr: number | null
+  pasted: boolean
+  reason: string
+}
+
+export type LaunchTemplate = {
+  symbol: string
+  name: string
+  ignition: string
+  third: string
+  volume: number
+  yang: number
+  source: string
+}
+
+export type LaunchReport = {
+  schemaVersion: string
+  asOf: string | null
+  template: LaunchTemplate
+  watched: number
+  pasted: number
+  relatedCount: number
+  unrelatedCount: number
+  missingCount: number
+  rows: LaunchRow[]
+  unrelatedPasted: string[]
+  missingPasted: string[]
+  notes: string[]
+  createdAt: string
+}
+
+export type LaunchResponse = {
+  ok: boolean
+  empty: boolean
+  error: string | null
+  message: string | null
+  report: LaunchReport | null
+}
+
+function mapLaunch(value: unknown): LaunchReport | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Raw
+  const template = (row.template ?? {}) as Raw
+  const rows = Array.isArray(row.rows) ? row.rows : []
+  return {
+    schemaVersion: str(row.schema_version),
+    asOf: row.as_of == null || row.as_of === '' ? null : str(row.as_of),
+    template: {
+      symbol: str(template.symbol),
+      name: str(template.name),
+      ignition: str(template.ignition),
+      third: str(template.third),
+      volume: num(template.volume) ?? 0,
+      yang: num(template.yang) ?? 3,
+      source: str(template.source),
+    },
+    watched: num(row.watched) ?? 0,
+    pasted: num(row.pasted) ?? 0,
+    relatedCount: num(row.related_count) ?? 0,
+    unrelatedCount: num(row.unrelated_count) ?? 0,
+    missingCount: num(row.missing_count) ?? 0,
+    rows: rows.map((item) => {
+      const line = item as Raw
+      return {
+        symbol: str(line.symbol),
+        stockName: str(line.stock_name),
+        similarity: num(line.similarity) ?? 0,
+        spiral: num(line.spiral) ?? 0,
+        price: num(line.price) ?? 0,
+        volume: num(line.volume) ?? 0,
+        yang: num(line.yang) ?? 0,
+        yangCount: num(line.yang_n) ?? 0,
+        vr: num(line.vr),
+        pasted: Boolean(line.pasted),
+        reason: str(line.reason),
+      }
+    }),
+    unrelatedPasted: Array.isArray(row.unrelated_pasted) ? row.unrelated_pasted.map((item) => str(item)) : [],
+    missingPasted: Array.isArray(row.missing_pasted) ? row.missing_pasted.map((item) => str(item)) : [],
+    notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],
+    createdAt: str(row.created_at),
+  }
+}
+
+export async function fetchCapmLaunch(symbols = '', refresh = false): Promise<LaunchResponse> {
+  const response = refresh
+    ? await fetch(apiUrl('/api/capm/launch'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols }),
+      })
+    : await fetch(apiUrl(`/api/capm/launch?${new URLSearchParams({ symbols }).toString()}`))
+  if (!response.ok) throw new Error(`读取百亚启动段失败 (${response.status})`)
+  const raw = (await response.json()) as Raw
+  return {
+    ok: Boolean(raw.ok),
+    empty: Boolean(raw.empty),
+    error: raw.error == null ? null : str(raw.error),
+    message: raw.message == null ? null : str(raw.message),
+    report: mapLaunch(raw.report),
+  }
+}
+
 export async function refreshCapmStocks(universe: 'vp6' | 'paste' | 'watch46', symbols = ''): Promise<CapmResponse> {
   const response = await fetch(apiUrl('/api/capm/stocks'), {
     method: 'POST',
