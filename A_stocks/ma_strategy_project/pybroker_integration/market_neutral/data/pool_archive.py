@@ -133,12 +133,12 @@ def _upsert_index(
 def seed_from_current_watch(
     *,
     integration_root: str,
-    combo_ids: Sequence[int] = (4, 6),
+    combo_ids: Sequence[int] = (2, 4),
     root: Optional[str] = None,
 ) -> List[str]:
     """
     对「尚无任何归档」的 combo，用当前 vp_combo_watch_{id}.csv 播种一版。
-    已有其它 combo 归档时，仍可为缺失的 combo 单独播种（避免 4+6 有档却跳过 2+3）。
+    已有其它 combo 归档时，仍可为缺失的 combo 单独播种（避免 2+4 有档却跳过 1+3+5）。
     """
     notes: List[str] = []
     archived: set = set()

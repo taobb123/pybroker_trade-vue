@@ -286,7 +286,7 @@ def _render_summary_md(
     cfg_info: dict,
     holdings: pd.DataFrame,
 ) -> str:
-    pool = cfg_info.get("pool", "combo4+6")
+    pool = cfg_info.get("pool", "combo2+4")
     hedge = cfg_info.get("hedge", "个股多空")
     rebal = cfg_info.get("rebalance", "weekly")
     q_rebal = cfg_info.get("q_rebalance", "monthly")

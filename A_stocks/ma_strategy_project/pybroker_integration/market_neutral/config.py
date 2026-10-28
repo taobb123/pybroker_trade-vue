@@ -59,7 +59,7 @@ class MNConfig:
     pattern_scan_csv: str = field(
         default_factory=lambda: os.path.join(_ROOT, "pattern_entry_scan.csv")
     )
-    combo_ids: Sequence[int] = field(default_factory=lambda: (4, 6))
+    combo_ids: Sequence[int] = field(default_factory=lambda: (2, 4))
 
     def resolve_end_date(self) -> str:
         if str(self.end_date or "").strip():

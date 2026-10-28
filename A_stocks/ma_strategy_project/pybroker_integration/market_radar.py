@@ -59,14 +59,14 @@ _EM_HEADERS = {
 GROWTH_PICK_TABLES = (
     ("M加", _SCRIPT_DIR / "pattern_entry_mplus_growth_rank.csv"),
     ("Q", _SCRIPT_DIR / "vp_combo_23_q_growth_rank.csv"),
-    ("G·4+6", _SCRIPT_DIR / "pattern_entry_g_growth_rank.csv"),
-    ("G·2+3", _SCRIPT_DIR / "vp_combo_23_g_growth_rank.csv"),
+    ("G·2+4", _SCRIPT_DIR / "pattern_entry_g_growth_rank.csv"),
+    ("G·1+3+5", _SCRIPT_DIR / "vp_combo_23_g_growth_rank.csv"),
 )
 VOLUME_GROUP = "量能"
 VOLUME_GROWTH_CSV = _SCRIPT_DIR / "pattern_entry_volume_growth_rank.csv"
-GROWTH_GROUPS = ("M加", "Q", "G·4+6", "G·2+3", VOLUME_GROUP)
+GROWTH_GROUPS = ("M加", "Q", "G·2+4", "G·1+3+5", VOLUME_GROUP)
 GROWTH_TOP_N = 3
-GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·4+6 / G·2+3 各前3 · 量能全部确认建仓"
+GROWTH_UNIVERSE_LABEL = "因子自选 · M加 / Q / G·2+4 / G·1+3+5 各前3 · 量能全部确认建仓"
 GROWTH_FILES_LABEL = (
     "pattern_entry_mplus_growth_rank.csv, vp_combo_23_q_growth_rank.csv, "
     "pattern_entry_g_growth_rank.csv, vp_combo_23_g_growth_rank.csv, "

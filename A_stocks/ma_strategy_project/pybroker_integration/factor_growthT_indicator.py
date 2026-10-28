@@ -659,8 +659,8 @@ _EMPTY_GROWTH_COLUMNS = (
 UPSTREAM_GROWTH_SPECS = (
     ("M加", DEFAULT_MPLUS_RANK_CSV, DEFAULT_MPLUS_GROWTH_CSV),
     ("Q", DEFAULT_Q_RANK_CSV, DEFAULT_Q_GROWTH_CSV),
-    ("G·4+6", DEFAULT_G46_RANK_CSV, DEFAULT_G46_GROWTH_CSV),
-    ("G·2+3", DEFAULT_G23_RANK_CSV, DEFAULT_G23_GROWTH_CSV),
+    ("G·2+4", DEFAULT_G46_RANK_CSV, DEFAULT_G46_GROWTH_CSV),
+    ("G·1+3+5", DEFAULT_G23_RANK_CSV, DEFAULT_G23_GROWTH_CSV),
 )
 
 
@@ -927,17 +927,23 @@ def rank_yoy_top_by_growth(
     return ranked, notes
 
 
-GROWTH_GROUP_ORDER = ("M加", "Q", "G·4+6", "G·2+3", VOLUME_GROUP_NAME)
+GROWTH_GROUP_ORDER = ("M加", "Q", "G·2+4", "G·1+3+5", VOLUME_GROUP_NAME)
 _GROWTH_GROUP_ALIASES = {
     "m+": "M加",
     "m加": "M加",
     "q": "Q",
-    "g·4+6": "G·4+6",
-    "g4+6": "G·4+6",
-    "4+6": "G·4+6",
-    "g·2+3": "G·2+3",
-    "g2+3": "G·2+3",
-    "2+3": "G·2+3",
+    "g·2+4": "G·2+4",
+    "g2+4": "G·2+4",
+    "2+4": "G·2+4",
+    "g·4+6": "G·2+4",
+    "g4+6": "G·2+4",
+    "4+6": "G·2+4",
+    "g·1+3+5": "G·1+3+5",
+    "g1+3+5": "G·1+3+5",
+    "1+3+5": "G·1+3+5",
+    "g·2+3": "G·1+3+5",
+    "g2+3": "G·1+3+5",
+    "2+3": "G·1+3+5",
     "量能": VOLUME_GROUP_NAME,
     "volume": VOLUME_GROUP_NAME,
 }
@@ -1256,7 +1262,7 @@ def main():
     parser.add_argument(
         "--from-upstream-top13",
         action="store_true",
-        help="从 M+、Q、G·4+6、G·2+3 上游排名表取前N只，并排信号表全部确认建仓；各组独立成长排序写 CSV（暂不推东财）",
+        help="从 M+、Q、G·2+4、G·1+3+5 上游排名表取前N只，并排信号表全部确认建仓；各组独立成长排序写 CSV（暂不推东财）",
     )
     parser.add_argument(
         "--symbols",
@@ -1266,7 +1272,7 @@ def main():
     parser.add_argument(
         "--group",
         default="",
-        help="分组标签（M加、Q、G·4+6、G·2+3 或 量能）。与 --symbols 联用时只排这一组",
+        help="分组标签（M加、Q、G·2+4、G·1+3+5 或 量能）。与 --symbols 联用时只排这一组",
     )
     parser.add_argument(
         "--ranking-file",
@@ -1282,7 +1288,7 @@ def main():
     parser.add_argument(
         "--groups",
         default="",
-        help="只跑这些分组，逗号分隔：M加,Q,G·4+6,G·2+3,量能。空则五组都跑。",
+        help="只跑这些分组，逗号分隔：M加,Q,G·2+4,G·1+3+5,量能。空则五组都跑。",
     )
     parser.add_argument(
         "--from-mx-groups",
@@ -1333,7 +1339,7 @@ def main():
             print("[warn] --from-mx-groups 已停用。改走上游 M+/Q/G 前N，量能改读信号表确认建仓。")
         groups = parse_group_filter(str(args.groups or ""))
         if groups is not None and not groups:
-            print("[fail] --groups 没有可用分组。可选：M加,Q,G·4+6,G·2+3,量能")
+            print("[fail] --groups 没有可用分组。可选：M加,Q,G·2+4,G·1+3+5,量能")
             raise SystemExit(2)
         raise SystemExit(
             run_from_upstream_top13(

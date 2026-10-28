@@ -20,15 +20,13 @@ OHLC_CACHE = PROJECT_ROOT / "capm" / "cache" / "ohlc.csv"
 BENCH_CACHE = PROJECT_ROOT / "capm" / "cache" / "benchmark.csv"
 VP6_SCAN = PROJECT_ROOT / "vp_six_combo_scan.csv"
 WATCH_FILES = (
-    PROJECT_ROOT / "vp_combo_watch_4.csv",
-    PROJECT_ROOT / "vp_combo_watch_6.csv",
-)
-STOCK_WATCH_FILES = (
-    PROJECT_ROOT / "vp_combo_watch_4.csv",
-    PROJECT_ROOT / "vp_combo_watch_6.csv",
     PROJECT_ROOT / "vp_combo_watch_2.csv",
+    PROJECT_ROOT / "vp_combo_watch_4.csv",
+    PROJECT_ROOT / "vp_combo_watch_1.csv",
     PROJECT_ROOT / "vp_combo_watch_3.csv",
+    PROJECT_ROOT / "vp_combo_watch_5.csv",
 )
+STOCK_WATCH_FILES = WATCH_FILES
 THEME_RANK_FILES = (
     PROJECT_ROOT / "pattern_entry_mplus_rank.csv",
     PROJECT_ROOT / "pattern_entry_g_rank.csv",

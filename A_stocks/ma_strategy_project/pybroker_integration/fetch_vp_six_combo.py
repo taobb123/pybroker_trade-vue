@@ -26,8 +26,9 @@ Phase1 位置×量能定主标签；Phase2 换手+筹码修正匹配度、有限
 
 股票列表优先级：--symbols > 非空 --pool 自定义列表 > 显式 --ma5-csv > stocks_pool.txt。
 
-下游形态建仓：按 watch_combo_ids（默认 4、6）滚动合并 vp_combo_watch_{id}.csv
-（最多 6 个交易日、同票只留最新）与 config/fetch_pattern_entry_symbols*.txt；
+下游观察池：按 watch_combo_ids（默认 1、2、3、4、5）滚动合并 vp_combo_watch_{id}.csv
+（最多 2 个交易日、同票只留最新）与 config/fetch_pattern_entry_symbols*.txt。
+两条池为 2+4 与 1+3+5。组合 6 仍在全表里分类，不导出观察池。
 主表仍为当日截面，含 platform/breakout 锚点字段。
 """
 
@@ -39,7 +40,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -92,10 +93,11 @@ VP_SIX_CONFIG = {
     "turnover_shrink_ratio": 0.7,
     # Phase2 共振
     "resonance_pass_score": 60.0,
-    # 下游形态建仓：按 combo 导出观察列表（4=上涨放量突破，6=下跌放量）
-    "watch_combo_ids": [4, 6],
+    # 下游观察池：1 底部缩量、2 底部放量上涨、3 上涨缩量整理、4 上涨放量突破、5 高位放量滞涨。
+    # 组合 6 下跌放量仍在全表分类，不导出。两条池为 2+4 与 1+3+5。
+    "watch_combo_ids": [1, 2, 3, 4, 5],
     # 观察池滚动：最多保留若干交易日；同代码只留最新 signal_date
-    "watch_pool_max_trade_days": 6,
+    "watch_pool_max_trade_days": 2,
 }
 
 COMBO_META = {
@@ -1121,6 +1123,19 @@ def watch_csv_path(combo_id: int, *, out_dir: Optional[str] = None) -> str:
     return os.path.join(base, f"vp_combo_watch_{int(combo_id)}.csv")
 
 
+def downstream_watch_ids(cfg: Optional[dict] = None) -> List[int]:
+    src = cfg if cfg is not None else VP_SIX_CONFIG
+    return [int(x) for x in src.get("watch_combo_ids", [1, 2, 3, 4, 5])]
+
+
+def primary_watch_combo_id(combo_ids: Sequence[int]) -> int:
+    """兼容用的观察代码文件仍对应组合 4，供突破回踩读取。"""
+    ids = [int(x) for x in combo_ids]
+    if 4 in ids:
+        return 4
+    return ids[0] if ids else 4
+
+
 def pattern_entry_symbols_path(combo_id: int) -> str:
     """combo 4 沿用历史路径；其它 combo 写独立 txt。"""
     cid = int(combo_id)
@@ -1146,7 +1161,7 @@ def merge_rolling_watch_pool(
     existing: pd.DataFrame,
     today: pd.DataFrame,
     *,
-    max_trade_days: int = 6,
+    max_trade_days: int = 2,
 ) -> pd.DataFrame:
     """
     合并观察池：同 symbol 只留最新 signal_date；
@@ -1212,7 +1227,7 @@ def export_combo_watch_lists(
     max_trade_days: Optional[int] = None,
 ) -> List[str]:
     """
-    按 combo_id 滚动合并观察池 CSV（默认最多 6 个交易日，同票只留最新），
+    按 combo_id 滚动合并观察池 CSV（默认最多 2 个交易日，同票只留最新），
     并同步写入对应 symbols txt。主表 out_df 仍为当日截面；观察池不整表清空。
     """
     notes: List[str] = []
@@ -1220,7 +1235,7 @@ def export_combo_watch_lists(
     max_days = int(
         max_trade_days
         if max_trade_days is not None
-        else VP_SIX_CONFIG.get("watch_pool_max_trade_days", 6)
+        else VP_SIX_CONFIG.get("watch_pool_max_trade_days", 2)
     )
     has_today = out_df is not None and not out_df.empty and "combo_id" in out_df.columns
 
@@ -1477,13 +1492,14 @@ def main() -> None:
         if ddir:
             os.makedirs(ddir, exist_ok=True)
         out_df.to_csv(out_path, index=False, encoding="utf-8-sig")
+        empty_ids = downstream_watch_ids(cfg)
         watch_notes = export_combo_watch_lists(
             out_df,
-            combo_ids=[int(x) for x in cfg.get("watch_combo_ids", [4, 6])],
+            combo_ids=empty_ids,
             out_dir=ddir or _SCRIPT_DIR,
             pattern_entry_symbols_txt=DEFAULT_PATTERN_ENTRY_SYMBOLS_TXT,
-            primary_combo_id=int(cfg.get("watch_combo_ids", [4, 6])[0]),
-            max_trade_days=int(cfg.get("watch_pool_max_trade_days", 6)),
+            primary_combo_id=primary_watch_combo_id(empty_ids),
+            max_trade_days=int(cfg.get("watch_pool_max_trade_days", 2)),
         )
         print(f"无待分类股票，已写空表: {out_path}")
         print("【形态观察池】当日无命中，仍滚动保留既有 watch（不整表清空）")
@@ -1532,14 +1548,14 @@ def main() -> None:
         os.makedirs(ddir, exist_ok=True)
     out_df.to_csv(out_path, index=False, encoding="utf-8-sig")
 
-    watch_ids = [int(x) for x in cfg.get("watch_combo_ids", [4, 6])]
+    watch_ids = downstream_watch_ids(cfg)
     watch_notes = export_combo_watch_lists(
         out_df,
         combo_ids=watch_ids,
         out_dir=ddir or _SCRIPT_DIR,
         pattern_entry_symbols_txt=DEFAULT_PATTERN_ENTRY_SYMBOLS_TXT,
-        primary_combo_id=watch_ids[0] if watch_ids else 4,
-        max_trade_days=int(cfg.get("watch_pool_max_trade_days", 6)),
+        primary_combo_id=primary_watch_combo_id(watch_ids),
+        max_trade_days=int(cfg.get("watch_pool_max_trade_days", 2)),
     )
 
     phase_tag = f"P{snaps[0].phase}" if snaps else "P?"

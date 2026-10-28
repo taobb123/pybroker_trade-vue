@@ -4,18 +4,20 @@
 形态建仓信号——接在「量价六组合分类」之后。
 
 已实现形态：
-  1) breakout_pullback_rebreak  ↔ combo 4 上涨放量突破
+  1) breakout_pullback_rebreak  ↔ combo 2 与 4 共用（2+4 接替原 4+6）
      严格主路径：缩量回踩后的再放量突破 → entry=True
   2) volume_dump_reversal       ↔ combo 6 下跌放量
      观察→止跌缩量→放量破压(试仓)→缩量回踩(加仓)→再放量创新高 → entry=True
 
 输入优先级：
   --symbols > 非空 --pool > --watch-csv（默认按 combo 读 vp_combo_watch_{id}.csv）
-  --combo-id 0 表示扫描全部已注册形态。
+  --combo-id 0 表示扫描组合 2 与 4，共用突破回踩。
+  组合 1、3、5 属于 1+3+5，不进入本步。组合 6 仅 --combo-id 6。
 
-跑完后：默认不推东财分组。M+ 动量前13、G·4+6 增长分前13 分别调用独立成长因子写 CSV；
+跑完后：默认不推东财分组。M+ 动量前13、G·2+4 增长分前13 分别调用独立成长因子写 CSV。
+G·2+4 的排名池是观察表 2 与 4 的并集，不是只含突破形态命中的股票。
 确认建仓（待选后通过）全部再做一组成长排序，不截前13，写入量能成长表。
-「Q」与 G·2+3 由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
+「Q」与 G·1+3+5 由 vp_combo_23_long_compare 同样调用成长因子写 CSV。
 不推 M减 / 估值因子，也不按成长分重推东财「量能」。半凯利仍取 M+ 排名 Top2。观察池入池条件不变。
 
 建仓名单跨次保留：上轮「建仓」仍用原锚点进入形态循环，不因观察池换锚点而退回观察。
@@ -55,6 +57,7 @@ from backtest_sy_002028_threshold import (  # noqa: E402
     fetch_stock_name,
 )
 from fetch_vp_six_combo import (  # noqa: E402
+    COMBO_META,
     DEFAULT_PATTERN_ENTRY_SYMBOLS_TXT,
     _norm_symbol,
     _parse_symbols_text,
@@ -252,7 +255,7 @@ class BreakoutPullbackRebreak(PatternBase):
     """放量突破 → 缩量回踩确认 → 再放量突破（唯一入场门闩）。"""
 
     pattern_id = "breakout_pullback_rebreak"
-    trigger_combo_ids = (4,)
+    trigger_combo_ids = (2, 4)
 
     def evaluate(
         self,
@@ -1044,9 +1047,12 @@ PATTERN_REGISTRY: Dict[str, Type[PatternBase]] = {
 }
 
 COMBO_DEFAULT_PATTERN: Dict[int, str] = {
+    2: BreakoutPullbackRebreak.pattern_id,
     4: BreakoutPullbackRebreak.pattern_id,
     6: VolumeDumpReversal.pattern_id,
 }
+# 默认形态建仓扫描：2 与 4 共用突破回踩，接替原 4+6。
+DEFAULT_SCAN_COMBO_IDS = (2, 4)
 
 
 def get_pattern_for_combo(combo_id: int) -> PatternBase:
@@ -1133,7 +1139,7 @@ def _anchors_for_symbols(
     combo_id: int,
 ) -> List[WatchAnchor]:
     out: List[WatchAnchor] = []
-    cname = "下跌放量" if int(combo_id) == 6 else "上涨放量突破"
+    cname = _combo_name_default(combo_id)
     for sym in symbols:
         s = _norm_symbol(sym)
         if s in watch_map:
@@ -1181,7 +1187,7 @@ def _infer_anchor_from_ohlc(
     vol_ma_bars: int = 20,
     vol_amplify_ratio: float = 1.5,
 ) -> Optional[WatchAnchor]:
-    """无 watch 锚点时：combo4 用最近放量突破；combo6 用最近放量下跌日。"""
+    """无 watch 锚点时：组合 2 与 4 用最近放量突破；combo6 用最近放量下跌日。"""
     d = ohlc.sort_values("date").reset_index(drop=True).copy()
     if len(d) < breakout_lookback + 5:
         return None
@@ -1192,7 +1198,7 @@ def _infer_anchor_from_ohlc(
     d["volume"] = pd.to_numeric(d["volume"], errors="coerce")
     vb = max(5, int(vol_ma_bars))
     bb = max(5, int(breakout_lookback))
-    cname = "下跌放量" if int(combo_id) == 6 else "上涨放量突破"
+    cname = _combo_name_default(combo_id)
 
     if int(combo_id) == 6:
         # 近 lookback 内找量比最大的阴线作为恐慌日
@@ -1342,9 +1348,7 @@ def scan_pattern_entry(
                 a.stock_name = name or a.stock_name
 
             if not a.combo_name:
-                a.combo_name = (
-                    "下跌放量" if int(a.combo_id) == 6 else "上涨放量突破"
-                )
+                a.combo_name = _combo_name_default(a.combo_id)
 
             pattern = get_pattern_for_combo(a.combo_id)
             res = pattern.evaluate(ohlc, a, end_date=end_s, cfg=cfg)
@@ -1838,8 +1842,39 @@ def build_pattern_kelly_rows(
     return rows, notes
 
 
+def watch_union_symbols(combo_ids: Sequence[int]) -> Tuple[List[str], Dict[str, str], List[str]]:
+    """合并若干观察表的代码与名称。同票只留先出现的一条。"""
+    notes: List[str] = []
+    syms: List[str] = []
+    names: Dict[str, str] = {}
+    seen = set()
+    for cid in combo_ids:
+        path = watch_csv_path(int(cid))
+        if not os.path.isfile(path):
+            notes.append(f"无 watch[{int(cid)}]：{path}")
+            continue
+        df = load_watch_csv(path)
+        if df is None or df.empty or "symbol" not in df.columns:
+            notes.append(f"watch[{int(cid)}] 为空")
+            continue
+        n_add = 0
+        for _, row in df.iterrows():
+            sym = _norm_symbol(row.get("symbol"))
+            if len(sym) != 6 or sym in seen:
+                continue
+            seen.add(sym)
+            syms.append(sym)
+            name = str(row.get("stock_name") or "")
+            if name:
+                names[sym] = name
+            n_add += 1
+        notes.append(f"watch[{int(cid)}] 纳入排名 {n_add} 只")
+    notes.append(f"2+4 排名池合计 {len(syms)} 只")
+    return syms, names, notes
+
+
 def _combo_name_default(combo_id: int) -> str:
-    return "下跌放量" if int(combo_id) == 6 else "上涨放量突破"
+    return str(COMBO_META.get(int(combo_id), {}).get("combo_name") or combo_id)
 
 
 def resolve_all_anchors(
@@ -2152,7 +2187,7 @@ def main() -> None:
         "--combo-id",
         type=int,
         default=0,
-        help="上游六组合 id：4=上涨放量突破，6=下跌放量；0=全部已注册",
+        help="上游六组合 id：0=扫描 2 与 4 并共用突破回踩；也可指定 2、4 或 6。1、3、5 不在本步",
     )
     parser.add_argument(
         "--watch-csv",
@@ -2216,7 +2251,7 @@ def main() -> None:
     parser.add_argument(
         "--push-value",
         action="store_true",
-        help="例外：仍推送「估值因子」（默认关闭，定向由 2+3 对比步骤推）",
+        help="例外：仍推送「估值因子」（默认关闭，定向由 1+3+5 对比步骤推）",
     )
     parser.add_argument(
         "--skip-qm-rank",
@@ -2243,19 +2278,18 @@ def main() -> None:
         "--qm-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="交给独立成长因子的 M+ 动量只数，以及 G·4+6 增长分只数（默认 13；打分失败则中止该组，不回退）",
+        help="交给独立成长因子的 M+ 动量只数，以及 G·2+4 增长分只数（默认 13；打分失败则中止该组，不回退）",
     )
     args = parser.parse_args()
 
     if int(args.combo_id) == 0:
-        combo_ids = sorted(COMBO_DEFAULT_PATTERN.keys())
+        combo_ids = list(DEFAULT_SCAN_COMBO_IDS)
     else:
-        combo_ids = [int(args.combo_id)]
-        try:
-            get_pattern_for_combo(combo_ids[0])
-        except KeyError as exc:
-            print(str(exc))
+        cid = int(args.combo_id)
+        if cid not in (2, 4, 6):
+            print("形态建仓只扫描组合 2 和 4；组合 6 需单独指定")
             sys.exit(2)
+        combo_ids = [cid]
 
     try:
         anchors, notes = resolve_all_anchors(
@@ -2358,8 +2392,32 @@ def main() -> None:
     }
     pool_syms = []
     seen_pool = set()
-    for a in anchors:
-        s = _norm_symbol(a.symbol)
+    g_group = "G·2+4"
+    rank_source: List[str] = []
+    use_pool_24 = 6 not in combo_ids and ({2, 4} <= set(combo_ids) or combo_ids == [4])
+    if use_pool_24:
+        rank_syms, rank_names, rank_notes = watch_union_symbols((2, 4))
+        for note in rank_notes:
+            print(note)
+        for sym, name in rank_names.items():
+            if name:
+                name_map.setdefault(sym, name)
+        rank_source = rank_syms
+        if not rank_source:
+            print("2+4 观察表为空，排名改用本次形态锚点")
+    else:
+        if combo_ids == [6]:
+            g_group = "G·6"
+        elif {2, 4} <= set(combo_ids):
+            g_group = "G·2+4"
+        else:
+            g_group = "G·" + "+".join(str(c) for c in combo_ids)
+    if not rank_source:
+        for a in anchors:
+            s = _norm_symbol(a.symbol)
+            if len(s) == 6:
+                rank_source.append(s)
+    for s in rank_source:
         if len(s) != 6 or s in seen_pool or s in invalid_syms:
             continue
         seen_pool.add(s)
@@ -2421,7 +2479,7 @@ def main() -> None:
             top_n=int(args.qm_push_top_n),
             skip_push=True,
             skip_fina=bool(args.skip_qm_fina),
-            # M+ 动量前13 调用独立成长因子写 CSV；暂不推东财。Q 与 G·2+3 由 2+3 步骤同样只排序。
+            # M+ 动量前13 调用独立成长因子写 CSV；暂不推东财。Q 与 G·1+3+5 由 1+3+5 步骤同样只排序。
             push_labels=("M+",),
             exclude_symbols=list(invalid_syms),
         )
@@ -2435,12 +2493,12 @@ def main() -> None:
         pool_syms,
         asof=str(args.end_date),
         path=DEFAULT_G_RANK_CSV,
-        group_name="G·4+6",
+        group_name=g_group,
         name_map=name_map,
     )
     _g_ranked, g_growth_notes = rank_yoy_top_by_growth(
         DEFAULT_G_RANK_CSV,
-        group_name="G·4+6",
+        group_name=g_group,
         out_csv=DEFAULT_G_GROWTH_CSV,
         top_n=int(args.qm_push_top_n),
         name_map=name_map,
@@ -2488,8 +2546,11 @@ def main() -> None:
         f"形态建仓 | combo={combo_ids} | 截止 {args.end_date} | "
         f"观察 {len(anchors)} | 结果 {len(results)} | CSV {out_path}"
     )
-    print("【形态1】放量突破→缩量回踩→再放量突破")
-    print("【形态2】下跌放量→止跌缩量→放量破压→缩量回踩→再放量创新高")
+    shared = [cid for cid in combo_ids if cid in DEFAULT_SCAN_COMBO_IDS]
+    if shared:
+        print(f"【形态】组合 {shared} 共用：放量突破→缩量回踩→再放量突破")
+    if 6 in combo_ids:
+        print("【形态2】下跌放量→止跌缩量→放量破压→缩量回踩→再放量创新高")
     if prune_notes:
         print("【观察池清理·仅作废】")
         for pn in prune_notes:
@@ -2507,7 +2568,7 @@ def main() -> None:
         for pn in qm_notes:
             print(f"  {pn}")
     if g_notes:
-        print("【G·4+6】（增长因子全表保留；前13调用独立成长因子；不改入池，不推东财）")
+        print(f"【{g_group}】（增长因子全表保留；前13调用独立成长因子；不改入池，不推东财）")
         for pn in g_notes:
             print(f"  {pn}")
     if volume_notes:

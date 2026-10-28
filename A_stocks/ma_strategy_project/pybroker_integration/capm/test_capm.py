@@ -479,7 +479,7 @@ class Vp6UniverseTests(unittest.TestCase):
             self.assertEqual(by_symbol["600000"]["act_label"], "无")
             self.assertEqual(by_symbol["002821"]["act_label"], "无日线")
             self.assertTrue(any("missing_watch3.csv" in note for note in payload["report"]["notes"]))
-            self.assertTrue(any("4+6 与 2+3" in note for note in payload["report"]["notes"]))
+            self.assertTrue(any("2+4 与 1+3+5" in note for note in payload["report"]["notes"]))
 
             pasted = stocks_payload(
                 universe="paste",

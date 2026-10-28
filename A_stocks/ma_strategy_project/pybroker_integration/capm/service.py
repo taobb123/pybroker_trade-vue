@@ -121,7 +121,7 @@ def stocks_payload(
         f"本次请求 {len(picked)} 只，其中 {ready} 只能做出 120 日或 250 日窗口。",
     ]
     if _universe_name(universe) == "vp6":
-        extra.append("个股名单来自 4+6 与 2+3 观察表，合并去重，不按排名截取。")
+        extra.append("个股名单来自 2+4 与 1+3+5 观察表，合并去重，不按排名截取。")
         if missing:
             extra.append("未读到：" + "、".join(missing))
     if truncated:

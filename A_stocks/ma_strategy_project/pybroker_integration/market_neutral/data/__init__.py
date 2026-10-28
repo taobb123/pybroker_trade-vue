@@ -24,7 +24,7 @@ def _norm_sym(x) -> str:
 
 def load_observation_pool(cfg: MNConfig) -> Tuple[List[PoolMember], pd.DataFrame]:
     """
-    合并 combo4/6 观察代码 txt + watch CSV。
+    合并所选 combo 的观察代码 txt + watch CSV。
     同一代码若分属两侧，保留两条（形态评估按各自 combo）。
     """
     ensure_sys_path()

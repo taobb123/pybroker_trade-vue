@@ -66,7 +66,7 @@ steps:
   highlight: chain
   tier: advanced
   frequency: daily
-  frequency_note: 不跟随 MA5 扫描 · Phase2；名单优先粘贴/自定义列表，否则股票池；watch4/6 滚动≤6交易日、同票留最新
+  frequency_note: 不跟随 MA5 扫描 · Phase2；名单优先粘贴/自定义列表，否则股票池；观察表1/2/3/4/5 滚动≤2交易日、同票留最新
   symbols_paste: true
   workspace_inputs:
   - path: config/fetch_vp_six_combo_symbols.txt
@@ -76,40 +76,52 @@ steps:
   workspace_outputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表
+  - path: vp_combo_watch_1.csv
+    label: 底部缩量观察表
+  - path: vp_combo_watch_2.csv
+    label: 底部放量上涨观察表
+  - path: vp_combo_watch_3.csv
+    label: 上涨缩量整理观察表
   - path: vp_combo_watch_4.csv
     label: 上涨放量突破观察表
-  - path: vp_combo_watch_6.csv
-    label: 下跌放量观察表
+  - path: vp_combo_watch_5.csv
+    label: 高位放量滞涨观察表
+  - path: config/fetch_pattern_entry_symbols_1.txt
+    label: 观察代码·combo1
+  - path: config/fetch_pattern_entry_symbols_2.txt
+    label: 观察代码·combo2
+  - path: config/fetch_pattern_entry_symbols_3.txt
+    label: 观察代码·combo3
   - path: config/fetch_pattern_entry_symbols.txt
-    label: 形态建仓观察代码·combo4
-  - path: config/fetch_pattern_entry_symbols_6.txt
-    label: 形态建仓观察代码·combo6
+    label: 观察代码·combo4
+  - path: config/fetch_pattern_entry_symbols_5.txt
+    label: 观察代码·combo5
 - id: fetch_pattern_entry
-  title: 形态建仓信号（突破回踩 / 下跌放量反转）
+  title: 形态建仓信号（突破回踩）
   type: script
   script: fetch_pattern_entry.py
   args:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 跟随 fetch_vp_six_combo · combo4+6；M+动量前13、G·4+6增长分前13各调用四层成长因子写 CSV（暂不推东财）；半凯利仍取 M+ Top2
+  frequency_note: 2+4 接替原 4+6。默认扫描组合2与4，共用突破回踩。1+3+5 不在本步。M+与G·2+4排名池是观察表2+4
   symbols_paste: true
-  symbols_paste_hint: 可选粘贴；空则按上游 combo4/6 观察表扫描两种形态
-  symbols_paste_empty_hint: 未粘贴 → 扫描上游 combo4+6 观察表
+  symbols_paste_hint: 可选粘贴并选择组合 2 或 4；空则扫描观察表2与4，共用突破回踩
+  symbols_paste_empty_hint: 未粘贴 → 扫描组合2与4
   symbols_paste_combo_options:
+  - id: 2
+    label: 2 · 底部放量上涨
   - id: 4
-    label: 4 · 上涨放量突破（形态1）
-  - id: 6
-    label: 6 · 下跌放量反转（形态2）
+    label: 4 · 上涨放量突破
   workspace_inputs:
+  - path: config/fetch_pattern_entry_symbols_2.txt
+    label: 观察代码·combo2（可选）
   - path: config/fetch_pattern_entry_symbols.txt
     label: 观察代码·combo4（可选）
-  - path: config/fetch_pattern_entry_symbols_6.txt
-    label: 观察代码·combo6（可选）
+  - path: vp_combo_watch_2.csv
+    label: 底部放量上涨观察表
   - path: vp_combo_watch_4.csv
     label: 上涨放量突破观察表
-  - path: vp_combo_watch_6.csv
-    label: 下跌放量观察表
   workspace_outputs:
   - path: pattern_entry_scan.csv
     label: 形态建仓信号表
@@ -122,9 +134,9 @@ steps:
   - path: pattern_entry_mplus_growth_rank.csv
     label: M+前13成长因子排序
   - path: pattern_entry_g_rank.csv
-    label: G·4+6增长因子排序（取前13交成长因子）
+    label: G·2+4增长因子排序（取前13交成长因子）
   - path: pattern_entry_g_growth_rank.csv
-    label: G·4+6前13成长因子排序
+    label: G·2+4前13成长因子排序
   - path: pattern_entry_volume_growth_rank.csv
     label: 量能确认建仓成长因子排序
   - path: pattern_entry_mminus_rank.csv
@@ -132,7 +144,7 @@ steps:
   - path: pattern_entry_kelly_positions.csv
     label: 凯利仓位·M加
 - id: vp_combo_23_long_compare
-  title: 回测对比 · 底部放量上涨+上涨缩量整理 vs 原4+6（仅多头年化）
+  title: 回测对比 · 1+3+5 vs 2+4（仅多头年化）
   type: script
   script: run_vp_combo_23_long_compare.py
   args:
@@ -151,12 +163,12 @@ steps:
   highlight: chain
   tier: advanced
   frequency: weekly
-  frequency_note: 页面「打开回测」默认关，关时带 --skip-backtest，因子只留 M加 / Q / G·4+6 / G·2+3；打开后才跑回测，并用未超过一个月的年化表为每池追加冠军因子
+  frequency_note: 页面「打开回测」默认关，关时带 --skip-backtest，因子只留 M加 / Q / G·2+4 / G·1+3+5；打开后才跑回测，并用未超过一个月的年化表为每池追加冠军因子
   workspace_inputs:
   - path: vp_six_combo_scan.csv
     label: 量价六组合表（需先跑六组合）
   - path: market_neutral/output/latest/metrics.csv
-    label: 原4+6中性指标（建议先跑市场中性）
+    label: 2+4中性指标（建议先跑市场中性）
   workspace_outputs:
   - path: vp_combo_23_vs_46_long_annual.md
     label: 仅多头年化对比摘要
@@ -165,23 +177,25 @@ steps:
   - path: vp_combo_23_mminus_top.csv
     label: M- mud_minus Top（仅排名，不推送）
   - path: vp_combo_23_q_rank.csv
-    label: 2+3 池 Q 排名（取前13交成长因子）
+    label: 1+3+5 池 Q 排名（取前13交成长因子）
   - path: vp_combo_23_q_growth_rank.csv
     label: Q前13成长因子排序
   - path: vp_combo_23_g_rank.csv
-    label: G·2+3增长因子排序（取前13交成长因子）
+    label: G·1+3+5增长因子排序（取前13交成长因子）
   - path: vp_combo_23_g_growth_rank.csv
-    label: G·2+3前13成长因子排序
+    label: G·1+3+5前13成长因子排序
   - path: vp_combo_23_valuation_rank.csv
-    label: 2+3 池估值排名（仅排名，不推送）
+    label: 1+3+5 池估值排名（仅排名，不推送）
   - path: vp_combo_23_kelly_positions.csv
     label: 凯利仓位·Q
-  - path: vp_combo_watch_2.csv
-    label: 底部放量上涨观察表
+  - path: vp_combo_watch_1.csv
+    label: 底部缩量观察表
   - path: vp_combo_watch_3.csv
     label: 上涨缩量整理观察表
+  - path: vp_combo_watch_5.csv
+    label: 高位放量滞涨观察表
   - path: market_neutral/output/combo23_latest/summary.md
-    label: combo2+3 中性回测摘要
+    label: combo1+3+5 中性回测摘要
 - id: market_neutral
   title: 市场中性 · 形态/PE/Q/G/MUD 个股多空
   type: script
@@ -270,10 +284,10 @@ steps:
   workspace_inputs:
   - path: pattern_entry_scan.csv
     label: 形态建仓信号表
+  - path: vp_combo_watch_2.csv
+    label: 底部放量上涨观察表
   - path: vp_combo_watch_4.csv
     label: 上涨放量突破观察表
-  - path: vp_combo_watch_6.csv
-    label: 下跌放量观察表
   - path: market_neutral/archive/watch_pool/index.csv
     label: 观察池归档索引
   - path: market_temperature_backtest.csv
@@ -321,7 +335,7 @@ steps:
   - --skip-mx-push
   highlight: chain
   frequency: daily
-  frequency_note: 读取 M+动量前13、Q前13、G·4+6与G·2+3增长分前13，以及形态建仓全部确认建仓；组内成长排序写 CSV；暂不推东财。粘贴代码默认与成长综合得分表一起标准化，结果单独成表、不改综合表
+  frequency_note: 读取 M+动量前13、Q前13、G·2+4与G·1+3+5增长分前13，以及形态建仓全部确认建仓；组内成长排序写 CSV；暂不推东财。粘贴代码默认与成长综合得分表一起标准化，结果单独成表、不改综合表
   symbols_paste: true
   symbols_paste_as_input: true
   symbols_paste_hint: 每行一个 6 位代码，也可用逗号或空格分隔。默认与成长综合得分表一起标准化
@@ -333,9 +347,9 @@ steps:
   - path: vp_combo_23_q_rank.csv
     label: 回测对比 Q 排名（取前13）
   - path: pattern_entry_g_rank.csv
-    label: G·4+6增长因子排序（取前13）
+    label: G·2+4增长因子排序（取前13）
   - path: vp_combo_23_g_rank.csv
-    label: G·2+3增长因子排序（取前13）
+    label: G·1+3+5增长因子排序（取前13）
   - path: pattern_entry_scan.csv
     label: 形态建仓信号表（取确认建仓）
   workspace_outputs:
@@ -346,9 +360,9 @@ steps:
   - path: vp_combo_23_q_growth_rank.csv
     label: Q前13成长因子排序
   - path: pattern_entry_g_growth_rank.csv
-    label: G·4+6前13成长因子排序
+    label: G·2+4前13成长因子排序
   - path: vp_combo_23_g_growth_rank.csv
-    label: G·2+3前13成长因子排序
+    label: G·1+3+5前13成长因子排序
   - path: pattern_entry_volume_growth_rank.csv
     label: 量能确认建仓成长因子排序
   - path: factor_growth_paste_rank.csv

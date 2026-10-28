@@ -104,8 +104,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     )
     p.add_argument(
         "--combo-ids",
-        default="4,6",
-        help="观察池 combo id，逗号分隔（默认 4,6；对比步骤可用 2,3）",
+        default="2,4",
+        help="观察池 combo id，逗号分隔（默认 2,4；对比步骤用 1,3,5）",
     )
     p.add_argument("--output-dir", default="")
     p.add_argument(
@@ -159,7 +159,7 @@ def main(argv=None) -> int:
     )
     combo_ids = tuple(
         int(x.strip())
-        for x in str(args.combo_ids or "4,6").split(",")
+        for x in str(args.combo_ids or "2,4").split(",")
         if str(x).strip()
     )
     if not combo_ids:

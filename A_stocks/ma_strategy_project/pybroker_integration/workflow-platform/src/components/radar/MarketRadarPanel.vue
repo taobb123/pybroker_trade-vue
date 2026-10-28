@@ -20,7 +20,7 @@ import {
 
 const GROWTH_STEP_ID = 'growth_factor'
 /** 四组各前 3，量能为全部确认建仓；年化追加的 Tab 由接口 groups 接在后面 */
-const BASE_GROUPS = ['M加', 'Q', 'G·4+6', 'G·2+3', '量能'] as const
+const BASE_GROUPS = ['M加', 'Q', 'G·2+4', 'G·1+3+5', '量能'] as const
 const HIGHLIGHT_MS = 2500
 const RISK_BAR_FULL = 2
 
@@ -198,10 +198,10 @@ function emptyGroupHint(name: string) {
   if (name === '量能') {
     return '请先运行「形态建仓」或「按成长因子排序」，对确认建仓股做成长排序。'
   }
-  if (name.endsWith('·4+6') || name === 'G·4+6') {
+  if (name.endsWith('·2+4') || name === 'G·2+4') {
     return '请先运行「形态建仓」或「按成长因子排序」生成该组表格。'
   }
-  if (name.endsWith('·2+3') || name === 'G·2+3') {
+  if (name.endsWith('·1+3+5') || name === 'G·1+3+5') {
     return '请先运行「回测对比」或「按成长因子排序」生成该组表格。'
   }
   return '请先运行「按成长因子排序」生成该组表格。'
@@ -243,7 +243,7 @@ defineExpose({ refresh: load })
         </p>
         <h3 class="mt-0.5 text-base font-semibold">因子自选 · 相对板块与大盘</h3>
         <p class="mt-0.5 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
-          M加、Q、G·4+6、G·2+3 来自各组前 13 的成长因子排序（M加取动量前 13，Q 取公司质量前 13，G 取增长分前 13），再各取前 3。量能取形态建仓里全部确认建仓股，按成长因子排序后整组进入，不截前 13、不截前 3。随后映射申万行业，对照沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
+          M加、Q、G·2+4、G·1+3+5 来自各组前 13 的成长因子排序（M加取动量前 13，Q 取公司质量前 13，G 取增长分前 13），再各取前 3。量能取形态建仓里全部确认建仓股，按成长因子排序后整组进入，不截前 13、不截前 3。随后映射申万行业，对照沪深300。盘中行情来自东方财富实时，约 1 分钟刷新，非投资建议。
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -489,7 +489,7 @@ defineExpose({ refresh: load })
         </div>
         <p class="text-sm font-medium">还没有因子自选名单</p>
         <p class="max-w-sm text-[11px] text-muted-foreground">
-          M加、Q、G·4+6、G·2+3 来自各组前 13 的成长因子排序，再各取前三。量能是确认建仓股按成长因子排序后的全部。
+          M加、Q、G·2+4、G·1+3+5 来自各组前 13 的成长因子排序，再各取前三。量能是确认建仓股按成长因子排序后的全部。
         </p>
         <Button size="sm" variant="outline" @click="openGrowthWorkflow">
           运行按成长因子排序

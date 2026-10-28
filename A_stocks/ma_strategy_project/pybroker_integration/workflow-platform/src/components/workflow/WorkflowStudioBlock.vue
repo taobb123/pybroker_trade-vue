@@ -691,8 +691,8 @@ watch([tableHost, tableExpanded], () => {
       <p v-if="isBacktestCompare" class="text-[11px] leading-relaxed text-muted-foreground">
         {{
           backtestOpen
-            ? '回测已打开。运行本步会重算仅多头年化；报告未超过一个月时，2+3 与 4+6 各追加一个年化最高、且不在现有因子里的 Tab。'
-            : '回测已关闭（默认）。跳过回测，市场雷达因子只保留 M加 / Q / G·4+6 / G·2+3。'
+            ? '回测已打开。运行本步会重算仅多头年化；报告未超过一个月时，1+3+5 与 2+4 各追加一个年化最高、且不在现有因子里的 Tab。'
+            : '回测已关闭（默认）。跳过回测，市场雷达因子只保留 M加 / Q / G·2+4 / G·1+3+5。'
         }}
       </p>
     </div>

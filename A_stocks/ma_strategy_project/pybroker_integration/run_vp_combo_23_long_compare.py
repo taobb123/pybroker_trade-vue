@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-回测对比：六组合「底部放量上涨(2)+上涨缩量整理(3)」vs 原「上涨放量突破(4)+下跌放量(6)」。
+回测对比：六组合「1+3+5」vs「2+4」。
 
-形态 A：单步骤
-  1) 从当日 vp_six_combo_scan.csv 导出 watch_2 / watch_3（不改原步骤默认 watch 4+6）
-  2) 归档当日 2+3 快照
-  3) 用同一套市场中性参数跑 combo2+3（输出到独立 latest，不覆盖 4+6）
+1+3+5：底部缩量、上涨缩量整理、高位放量滞涨。
+2+4：底部放量上涨、上涨放量突破。
+
+  1) 从当日 vp_six_combo_scan.csv 再滚动合并 watch_1 / watch_3 / watch_5（窗口与六组合步骤相同）
+  2) 归档当日 1+3+5 快照
+  3) 用同一套市场中性参数跑 combo1+3+5（输出到独立 latest，不覆盖 2+4）
      —— 可 --skip-backtest 暂时关掉，以加快链式运行
-  4) 读取原 market_neutral/output/latest（4+6）metrics，对比「仅多头 *_L」年化
+  4) 读取 market_neutral/output/latest（2+4）metrics，对比「仅多头 *_L」年化
      —— skip-backtest 时跳过
   5) 将 Q 观察池排名前13 作为参数调用独立成长因子写 CSV（暂不推东财）
-     G·2+3 先写增长因子全表，再将增长分前13 调用同一套成长因子（打分失败不回退）
+     G·1+3+5 先写增长因子全表，再将增长分前13 调用同一套成长因子（打分失败不回退）
      不推估值因子 / 23M减。回测组别 G 的月频同比截面不改。
   6) 半凯利仍取 Q 排名 Top2
 
-前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」4+6 结果。
-skip-backtest 时 23M减 改用 2+3 观察池当日 M- 截面，不依赖本次回测 snapshot。
+前置：建议先跑「量价六组合分类」生成 scan；对比基线需已有「市场中性」2+4 结果。
+skip-backtest 时 23M减 改用 1+3+5 观察池当日 M- 截面，不依赖本次回测 snapshot。
 """
 from __future__ import annotations
 
@@ -71,8 +73,8 @@ MX_Q_GROUP = "Q"
 MX_TOP_N_DEFAULT = 2
 MX_PUSH_TOP_N_DEFAULT = 13
 KELLY_TOP_N_DEFAULT = 2
-NEW_IDS = (2, 3)
-BASE_IDS = (4, 6)
+NEW_IDS = (1, 3, 5)
+BASE_IDS = (2, 4)
 
 
 def _norm_symbol(x) -> str:
@@ -96,7 +98,7 @@ def _combo_label(ids: Tuple[int, ...]) -> str:
 
 
 def collect_combo23_pool_symbols() -> Tuple[List[str], Dict[str, str], List[str]]:
-    """合并 watch_2/watch_3 代码与名称。"""
+    """合并 watch_1/watch_3/watch_5 代码与名称。"""
     notes: List[str] = []
     syms: List[str] = []
     names: Dict[str, str] = {}
@@ -126,7 +128,7 @@ def collect_combo23_pool_symbols() -> Tuple[List[str], Dict[str, str], List[str]
                 names[s] = nm
             n_add += 1
         notes.append(f"watch[{cid}] 纳入 {n_add} 只")
-    notes.append(f"2+3 观察池合计 {len(syms)} 只")
+    notes.append(f"1+3+5 观察池合计 {len(syms)} 只")
     return syms, names, notes
 
 
@@ -142,7 +144,7 @@ def push_combo23_value_and_q(
     skip_fina: bool = False,
 ) -> Tuple[List[dict], List[str], Dict[str, List[str]], pd.DataFrame]:
     """
-    2+3 池：写估值/Q 排名表；将 Q 前 push_top_n 交给独立成长因子排序写 CSV。
+    1+3+5 池：写估值/Q 排名表；将 Q 前 push_top_n 交给独立成长因子排序写 CSV。
     暂不推送东财分组，也不写「估值因子」。
     返回 (记录[{group,syms}], 日志, {group: syms}, M- 排名表)。
     """
@@ -241,7 +243,7 @@ def export_watch_23(*, scan_csv: str) -> List[str]:
         notes.append(f"读取扫描表失败: {exc}")
         return notes
     if out_df.empty or "combo_id" not in out_df.columns:
-        notes.append("扫描表无 combo_id，跳过导出 2+3")
+        notes.append("扫描表无 combo_id，跳过导出 1+3+5")
         return notes
     primary_txt = pattern_entry_symbols_path(NEW_IDS[0])
     notes.extend(
@@ -460,7 +462,7 @@ def write_compare_report(
         best46 = f"{k} = {_pct(m['annual_return'])}"
 
     lines = [
-        "# 仅多头年化对比 · combo2+3 vs combo4+6",
+        "# 仅多头年化对比 · combo1+3+5 vs combo2+4",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 新池：{_combo_label(NEW_IDS)}",
@@ -468,7 +470,7 @@ def write_compare_report(
         f"- 主指标：仅多头 `*_L` 年化",
         f"- 参数：{cfg_note}",
         "",
-        "| 组别 | 2+3 年化 | 4+6 年化 | 差值(2+3−4+6) | 2+3 月胜率 | 4+6 月胜率 |",
+        "| 组别 | 1+3+5 年化 | 2+4 年化 | 差值(1+3+5−2+4) | 1+3+5 月胜率 | 2+4 月胜率 |",
         "|------|----------|----------|---------------|-----------|-----------|",
     ]
     for _, r in cdf.iterrows():
@@ -481,15 +483,15 @@ def write_compare_report(
         [
             "",
             "## 结论摘录",
-            f"- 新池(2+3)仅多头年化最高：{best23 or '无'}",
-            f"- 原池(4+6)仅多头年化最高：{best46 or '无'}",
+            f"- 1+3+5 池仅多头年化最高：{best23 or '无'}",
+            f"- 2+4 池仅多头年化最高：{best46 or '无'}",
             "",
             "## 说明",
-            "- 原步骤「量价六组合」仍只导出/归档 4+6；本步骤单独导出 2+3。",
-            "- 2+3 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
-            "- 4+6 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
+            "- 「量价六组合」导出观察表 1、2、3、4、5，滚动 2 个交易日。本步骤再合并 1+3+5。",
+            "- 1+3+5 历史归档若偏少，长区间回测会更依赖近期池，解读时注意样本偏差。",
+            "- 2+4 基线读取 `market_neutral/output/latest/metrics.csv`（勿被本步骤覆盖）。",
             f"- 定向推送：Q 前{MX_PUSH_TOP_N_DEFAULT} 作为参数调用独立成长因子后写入「Q」（打分失败则中止推送）；不推估值因子 / 「{MX_MMINUS_GROUP}」。",
-            f"- G·2+3：增长因子全表保留；增长分前{MX_PUSH_TOP_N_DEFAULT} 调用独立成长因子写入「G·2+3」（打分失败不回退增长分前三）。回测 G 月频同比不改。",
+            f"- G·1+3+5：增长因子全表保留；增长分前{MX_PUSH_TOP_N_DEFAULT} 调用独立成长因子写入「G·1+3+5」（打分失败不回退增长分前三）。回测 G 月频同比不改。",
             "- 半凯利取 Q 排名 Top2，不跟东财推送名单。",
             "",
         ]
@@ -501,7 +503,7 @@ def write_compare_report(
 
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="回测对比 combo2+3 vs combo4+6（仅多头年化）"
+        description="回测对比 combo1+3+5 vs combo2+4（仅多头年化）"
     )
     p.add_argument("--start", default="2025-06-01")
     p.add_argument("--end", default="")
@@ -511,11 +513,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--variants", default="A,B,Q,G,M+,M-")
     p.add_argument("--scan-csv", default=DEFAULT_SCAN)
     p.add_argument("--baseline-metrics", default=BASELINE_METRICS)
-    p.add_argument("--skip-export", action="store_true", help="不从 scan 导出 2+3")
+    p.add_argument("--skip-export", action="store_true", help="不从 scan 导出 1+3+5")
     p.add_argument(
         "--skip-backtest",
         action="store_true",
-        help="跳过 2+3 市场中性回测与年化对比，仍导出观察池并写 Q 成长表",
+        help="跳过 1+3+5 市场中性回测与年化对比，仍导出观察池并写 Q 成长表",
     )
     p.add_argument("--no-rotation", action="store_true")
     p.add_argument("--skip-fina", action="store_true")
@@ -534,7 +536,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--mx-push-top-n",
         type=int,
         default=MX_PUSH_TOP_N_DEFAULT,
-        help="交给独立成长因子的 Q 只数，以及 G·2+3 增长分只数（默认 13；打分失败则中止该组，不回退）",
+        help="交给独立成长因子的 Q 只数，以及 G·1+3+5 增长分只数（默认 13；打分失败则中止该组，不回退）",
     )
     p.add_argument(
         "--kelly-top-n",
@@ -553,7 +555,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 def main(argv=None) -> int:
     args = parse_args(argv)
     print("=" * 64, flush=True)
-    print("combo2+3 · 观察池与 Q 成长排序" + ("（已跳过回测）" if args.skip_backtest else " · 回测对比仅多头年化"), flush=True)
+    print("combo1+3+5 · 观察池与 Q 成长排序" + ("（已跳过回测）" if args.skip_backtest else " · 回测对比仅多头年化"), flush=True)
     print("=" * 64, flush=True)
 
     if not args.skip_export:
@@ -579,7 +581,7 @@ def main(argv=None) -> int:
             "--variants",
             str(args.variants),
             "--combo-ids",
-            "2,3",
+            "1,3,5",
             "--output-dir",
             out_dir,
             "--latest-dir",
@@ -591,7 +593,7 @@ def main(argv=None) -> int:
             mn_argv.append("--no-rotation")
         if args.skip_fina:
             mn_argv.append("--skip-fina")
-        print(f"[backtest] 启动市场中性 combo2+3 → {out_dir}", flush=True)
+        print(f"[backtest] 启动市场中性 combo1+3+5 → {out_dir}", flush=True)
         rc = int(market_neutral_main(mn_argv) or 0)
         if rc != 0:
             print(f"[backtest] 失败 exit={rc}", flush=True)
@@ -604,11 +606,11 @@ def main(argv=None) -> int:
         metrics_23 = _load_long_only_metrics(metrics_23_path)
         metrics_46 = _load_long_only_metrics(str(args.baseline_metrics))
         if not metrics_23:
-            print(f"无 2+3 仅多头指标：{metrics_23_path}", flush=True)
+            print(f"无 1+3+5 仅多头指标：{metrics_23_path}", flush=True)
             return 1
         if not metrics_46:
             print(
-                f"警告：无 4+6 基线 {args.baseline_metrics}（请先跑「市场中性」步骤）",
+                f"警告：无 2+4 基线 {args.baseline_metrics}（请先跑「市场中性」步骤）",
                 flush=True,
             )
 
@@ -630,8 +632,8 @@ def main(argv=None) -> int:
             cdf = pd.read_csv(csv_path, encoding="utf-8-sig")
             for _, r in cdf.iterrows():
                 print(
-                    f"  {r['variant']}: 2+3={_pct(r['pool_23_annual'])}  "
-                    f"4+6={_pct(r['pool_46_annual'])}  "
+                    f"  {r['variant']}: 1+3+5={_pct(r['pool_23_annual'])}  "
+                    f"2+4={_pct(r['pool_46_annual'])}  "
                     f"Δ={_pct(r['delta_23_minus_46'])}",
                     flush=True,
                 )
@@ -654,7 +656,7 @@ def main(argv=None) -> int:
     snap_path = next((p for p in snap_candidates if os.path.isfile(p)), snap_candidates[-1])
 
     pool_syms, pool_names, pool_notes = collect_combo23_pool_symbols()
-    print("【2+3 观察池】", flush=True)
+    print("【1+3+5 观察池】", flush=True)
     for note in pool_notes:
         print(f"  {note}", flush=True)
 
@@ -673,21 +675,21 @@ def main(argv=None) -> int:
     for note in vq_notes:
         print(f"  {note}", flush=True)
 
-    print("【G·2+3】", flush=True)
+    print("【G·1+3+5】", flush=True)
     from market_neutral.factors.growth import write_yoy_rank_csv
 
     g_notes = write_yoy_rank_csv(
         pool_syms,
         asof=end_date,
         path=G_RANK_CSV,
-        group_name="G·2+3",
+        group_name="G·1+3+5",
         name_map=pool_names,
     )
     from factor_growthT_indicator import rank_yoy_top_by_growth
 
     _g_ranked, g_growth_notes = rank_yoy_top_by_growth(
         G_RANK_CSV,
-        group_name="G·2+3",
+        group_name="G·1+3+5",
         out_csv=G_GROWTH_CSV,
         top_n=int(args.mx_push_top_n),
         name_map=pool_names,
