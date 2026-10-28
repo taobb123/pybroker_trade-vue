@@ -11,12 +11,16 @@ import pandas as pd
 
 from capm.alpha_state import (
     classify_state,
+    collect_gap_bucket_holds,
     collect_speed_observations,
     forward_excess,
+    forward_hold,
     gap_admits,
+    gap_bucket,
     price_gates,
     rolling_ols,
     snapshot_factors,
+    summarize_gap_buckets,
     summarize_speed_groups,
 )
 from capm.desk import desk_payload
@@ -41,6 +45,15 @@ def _market(n: int) -> np.ndarray:
 
 
 def _in_pool_improving(n: int = 280, beta: float = 0.3):
+    """近端抬升，但 120 日 α 仍低于 250 日 α。"""
+    market = _market(n)
+    alpha = np.full(n, 0.0)
+    alpha[n - 140 : n - 60] = -0.004
+    alpha[n - 60 :] = -0.001
+    return _series(alpha + beta * market), _series(market)
+
+
+def _wide_positive_gap(n: int = 280, beta: float = 0.3):
     """近端抬升，且 120 日 α 比 250 日 α 高出 40% 以上。"""
     market = _market(n)
     alpha = np.full(n, -0.001)
@@ -130,17 +143,63 @@ class StateTests(unittest.TestCase):
         bars = _confirming_bars(asset.index[-21:])
         row = snapshot_factors(asset, market, bars)
         assert row is not None
-        self.assertGreater(row["alphaGap"], 0.40)
+        self.assertLess(row["alphaGap"], 0)
         self.assertGreater(row["delta120"], 0)
         self.assertTrue(row["persisted"])
         self.assertEqual(row["state"], "S2")
+
+    def test_gap_buckets_do_not_overlap(self) -> None:
+        self.assertEqual(gap_bucket(-0.01), "lt0")
+        self.assertEqual(gap_bucket(0.0), "mid")
+        self.assertEqual(gap_bucket(0.40), "mid")
+        self.assertEqual(gap_bucket(0.4000001), "gt40")
+        self.assertIsNone(gap_bucket(float("nan")))
+
+    def test_five_day_hold_starts_the_day_after_the_signal(self) -> None:
+        asset = np.zeros(12)
+        market = np.zeros(12)
+        asset[4] = 0.5
+        asset[5:10] = 0.01
+        held = forward_hold(asset, market, 4, 5)
+        assert held is not None
+        self.assertAlmostEqual(held[0], float(np.prod(np.full(5, 1.01)) - 1), places=8)
+        self.assertAlmostEqual(held[1], 0.0, places=8)
+
+    def test_gap_backtest_compounds_cash_on_empty_dates(self) -> None:
+        observations = [
+            {"date": "2026-01-05", "symbol": "000001", "bucket": "lt0", "ret": 0.02, "excess": 0.01},
+            {"date": "2026-01-05", "symbol": "000002", "bucket": "lt0", "ret": 0.04, "excess": 0.03},
+            {"date": "2026-01-12", "symbol": "000003", "bucket": "gt40", "ret": -0.01, "excess": -0.02},
+        ]
+        out = summarize_gap_buckets(observations, ["2026-01-05", "2026-01-12"])
+        groups = {item["id"]: item for item in out["groups"]}
+        self.assertEqual(out["hold_days"], 5)
+        self.assertEqual(groups["lt0"]["n_held"], 1)
+        self.assertAlmostEqual(groups["lt0"]["mean_return"], 0.03)
+        self.assertAlmostEqual(groups["lt0"]["mean_excess"], 0.02)
+        self.assertAlmostEqual(groups["lt0"]["total_return"], 0.03)
+        self.assertEqual(groups["mid"]["n_held"], 0)
+        self.assertIsNone(groups["mid"]["mean_return"])
+        self.assertAlmostEqual(groups["mid"]["total_return"], 0.0)
+        self.assertEqual(groups["gt40"]["n_held"], 1)
+        self.assertAlmostEqual(groups["gt40"]["total_return"], -0.01)
+
+    def test_declining_alpha_stays_below_zero_and_a_wide_gap_ends_above_forty(self) -> None:
+        worse, worse_market = _in_pool_worsening()
+        holds, dates = collect_gap_bucket_holds({"000001": worse}, worse_market, {"000001"})
+        self.assertTrue(dates)
+        self.assertTrue(holds)
+        self.assertTrue(all(item["bucket"] == "lt0" for item in holds))
+        better, better_market = _wide_positive_gap()
+        lifted, _lift_dates = collect_gap_bucket_holds({"000001": better}, better_market, {"000001"})
+        self.assertEqual(lifted[-1]["bucket"], "gt40")
 
     def test_states_follow_the_pool_and_the_price_gate(self) -> None:
         self.assertFalse(gap_admits(-0.10, -0.10))
         self.assertFalse(gap_admits(0.0, -0.40))
         self.assertFalse(gap_admits(-0.10, -0.20))
         self.assertTrue(gap_admits(-0.20, -0.10))
-        self.assertTrue(gap_admits(0.0, -0.41))
+        self.assertFalse(gap_admits(0.0, -0.41))
         self.assertEqual(classify_state(0.8, -0.2, -0.1, 0.02, True, True), "excluded")
         self.assertEqual(classify_state(-0.1, -0.2, -0.1, 0.02, True, True), "excluded")
         self.assertEqual(classify_state(0.3, -0.1, -0.2, 0.02, True, True), "excluded")
@@ -152,7 +211,7 @@ class StateTests(unittest.TestCase):
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, False, True), "S1")
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, True, False), "S1")
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, True, True), "S2")
-        self.assertEqual(classify_state(0.3, 0.01, -0.40, 0.02, True, True), "S2")
+        self.assertEqual(classify_state(0.3, 0.01, -0.40, 0.02, True, True), "excluded")
 
     def test_quintiles_rise_from_slowest_to_fastest(self) -> None:
         speeds = [-0.02, -0.01, 0.0, 0.01, 0.02]
@@ -260,8 +319,9 @@ class DeskPayloadTests(unittest.TestCase):
         self.assertEqual(payload["report"]["buys"], [])
         self.assertTrue(payload["report"]["open_missing"])
         self.assertIn("hypothesis", payload["report"])
+        self.assertNotIn("gap_backtest", payload["report"])
         self.assertTrue(any("不止盈" in note for note in payload["report"]["notes"]))
-        self.assertTrue(any("40%" in note for note in payload["report"]["notes"]))
+        self.assertTrue(any("小于 0" in note for note in payload["report"]["notes"]))
 
 
 class HistoryBackfillTests(unittest.TestCase):

@@ -20,8 +20,14 @@ PERSIST_COUNT = 2
 PRICE_WINDOW = 20
 VOLUME_MULT = 1.3
 FORWARD = 10
+HOLD_DAYS = 5
 GROUPS = 5
 MIN_NAMES = 5
+GAP_BUCKETS = (
+    ("lt0", "小于 0"),
+    ("mid", "0 到 40%"),
+    ("gt40", "大于 40%"),
+)
 
 STATE_LABEL = {
     "S0": "禁止买入",
@@ -74,12 +80,22 @@ def alpha_gap(alpha_120: float, alpha_250: float) -> float:
     return float(alpha_120) - float(alpha_250)
 
 
+def gap_bucket(gap: float) -> str | None:
+    """三档互不重叠。等于 0 和等于 40% 落在中间档。"""
+    if not np.isfinite(gap):
+        return None
+    if float(gap) < 0.0:
+        return "lt0"
+    if float(gap) <= ALPHA_GAP_HI:
+        return "mid"
+    return "gt40"
+
+
 def gap_admits(alpha_120: float, alpha_250: float) -> bool:
-    """差为负，或严格大于 40%。等于 0、等于 40%，以及两者之间，都不进候选。"""
+    """候选只收差小于 0。等于 0 或为正都不进候选。"""
     if not (np.isfinite(alpha_120) and np.isfinite(alpha_250)):
         return False
-    gap = alpha_gap(alpha_120, alpha_250)
-    return bool(gap < 0.0 or gap > ALPHA_GAP_HI)
+    return bool(alpha_gap(alpha_120, alpha_250) < 0.0)
 
 
 def in_risk_pool(beta: float, alpha_120: float, alpha_250: float) -> bool:
@@ -190,7 +206,7 @@ def explain_state(
         if not (np.isfinite(beta) and BETA_LO <= float(beta) <= BETA_HI):
             return "250 日 β 不在 0 到 0.5。"
         if not gap_admits(alpha_120, alpha_250):
-            return "120 日与 250 日年化 α 之差不是负数，也没有大于 40%。"
+            return "120 日与 250 日年化 α 之差不是负数。"
         return "不在低 β、120 日与 250 日 α 之差的筛选里。"
     if state == "S0":
         if np.isfinite(delta) and float(delta) < 0:
@@ -222,7 +238,9 @@ def explain_state(
     return "α 在收敛，价格还没确认。"
 
 
-def forward_excess(asset: np.ndarray, market: np.ndarray, pos: int, horizon: int = FORWARD) -> float | None:
+def _forward_legs(
+    asset: np.ndarray, market: np.ndarray, pos: int, horizon: int
+) -> tuple[np.ndarray, np.ndarray] | None:
     """从信号日的下一根收益起，取 horizon 个交易日。信号日本身不计入。"""
     start = pos + 1
     end = start + horizon
@@ -232,7 +250,25 @@ def forward_excess(asset: np.ndarray, market: np.ndarray, pos: int, horizon: int
     right = np.asarray(market[start:end], dtype=float)
     if len(left) < horizon or not np.isfinite(left).all() or not np.isfinite(right).all():
         return None
+    return left, right
+
+
+def forward_excess(asset: np.ndarray, market: np.ndarray, pos: int, horizon: int = FORWARD) -> float | None:
+    """从信号日的下一根收益起，取 horizon 个交易日。信号日本身不计入。"""
+    legs = _forward_legs(asset, market, pos, horizon)
+    if legs is None:
+        return None
+    left, right = legs
     return float(np.prod(1.0 + left) - np.prod(1.0 + right))
+
+
+def forward_hold(asset: np.ndarray, market: np.ndarray, pos: int, horizon: int) -> tuple[float, float] | None:
+    """下一交易日起的个股复合收益，以及同期基准复合收益。"""
+    legs = _forward_legs(asset, market, pos, horizon)
+    if legs is None:
+        return None
+    left, right = legs
+    return float(np.prod(1.0 + left) - 1.0), float(np.prod(1.0 + right) - 1.0)
 
 
 def _finite(value: float) -> bool:
@@ -287,15 +323,15 @@ def snapshot_factors(asset: pd.Series, market: pd.Series, bars: pd.DataFrame | N
     }
 
 
-def clock_dates(market: pd.Series) -> list[pd.Timestamp]:
-    """每隔一个持有期取一个信号日，并且后面还留着 10 个交易日。"""
+def clock_dates(market: pd.Series, horizon: int = FORWARD) -> list[pd.Timestamp]:
+    """每隔一个持有期取一个信号日，并且后面还留着这么多个交易日。"""
     idx = pd.DatetimeIndex(pd.to_datetime(market.index)).normalize()
     dates: list[pd.Timestamp] = []
-    last = len(idx) - FORWARD
+    last = len(idx) - horizon
     pos = WINDOW_LONG - 1
     while pos < last:
         dates.append(pd.Timestamp(idx[pos]).normalize())
-        pos += FORWARD
+        pos += horizon
     return dates
 
 
@@ -451,4 +487,101 @@ def summarize_speed_groups(observations: list[dict]) -> dict:
         "sample_end": max(used) if used else None,
         "groups": groups,
         "verdict": verdict,
+    }
+
+
+def collect_gap_bucket_holds(
+    returns: dict[str, pd.Series],
+    market: pd.Series,
+    symbols: set[str] | None = None,
+    horizon: int = HOLD_DAYS,
+) -> tuple[list[dict], list[str]]:
+    """观察池按 α 差分档。信号日收盘后分档，下一交易日起持有 horizon 日，持仓不重叠。"""
+    clocks = clock_dates(market, horizon)
+    if not clocks:
+        return [], []
+    clock_set = set(clocks)
+    rows: list[dict] = []
+    for symbol, series in returns.items():
+        if symbols is not None and str(symbol) not in symbols:
+            continue
+        both = align_returns(series, market)
+        if len(both) < WINDOW_LONG + horizon:
+            continue
+        asset_np = both["asset"].to_numpy(dtype=float)
+        market_np = both["market"].to_numpy(dtype=float)
+        alpha_120, _ = rolling_ols(asset_np, market_np, WINDOW_SHORT)
+        alpha_250, _beta_250 = rolling_ols(asset_np, market_np, WINDOW_LONG)
+        positions = {pd.Timestamp(day).normalize(): i for i, day in enumerate(both.index)}
+        for day, pos in positions.items():
+            if day not in clock_set or pos < WINDOW_LONG - 1:
+                continue
+            if not _finite(alpha_120[pos]) or not _finite(alpha_250[pos]):
+                continue
+            short = float(alpha_120[pos] * ANN_FACTOR)
+            long = float(alpha_250[pos] * ANN_FACTOR)
+            bucket = gap_bucket(alpha_gap(short, long))
+            if bucket is None:
+                continue
+            held = forward_hold(asset_np, market_np, pos, horizon)
+            if held is None:
+                continue
+            stock, bench = held
+            rows.append(
+                {
+                    "date": day.date().isoformat(),
+                    "symbol": str(symbol),
+                    "bucket": bucket,
+                    "ret": stock,
+                    "excess": stock - bench,
+                }
+            )
+    return rows, [day.date().isoformat() for day in clocks]
+
+
+def summarize_gap_buckets(observations: list[dict], sample_dates: list[str]) -> dict:
+    """同一组取样日上比较三档。某档当天没有股票时，这 5 日收益记 0。"""
+    by_key: dict[tuple[str, str], list[dict]] = {}
+    for item in observations:
+        by_key.setdefault((str(item["date"]), str(item["bucket"])), []).append(item)
+    groups = []
+    for key, label in GAP_BUCKETS:
+        wealth = 1.0
+        held_returns: list[float] = []
+        held_excess: list[float] = []
+        held_counts: list[int] = []
+        names: set[str] = set()
+        for day in sample_dates:
+            members = by_key.get((day, key), [])
+            if not members:
+                period = 0.0
+            else:
+                period = float(np.mean([float(item["ret"]) for item in members]))
+                excess = float(np.mean([float(item["excess"]) for item in members]))
+                held_returns.append(period)
+                held_excess.append(excess)
+                held_counts.append(len(members))
+                names.update(str(item["symbol"]) for item in members)
+            wealth *= 1.0 + period
+        hit = None if not held_excess else float(np.mean(np.asarray(held_excess) > 0))
+        groups.append(
+            {
+                "id": key,
+                "label": label,
+                "n_held": len(held_returns),
+                "n_names": len(names),
+                "n_obs": int(sum(held_counts)),
+                "avg_names": None if not held_counts else float(np.mean(held_counts)),
+                "mean_return": None if not held_returns else float(np.mean(held_returns)),
+                "mean_excess": None if not held_excess else float(np.mean(held_excess)),
+                "hit_rate": hit,
+                "total_return": float(wealth - 1.0),
+            }
+        )
+    return {
+        "hold_days": HOLD_DAYS,
+        "n_dates": len(sample_dates),
+        "sample_start": sample_dates[0] if sample_dates else None,
+        "sample_end": sample_dates[-1] if sample_dates else None,
+        "groups": groups,
     }
