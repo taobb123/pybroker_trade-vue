@@ -44,12 +44,14 @@ _CACHE: dict = {"stamp": None, "payload": None}
 
 NOTES = (
     "交易部门只记下价格确认后的买入。不加仓，不止盈，不止损，不写观察池，不改仓位。",
-    "候选要同时满足：250 日 β 在 0 到 0.5，250 日 α 小于 0，120 日 α 小于 0。",
+    "名单和个股对比相同：2+4 与 1+3+5 观察表合并去重，不按排名截取。不在这份观察池里的股票不进入状态机。",
+    "候选要同时满足：250 日 β 在 0 到 0.5，并且年化 120 日 α 减年化 250 日 α 为负或大于 40%。"
+    "差等于 0、等于 40%，或落在两者之间，不进候选。",
     f"收敛看 120 日 α 相对 {LAG} 个交易日前是否上升。连续改善是每 {OBSERVE_STEP} 日观察一次、最近 {PERSIST_COUNT} 次都在改善。",
     f"价格确认要同时满足：当日最低价高于前 {PRICE_WINDOW} 日最低价；收盘价高于前 {PRICE_WINDOW} 日最高价；"
     f"成交量大于前 {PRICE_WINDOW} 日均量的 {VOLUME_MULT} 倍；收盘价高于开盘价。这些是初始参数。",
     "信号用到当日收盘和成交量。买入日记在下一交易日，不把当天收盘当成已经成交。",
-    "状态机用本地已有高低价和成交量的股票。假设检验用本地已有收盘，不是全市场，也不要求已经价格确认。",
+    "状态机和收敛速度分组都只用这份观察池里、本地已有行情的股票。分组不要求已经价格确认。",
     f"假设在每个取样日把候选按收敛速度分成五组，看其后 {FORWARD} 个交易日相对沪深300的超额。"
     f"取样每隔 {FORWARD} 个交易日。未来收益里若有停牌，这一笔不计入。",
 )
@@ -86,16 +88,22 @@ def desk_payload(
         return _empty(str(exc))
     if market is None or len(market) == 0:
         return _empty("没有沪深300收益")
-    names = _names(watch_paths)
+    try:
+        watch = _watch(watch_paths)
+    except FileNotFoundError as exc:
+        return _empty(str(exc))
+    if not watch:
+        return _empty("观察池里没有股票")
+    codes = {item["symbol"] for item in watch}
     closes = load_closes(
-        None,
+        codes,
         cache_path=Path(cache_path) if cache_path is not None else BARS_CACHE,
         fallback_path=Path(fallback_path) if fallback_path is not None else BARS_FALLBACK,
     )
     returns = closes_to_returns(closes)
-    ohlc = load_ohlc(None, cache_path=Path(ohlc_path) if ohlc_path is not None else OHLC_CACHE)
-    rows = _rows(returns, market, ohlc, names)
-    hypothesis = summarize_speed_groups(collect_speed_observations(returns, market))
+    ohlc = load_ohlc(codes, cache_path=Path(ohlc_path) if ohlc_path is not None else OHLC_CACHE)
+    rows = _rows(returns, market, ohlc, watch)
+    hypothesis = summarize_speed_groups(collect_speed_observations(returns, market, codes))
     market_end = pd.Timestamp(market.index.max()).date().isoformat()
     buys = [row for row in rows if row["state"] == "S2" and row["current"]]
     counts = {key: 0 for key in ("S2", "S1", "S0", "excluded", "insufficient")}
@@ -146,18 +154,19 @@ def _rows(
     returns: dict[str, pd.Series],
     market: pd.Series,
     ohlc: pd.DataFrame,
-    names: dict[str, str],
+    watch: list[dict[str, str]],
 ) -> list[dict]:
     grouped: dict[str, pd.DataFrame] = {}
     if ohlc is not None and not ohlc.empty and "symbol" in ohlc.columns:
         grouped = {str(symbol): part for symbol, part in ohlc.groupby("symbol", sort=False)}
+    names = {item["symbol"]: item.get("stock_name") or "" for item in watch}
     market_end = pd.Timestamp(market.index.max()).normalize()
     rows = []
-    for symbol in sorted(grouped):
-        bars = grouped[symbol]
+    for symbol in sorted(names):
+        bars = grouped.get(symbol, pd.DataFrame())
         series = returns.get(symbol, pd.Series(dtype=float))
         factor = snapshot_factors(series, market, bars)
-        rows.append(_public_row(symbol, names.get(symbol, ""), factor, market_end))
+        rows.append(_public_row(symbol, names[symbol], factor, market_end))
     return rows
 
 
@@ -184,6 +193,7 @@ def _public_row(symbol: str, name: str, factor: dict | None, market_end: pd.Time
             "beta250": None,
             "alpha250": None,
             "alpha120": None,
+            "alphaGap": None,
             "delta120": None,
             "speed": None,
             "persisted": False,
@@ -209,6 +219,7 @@ def _public_row(symbol: str, name: str, factor: dict | None, market_end: pd.Time
         "beta250": factor["beta250"],
         "alpha250": factor["alpha250"],
         "alpha120": factor["alpha120"],
+        "alphaGap": factor["alphaGap"],
         "delta120": factor["delta120"],
         "speed": factor["speed"],
         "persisted": bool(factor["persisted"]),
@@ -220,8 +231,8 @@ def _public_row(symbol: str, name: str, factor: dict | None, market_end: pd.Time
         "reason": explain_state(
             state,
             factor["beta250"],
-            factor["alpha250"],
             factor["alpha120"],
+            factor["alpha250"],
             factor["delta120"],
             bool(factor["persisted"]),
             gates,
@@ -230,12 +241,8 @@ def _public_row(symbol: str, name: str, factor: dict | None, market_end: pd.Time
     }
 
 
-def _names(watch_paths: tuple[Path, ...] | None) -> dict[str, str]:
-    try:
-        rows = load_watch(watch_paths or STOCK_WATCH_FILES)
-    except FileNotFoundError:
-        return {}
-    return {item["symbol"]: item["stock_name"] for item in rows if item.get("stock_name")}
+def _watch(watch_paths: tuple[Path, ...] | None) -> list[dict[str, str]]:
+    return load_watch(watch_paths or STOCK_WATCH_FILES)
 
 
 def _empty(message: str) -> dict:

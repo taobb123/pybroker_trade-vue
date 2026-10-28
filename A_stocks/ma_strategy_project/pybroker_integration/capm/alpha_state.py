@@ -13,6 +13,7 @@ BETA_LO = 0.0
 BETA_HI = 0.5
 WINDOW_LONG = 250
 WINDOW_SHORT = 120
+ALPHA_GAP_HI = 0.40
 LAG = 20
 OBSERVE_STEP = 5
 PERSIST_COUNT = 2
@@ -68,15 +69,21 @@ def rolling_ols(asset: np.ndarray, market: np.ndarray, window: int) -> tuple[np.
     return alpha, beta
 
 
-def in_risk_pool(beta: float, alpha_250: float, alpha_120: float) -> bool:
-    return bool(
-        np.isfinite(beta)
-        and np.isfinite(alpha_250)
-        and np.isfinite(alpha_120)
-        and BETA_LO <= float(beta) <= BETA_HI
-        and float(alpha_250) < 0
-        and float(alpha_120) < 0
-    )
+def alpha_gap(alpha_120: float, alpha_250: float) -> float:
+    """年化 120 日 α 减年化 250 日 α。"""
+    return float(alpha_120) - float(alpha_250)
+
+
+def gap_admits(alpha_120: float, alpha_250: float) -> bool:
+    """差为负，或严格大于 40%。等于 0、等于 40%，以及两者之间，都不进候选。"""
+    if not (np.isfinite(alpha_120) and np.isfinite(alpha_250)):
+        return False
+    gap = alpha_gap(alpha_120, alpha_250)
+    return bool(gap < 0.0 or gap > ALPHA_GAP_HI)
+
+
+def in_risk_pool(beta: float, alpha_120: float, alpha_250: float) -> bool:
+    return bool(np.isfinite(beta) and BETA_LO <= float(beta) <= BETA_HI and gap_admits(alpha_120, alpha_250))
 
 
 def consecutive_improvement(alpha: np.ndarray, pos: int) -> bool:
@@ -149,15 +156,15 @@ def price_confirmed(gates: dict[str, bool]) -> bool:
 
 def classify_state(
     beta: float,
-    alpha_250: float,
     alpha_120: float,
+    alpha_250: float,
     delta: float,
     persisted: bool,
     confirmed: bool,
 ) -> str:
-    if not all(np.isfinite(value) for value in (beta, alpha_250, alpha_120, delta)):
+    if not all(np.isfinite(value) for value in (beta, alpha_120, alpha_250, delta)):
         return "insufficient"
-    if not in_risk_pool(beta, alpha_250, alpha_120):
+    if not in_risk_pool(beta, alpha_120, alpha_250):
         return "excluded"
     if not (float(delta) > 0):
         return "S0"
@@ -169,8 +176,8 @@ def classify_state(
 def explain_state(
     state: str,
     beta: float,
-    alpha_250: float,
     alpha_120: float,
+    alpha_250: float,
     delta: float,
     persisted: bool,
     gates: dict[str, bool],
@@ -182,9 +189,9 @@ def explain_state(
     if state == "excluded":
         if not (np.isfinite(beta) and BETA_LO <= float(beta) <= BETA_HI):
             return "250 日 β 不在 0 到 0.5。"
-        if not (np.isfinite(alpha_250) and float(alpha_250) < 0 and np.isfinite(alpha_120) and float(alpha_120) < 0):
-            return "250 日或 120 日 α 不是负数。"
-        return "不在低 β、双周期负 α 的筛选里。"
+        if not gap_admits(alpha_120, alpha_250):
+            return "120 日与 250 日年化 α 之差不是负数，也没有大于 40%。"
+        return "不在低 β、120 日与 250 日 α 之差的筛选里。"
     if state == "S0":
         if np.isfinite(delta) and float(delta) < 0:
             return "120 日 α 仍在扩大，不买。"
@@ -259,8 +266,8 @@ def snapshot_factors(asset: pd.Series, market: pd.Series, bars: pd.DataFrame | N
     delta_ann = delta_daily * ANN_FACTOR
     state = classify_state(
         float(beta_250[pos]),
-        alpha_250_ann,
         alpha_120_ann,
+        alpha_250_ann,
         delta_ann,
         persisted,
         confirmed,
@@ -270,6 +277,7 @@ def snapshot_factors(asset: pd.Series, market: pd.Series, bars: pd.DataFrame | N
         "beta250": float(beta_250[pos]),
         "alpha250": alpha_250_ann,
         "alpha120": alpha_120_ann,
+        "alphaGap": alpha_gap(alpha_120_ann, alpha_250_ann),
         "delta120": float(delta_ann),
         "speed": float(delta_ann / LAG),
         "persisted": persisted,
@@ -306,13 +314,16 @@ def _next_market_dates(market: pd.Series, signal: pd.Timestamp, horizon: int) ->
 def collect_speed_observations(
     returns: dict[str, pd.Series],
     market: pd.Series,
+    symbols: set[str] | None = None,
 ) -> list[dict]:
-    """低 β、双负 α 的股票，在每个取样日记录收敛速度和其后 10 日超额。"""
+    """观察池里的候选，在每个取样日记录收敛速度和其后 10 日超额。"""
     clocks = set(clock_dates(market))
     if not clocks:
         return []
     rows: list[dict] = []
     for symbol, series in returns.items():
+        if symbols is not None and str(symbol) not in symbols:
+            continue
         both = align_returns(series, market)
         if len(both) < WINDOW_LONG + FORWARD:
             continue
@@ -330,7 +341,7 @@ def collect_speed_observations(
             prev = alpha_120[pos - LAG]
             if not _finite(beta) or not _finite(alpha_long) or not _finite(alpha_short) or not _finite(prev):
                 continue
-            if not in_risk_pool(beta, alpha_long, alpha_short):
+            if not in_risk_pool(beta, alpha_short, alpha_long):
                 continue
             future = _next_market_dates(market, day, FORWARD)
             if future is None:

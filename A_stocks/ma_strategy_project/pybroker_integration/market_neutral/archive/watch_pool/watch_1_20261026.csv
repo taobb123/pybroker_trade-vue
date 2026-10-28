@@ -1,0 +1,7 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+001229,魅视科技,2026-10-26,1,底部缩量,33.94,-9.9973,44.99,36.78,33.94,57814.6,1.074,1.074,False,68.0,True,bottom,
+002065,东华软件,2026-10-26,1,底部缩量,6.61,-0.3017,6.88,6.64,6.61,316536.26,1.3255,1.3255,False,82.0,True,bottom,
+002152,广电运通,2026-10-26,1,底部缩量,9.17,0.0,9.48,9.25,9.17,165107.4,1.1067,1.1067,False,82.0,True,bottom,
+002153,石基信息,2026-10-26,1,底部缩量,7.68,0.7874,8.18,7.8,7.68,186186.8,1.1274,1.1274,False,82.0,True,bottom,
+603496,恒为科技,2026-10-26,1,底部缩量,22.45,0.8083,23.74,22.48,22.45,51511.35,1.0678,1.0678,False,66.0,True,bottom,
+603660,苏州科达,2026-10-26,1,底部缩量,9.19,0.4372,10.12,9.25,9.19,163016.17,1.1059,1.1059,False,74.0,True,bottom,

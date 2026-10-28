@@ -178,6 +178,7 @@ export type DeskRow = {
   beta250: number | null
   alpha250: number | null
   alpha120: number | null
+  alphaGap: number | null
   delta120: number | null
   speed: number | null
   persisted: boolean
@@ -245,6 +246,7 @@ function mapDeskRow(value: unknown): DeskRow {
     beta250: num(line.beta250),
     alpha250: num(line.alpha250),
     alpha120: num(line.alpha120),
+    alphaGap: num(line.alphaGap),
     delta120: num(line.delta120),
     speed: num(line.speed),
     persisted: Boolean(line.persisted),

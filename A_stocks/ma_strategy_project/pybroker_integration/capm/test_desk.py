@@ -13,6 +13,7 @@ from capm.alpha_state import (
     classify_state,
     collect_speed_observations,
     forward_excess,
+    gap_admits,
     price_gates,
     rolling_ols,
     snapshot_factors,
@@ -33,6 +34,27 @@ def _line(n: int = 280, alpha: float = -0.001, beta: float = 0.3, seed: int = 1)
     market = rng.normal(0, 0.01, n)
     asset = alpha + beta * market
     return _series(asset), _series(market)
+
+
+def _market(n: int) -> np.ndarray:
+    return 0.01 * np.sin(np.arange(n) / 3.0)
+
+
+def _in_pool_improving(n: int = 280, beta: float = 0.3):
+    """近端抬升，且 120 日 α 比 250 日 α 高出 40% 以上。"""
+    market = _market(n)
+    alpha = np.full(n, -0.001)
+    alpha[n - 250 : n - 120] = -0.008
+    alpha[n - 120 : n - 20] = -0.002
+    alpha[n - 20 :] = 0.0
+    return _series(alpha + beta * market), _series(market)
+
+
+def _in_pool_worsening(n: int = 280, beta: float = 0.3):
+    """α 持续走低，120 日与 250 日之差为负，但仍在候选里。"""
+    market = _market(n)
+    alpha = np.linspace(-0.0004, -0.003, n)
+    return _series(alpha + beta * market), _series(market)
 
 
 def _bars(dates: pd.DatetimeIndex, *, opened: float | None, close: float, high: float, low: float, volume: float) -> pd.DataFrame:
@@ -77,20 +99,21 @@ class StateTests(unittest.TestCase):
         assert excess is not None
         self.assertAlmostEqual(excess, float(np.prod(np.full(10, 1.01)) - 1), places=8)
 
-    def test_flat_negative_alpha_stays_unbuyable_even_after_a_breakout(self) -> None:
-        asset, market = _line()
+    def test_flat_alpha_is_outside_the_gap_even_after_a_breakout(self) -> None:
+        shock = _market(280)
+        market = _series(shock)
+        asset = _series(-0.001 + 0.3 * shock)
         bars = _confirming_bars(asset.index[-21:])
         row = snapshot_factors(asset, market, bars)
         assert row is not None
-        self.assertLess(row["alpha250"], 0)
         self.assertLess(row["alpha120"], 0)
+        self.assertAlmostEqual(row["alphaGap"], 0.0, places=6)
+        self.assertFalse(gap_admits(row["alpha120"], row["alpha250"]))
         self.assertTrue(row["confirmed"])
-        self.assertEqual(row["state"], "S0")
+        self.assertEqual(row["state"], "excluded")
 
     def test_missing_open_blocks_the_buy(self) -> None:
-        asset, market = _line()
-        level = np.linspace(-0.003, -0.0004, len(asset))
-        asset = pd.Series(level + 0.3 * market.to_numpy(), index=asset.index)
+        asset, market = _in_pool_improving()
         bars = _confirming_bars(asset.index[-21:]).drop(columns=["open"])
         gates = price_gates(bars, asset.index[-1])
         self.assertTrue(gates["open_missing"])
@@ -98,29 +121,38 @@ class StateTests(unittest.TestCase):
         self.assertTrue(gates["breakout"])
         row = snapshot_factors(asset, market, bars)
         assert row is not None
-        self.assertIn(row["state"], {"S0", "S1"})
+        self.assertTrue(gap_admits(row["alpha120"], row["alpha250"]))
+        self.assertEqual(row["state"], "S1")
         self.assertNotEqual(row["state"], "S2")
 
     def test_confirmed_improvement_is_a_buy(self) -> None:
-        asset, market = _line(alpha=0.0, beta=0.3, seed=3)
-        level = np.linspace(-0.004, -0.0003, len(asset))
-        asset = pd.Series(level + 0.3 * market.to_numpy(), index=market.index)
+        asset, market = _in_pool_improving()
         bars = _confirming_bars(asset.index[-21:])
         row = snapshot_factors(asset, market, bars)
         assert row is not None
+        self.assertGreater(row["alphaGap"], 0.40)
         self.assertGreater(row["delta120"], 0)
         self.assertTrue(row["persisted"])
         self.assertEqual(row["state"], "S2")
 
     def test_states_follow_the_pool_and_the_price_gate(self) -> None:
-        self.assertEqual(classify_state(0.8, -0.1, -0.1, 0.02, True, True), "excluded")
-        self.assertEqual(classify_state(-0.1, -0.1, -0.1, 0.02, True, True), "excluded")
-        self.assertEqual(classify_state(0.3, 0.01, -0.1, 0.02, True, True), "excluded")
-        self.assertEqual(classify_state(0.0, -0.1, -0.1, 0.0, True, True), "S0")
-        self.assertEqual(classify_state(0.5, -0.1, -0.1, -0.01, True, True), "S0")
+        self.assertFalse(gap_admits(-0.10, -0.10))
+        self.assertFalse(gap_admits(0.0, -0.40))
+        self.assertFalse(gap_admits(-0.10, -0.20))
+        self.assertTrue(gap_admits(-0.20, -0.10))
+        self.assertTrue(gap_admits(0.0, -0.41))
+        self.assertEqual(classify_state(0.8, -0.2, -0.1, 0.02, True, True), "excluded")
+        self.assertEqual(classify_state(-0.1, -0.2, -0.1, 0.02, True, True), "excluded")
+        self.assertEqual(classify_state(0.3, -0.1, -0.2, 0.02, True, True), "excluded")
+        self.assertEqual(classify_state(0.3, -0.1, -0.1, 0.02, True, True), "excluded")
+        self.assertEqual(classify_state(0.3, 0.0, -0.40, 0.02, True, True), "excluded")
+        self.assertEqual(classify_state(float("nan"), -0.2, -0.1, 0.02, True, True), "insufficient")
+        self.assertEqual(classify_state(0.0, -0.2, -0.1, 0.0, True, True), "S0")
+        self.assertEqual(classify_state(0.5, -0.2, -0.1, -0.01, True, True), "S0")
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, False, True), "S1")
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, True, False), "S1")
         self.assertEqual(classify_state(0.3, -0.2, -0.1, 0.02, True, True), "S2")
+        self.assertEqual(classify_state(0.3, 0.01, -0.40, 0.02, True, True), "S2")
 
     def test_quintiles_rise_from_slowest_to_fastest(self) -> None:
         speeds = [-0.02, -0.01, 0.0, 0.01, 0.02]
@@ -155,7 +187,7 @@ class StateTests(unittest.TestCase):
         self.assertIn("不够", out["verdict"])
 
     def test_a_missing_forward_day_drops_the_observation(self) -> None:
-        asset, market = _line(n=280, alpha=-0.001, beta=0.3, seed=4)
+        asset, market = _in_pool_worsening()
         full = collect_speed_observations({"000001": asset}, market)
         self.assertTrue(full)
         day = pd.Timestamp(full[0]["date"])
@@ -167,10 +199,8 @@ class StateTests(unittest.TestCase):
 
 class DeskPayloadTests(unittest.TestCase):
     def test_payload_does_not_touch_the_watch_or_record_a_buy_without_open(self) -> None:
-        asset, market = _line(n=260, alpha=-0.001, beta=0.3, seed=5)
-        worsening = np.linspace(-0.0004, -0.003, len(asset))
-        asset = pd.Series(worsening + 0.3 * market.to_numpy(), index=market.index)
-        hot = pd.Series(1.4 * market.to_numpy(), index=market.index)
+        asset, market = _in_pool_worsening(n=260)
+        hot = pd.Series(1.4 * _market(len(asset)), index=asset.index)
         dates = list(asset.index)
         series = {"000001": asset.to_numpy(), "000002": hot.to_numpy()}
         first = dates[0] - pd.tseries.offsets.BDay(1)
@@ -209,7 +239,7 @@ class DeskPayloadTests(unittest.TestCase):
             ohlc = root / "ohlc.csv"
             pd.DataFrame(ohlc_rows).to_csv(ohlc, index=False)
             watch = root / "watch.csv"
-            watch.write_text("symbol,stock_name\n000001,平安\n", encoding="utf-8")
+            watch.write_text("symbol,stock_name\n000001,平安\n000003,空仓\n", encoding="utf-8")
             before = watch.read_bytes()
             payload = desk_payload(
                 bench_path=bench_path,
@@ -222,13 +252,16 @@ class DeskPayloadTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertFalse(payload["empty"])
         rows = {row["symbol"]: row for row in payload["report"]["rows"]}
+        self.assertEqual(set(rows), {"000001", "000003"})
         self.assertEqual(rows["000001"]["state"], "S0")
+        self.assertLess(rows["000001"]["alphaGap"], 0)
         self.assertEqual(rows["000001"]["stock_name"], "平安")
-        self.assertEqual(rows["000002"]["state"], "excluded")
+        self.assertEqual(rows["000003"]["state"], "insufficient")
         self.assertEqual(payload["report"]["buys"], [])
         self.assertTrue(payload["report"]["open_missing"])
         self.assertIn("hypothesis", payload["report"])
         self.assertTrue(any("不止盈" in note for note in payload["report"]["notes"]))
+        self.assertTrue(any("40%" in note for note in payload["report"]["notes"]))
 
 
 class HistoryBackfillTests(unittest.TestCase):

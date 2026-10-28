@@ -513,7 +513,7 @@ watch(deskReasonOptions, (options) => {
         用沪深300拆开市场贝塔和超额。主列是最近 250 个交易日，旁边是 120 日。无风险利率按 0。
         象限只用最近 120 日的年化 α、t(α) 和 β。高 α 要年化 α 为正且 t(α) ≥ 1，高 β 是 β > 1。
         250 日数字仍显示，不决定象限。
-        个股默认用 2+4 与 1+3+5 观察表，合并去重，不按排名截取。粘贴代码仍可单独计算。
+        个股默认用 2+4 与 1+3+5 观察表，合并去重，不按排名截取。交易部门用同一份观察池。粘贴代码仍可单独计算。
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
@@ -783,7 +783,8 @@ watch(deskReasonOptions, (options) => {
           <CardHeader>
             <CardTitle>Alpha 状态机</CardTitle>
             <CardDescription>
-              只做到买入的价格确认。候选是 250 日 β 在 0 到 0.5，并且 250 日、120 日 α 都为负。
+              只做到买入的价格确认。名单和个股对比相同，是 2+4 与 1+3+5 观察表合并去重。
+              候选是 250 日 β 在 0 到 0.5，并且年化 120 日 α 减年化 250 日 α 为负或大于 40%。差等于 0、等于 40%，或落在两者之间，不进候选。
               120 日 α 比 20 个交易日前更高才离开「禁止买入」。连续两次改善，并且收盘突破前 20 日最高价、不再创新低、放量 1.3 倍、收盘高于开盘，才记下买入。
               买入日记在下一交易日。不加仓，不止盈，不止损。
               本地收盘若晚于 2024-01-02，打开这一页会自动把更早的收盘补进缓存。
@@ -875,6 +876,7 @@ watch(deskReasonOptions, (options) => {
                     <TableHead class="text-right">β</TableHead>
                     <TableHead class="text-right">250 日 α</TableHead>
                     <TableHead class="text-right">120 日 α</TableHead>
+                    <TableHead class="text-right">120−250</TableHead>
                     <TableHead class="text-right">20 日变化</TableHead>
                     <TableHead class="text-right">速度</TableHead>
                     <TableHead>连续改善</TableHead>
@@ -894,6 +896,7 @@ watch(deskReasonOptions, (options) => {
                     <TableCell class="text-right tabular-nums">{{ num(row.beta250, 3) }}</TableCell>
                     <TableCell class="text-right tabular-nums">{{ pct(row.alpha250) }}</TableCell>
                     <TableCell class="text-right tabular-nums">{{ pct(row.alpha120) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.alphaGap) }}</TableCell>
                     <TableCell class="text-right tabular-nums">{{ pct(row.delta120) }}</TableCell>
                     <TableCell class="text-right tabular-nums">{{ pct(row.speed) }}</TableCell>
                     <TableCell>{{ row.persisted ? '是' : '否' }}</TableCell>
