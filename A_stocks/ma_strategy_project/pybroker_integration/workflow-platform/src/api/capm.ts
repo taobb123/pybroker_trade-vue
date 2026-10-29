@@ -414,6 +414,95 @@ function mapLaunch(value: unknown): LaunchReport | null {
   }
 }
 
+export type TipRow = {
+  symbol: string
+  stockName: string
+  drop: number
+  tip: number
+  tipBars: number
+  similarity: number
+  peak: string
+  anchor: string
+  pasted: boolean
+  reason: string
+}
+
+export type TipReport = {
+  schemaVersion: string
+  asOf: string | null
+  watched: number
+  pasted: number
+  matchedCount: number
+  unrelatedCount: number
+  missingCount: number
+  rows: TipRow[]
+  unrelatedPasted: string[]
+  missingPasted: string[]
+  notes: string[]
+  createdAt: string
+}
+
+export type TipResponse = {
+  ok: boolean
+  empty: boolean
+  error: string | null
+  message: string | null
+  report: TipReport | null
+}
+
+function mapTip(value: unknown): TipReport | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Raw
+  const rows = Array.isArray(row.rows) ? row.rows : []
+  return {
+    schemaVersion: str(row.schema_version),
+    asOf: row.as_of == null || row.as_of === '' ? null : str(row.as_of),
+    watched: num(row.watched) ?? 0,
+    pasted: num(row.pasted) ?? 0,
+    matchedCount: num(row.matched_count) ?? 0,
+    unrelatedCount: num(row.unrelated_count) ?? 0,
+    missingCount: num(row.missing_count) ?? 0,
+    rows: rows.map((item) => {
+      const line = item as Raw
+      return {
+        symbol: str(line.symbol),
+        stockName: str(line.stock_name),
+        drop: num(line.drop) ?? 0,
+        tip: num(line.tip) ?? 0,
+        tipBars: num(line.tip_n) ?? 0,
+        similarity: num(line.similarity) ?? 0,
+        peak: str(line.peak),
+        anchor: str(line.anchor),
+        pasted: Boolean(line.pasted),
+        reason: str(line.reason),
+      }
+    }),
+    unrelatedPasted: Array.isArray(row.unrelated_pasted) ? row.unrelated_pasted.map((item) => str(item)) : [],
+    missingPasted: Array.isArray(row.missing_pasted) ? row.missing_pasted.map((item) => str(item)) : [],
+    notes: Array.isArray(row.notes) ? row.notes.map((item) => str(item)) : [],
+    createdAt: str(row.created_at),
+  }
+}
+
+export async function fetchCapmTip(symbols = '', refresh = false): Promise<TipResponse> {
+  const response = refresh
+    ? await fetch(apiUrl('/api/capm/tip'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols }),
+      })
+    : await fetch(apiUrl(`/api/capm/tip?${new URLSearchParams({ symbols }).toString()}`))
+  if (!response.ok) throw new Error(`读取山尖失败 (${response.status})`)
+  const raw = (await response.json()) as Raw
+  return {
+    ok: Boolean(raw.ok),
+    empty: Boolean(raw.empty),
+    error: raw.error == null ? null : str(raw.error),
+    message: raw.message == null ? null : str(raw.message),
+    report: mapTip(raw.report),
+  }
+}
+
 export async function fetchCapmLaunch(symbols = '', refresh = false): Promise<LaunchResponse> {
   const response = refresh
     ? await fetch(apiUrl('/api/capm/launch'), {

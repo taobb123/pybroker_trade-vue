@@ -531,6 +531,7 @@ class ApiTests(unittest.TestCase):
         self.assertIn("/api/capm/sleeves", paths)
         self.assertIn("/api/capm/stocks", paths)
         self.assertIn("/api/capm/desk", paths)
+        self.assertIn("/api/capm/tip", paths)
 
     def test_live_sleeves_beta_near_existing_report(self) -> None:
         market = load_market()

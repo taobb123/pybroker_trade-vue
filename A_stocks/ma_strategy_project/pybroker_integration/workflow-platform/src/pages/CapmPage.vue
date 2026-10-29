@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   fetchCapmDesk,
   fetchCapmLaunch,
+  fetchCapmTip,
   fetchCapmSleeves,
   fetchCapmStocks,
   refreshCapmStocks,
@@ -24,6 +25,7 @@ import {
   type CapmWindow,
   type DeskReport,
   type LaunchReport,
+  type TipReport,
 } from '@/api/capm'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 
@@ -55,6 +57,13 @@ const loadingLaunch = ref(false)
 const launchPasted = ref('')
 const launchCopyFlash = ref('')
 let launchCopyTimer: ReturnType<typeof setTimeout> | undefined
+const tip = ref<TipReport | null>(null)
+const tipMessage = ref('')
+const tipError = ref('')
+const loadingTip = ref(false)
+const tipPasted = ref('')
+const tipCopyFlash = ref('')
+let tipCopyTimer: ReturnType<typeof setTimeout> | undefined
 const deskState = ref('pool')
 const deskReason = ref('all')
 const deskCopyFlash = ref('')
@@ -499,6 +508,39 @@ async function loadLaunch(refresh = false) {
   }
 }
 
+async function loadTip(refresh = false) {
+  loadingTip.value = true
+  tipError.value = ''
+  tipMessage.value = ''
+  try {
+    const payload = await fetchCapmTip(tipPasted.value, refresh)
+    tip.value = payload.report
+    if (payload.empty || !payload.report) tipMessage.value = payload.message || '没有可对照的股票。'
+  } catch (err) {
+    tipError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loadingTip.value = false
+  }
+}
+
+async function copyTipCodes() {
+  const rows = tip.value?.rows ?? []
+  const text = stockCodesToCopyText(
+    ['代码'],
+    rows.map((row) => [row.symbol]),
+  )
+  if (!text) {
+    tipCopyFlash.value = '没有代码'
+    return
+  }
+  const ok = await copyTextToClipboard(text)
+  tipCopyFlash.value = ok ? '已复制' : '复制失败'
+  if (tipCopyTimer) clearTimeout(tipCopyTimer)
+  tipCopyTimer = setTimeout(() => {
+    tipCopyFlash.value = ''
+  }, 1600)
+}
+
 async function copyLaunchCodes() {
   const rows = launch.value?.rows ?? []
   const text = stockCodesToCopyText(
@@ -526,11 +568,13 @@ onUnmounted(() => {
   unbindDeskBar()
   if (deskCopyTimer) clearTimeout(deskCopyTimer)
   if (launchCopyTimer) clearTimeout(launchCopyTimer)
+  if (tipCopyTimer) clearTimeout(tipCopyTimer)
 })
 
 watch(tab, (value) => {
   if (value === 'desk' && !desk.value && !loadingDesk.value) void loadDesk()
   if (value === 'desk' && !launch.value && !loadingLaunch.value) void loadLaunch(false)
+  if (value === 'desk' && !tip.value && !loadingTip.value) void loadTip(false)
 })
 
 watch([tab, desk], async () => {
@@ -561,7 +605,7 @@ watch(deskReasonOptions, (options) => {
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
-        交易部门只记下价格确认后的买入，不算止盈止损。百亚启动段只做形态对照。
+        交易部门只记下价格确认后的买入，不算止盈止损。百亚启动段和山尖只做形态对照。
       </p>
     </div>
 
@@ -1028,6 +1072,70 @@ watch(deskReasonOptions, (options) => {
             </p>
             <ul v-if="launch" class="space-y-1 text-xs text-muted-foreground">
               <li v-for="note in launch.notes" :key="note">{{ note }}</li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>山尖</CardTitle>
+            <CardDescription v-if="tip">
+              截止 {{ tip.asOf || '—' }}。两三个月整理优先。山尖和圆弧底在同一带 {{ tip.matchedCount }} 只，其余 {{ tip.unrelatedCount }} 只不是这幅左边画面。
+            </CardDescription>
+            <CardDescription v-else>{{ loadingTip ? '对照山尖…' : '尚未载入' }}</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <Textarea
+              v-model="tipPasted"
+              class="min-h-16 font-mono text-xs"
+              placeholder="粘贴 6 位代码，用逗号、空格或换行分隔。和观察池一起对照，最多 80 只。"
+            />
+            <div class="flex flex-wrap gap-2">
+              <Button size="sm" :disabled="loadingTip" @click="loadTip(true)">
+                {{ loadingTip ? '对照中' : '对照' }}
+              </Button>
+              <Button size="sm" variant="outline" :disabled="!tip?.rows.length" @click="copyTipCodes">
+                {{ tipCopyFlash || `复制代码（${tip?.rows.length ?? 0}）` }}
+              </Button>
+            </div>
+            <p v-if="tipError" class="text-xs text-destructive">{{ tipError }}</p>
+            <p v-else-if="tipMessage" class="text-xs text-muted-foreground">{{ tipMessage }}</p>
+            <div v-if="tip?.rows.length" class="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>代码</TableHead>
+                    <TableHead>名称</TableHead>
+                    <TableHead class="text-right">降幅</TableHead>
+                    <TableHead class="text-right">山尖</TableHead>
+                    <TableHead class="text-right">相似度</TableHead>
+                    <TableHead>说明</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in tip.rows" :key="row.symbol">
+                    <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
+                    <TableCell>
+                      {{ row.stockName || '—' }}
+                      <span v-if="row.pasted" class="ml-1 text-xs text-muted-foreground">粘贴</span>
+                    </TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.drop) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ row.tipBars }} 根</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ num(row.similarity, 2) }}</TableCell>
+                    <TableCell class="max-w-xl text-xs text-muted-foreground">{{ row.reason }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <p v-else-if="tip" class="text-xs text-muted-foreground">观察池里没有这幅左边画面。</p>
+            <p v-if="tip?.unrelatedPasted.length" class="text-xs text-muted-foreground">
+              粘贴里不是这条左线：{{ tip.unrelatedPasted.join('、') }}
+            </p>
+            <p v-if="tip?.missingPasted.length" class="text-xs text-muted-foreground">
+              粘贴缺日线：{{ tip.missingPasted.join('、') }}
+            </p>
+            <ul v-if="tip" class="space-y-1 text-xs text-muted-foreground">
+              <li v-for="note in tip.notes" :key="note">{{ note }}</li>
             </ul>
           </CardContent>
         </Card>

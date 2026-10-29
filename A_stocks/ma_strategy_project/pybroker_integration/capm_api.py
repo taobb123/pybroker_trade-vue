@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from capm.desk import desk_payload
 from capm.launch_match import launch_payload
+from capm.tip_match import tip_payload
 from capm.service import sleeves_payload, stocks_payload
 from capm.sources import fetch_act_bars, fetch_benchmark, latest_trading_day
 
@@ -42,6 +43,17 @@ def launch(symbols: str = Query(default="")) -> dict:
 def launch_refresh(body: LaunchBody | None = None) -> dict:
     params = body or LaunchBody()
     return launch_payload(symbols=params.symbols, fetch_missing=True)
+
+
+@router.get("/tip")
+def tip(symbols: str = Query(default="")) -> dict:
+    return tip_payload(symbols=symbols, fetch_missing=False)
+
+
+@router.post("/tip")
+def tip_refresh(body: LaunchBody | None = None) -> dict:
+    params = body or LaunchBody()
+    return tip_payload(symbols=params.symbols, fetch_missing=True)
 
 
 @router.get("/stocks")
