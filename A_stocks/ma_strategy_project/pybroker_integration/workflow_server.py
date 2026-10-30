@@ -273,6 +273,7 @@ def _compact_subprocess_log(text: str) -> str:
         " - INFO - ",
         "FutureWarning:",
         "Series.fillna with 'method' is deprecated",
+        "fillna(method=",
         "WARNING: 无法导入父级db_config",
     )
     kept: list[str] = []

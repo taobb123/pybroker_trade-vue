@@ -1,7 +1,1 @@
-﻿symbol,stock_name,pattern_id,combo_id,combo_name,state,state_code,select_tag,entry,position_frac,trial_ok,add_ok,score,signal_date,breakout_day,platform_level,breakout_high,breakout_close,breakout_vol,panic_low,close,pullback_bars,bars_since_breakout,pullback_ok,ma5_hold,macd_ok,turnover_fade,notes
-002195,岩山科技,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,5.0,2026-10-28,2026-10-26,6.28,6.1,6.05,1466415.37,,5.84,0,2,False,False,True,False,收盘跌破平台 6.2800；MACD红柱健康
-002605,姚记科技,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,5.0,2026-10-28,2026-10-14,17.65,17.29,17.17,80239.36,,17.64,0,10,False,False,True,False,收盘跌破平台 17.6500；MACD红柱健康
-603039,泛微网络,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,5.0,2026-10-28,2026-10-26,39.99,36.79,35.57,202344.95,,34.43,0,2,False,False,True,False,收盘跌破平台 39.9900；MACD红柱健康
-600570,恒生电子,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,0.0,2026-10-28,2026-10-26,20.62,21.04,20.84,268186.79,,19.74,0,2,False,False,False,False,收盘跌破平台 20.6200
-600797,浙大网新,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,0.0,2026-10-28,2026-10-26,6.84,6.89,6.6,257180.61,,6.39,0,2,False,False,False,False,收盘跌破平台 6.8400
-603383,顶点软件,breakout_pullback_rebreak,2,底部放量上涨,作废,invalid,,False,0.0,False,False,0.0,2026-10-28,2026-10-26,28.1,28.85,28.4,45062.82,,27.12,0,2,False,False,False,False,收盘跌破平台 28.1000
+﻿

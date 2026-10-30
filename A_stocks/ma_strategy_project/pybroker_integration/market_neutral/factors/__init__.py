@@ -18,9 +18,13 @@ __all__ = [
 def load_latest_pattern_scan(path: str) -> pd.DataFrame:
     if not path or not __import__("os").path.isfile(path):
         return pd.DataFrame()
-    df = pd.read_csv(path, encoding="utf-8-sig")
-    if df.empty:
-        return df
+    try:
+        df = pd.read_csv(path, encoding="utf-8-sig")
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeError):
+        # 只有 BOM/空行的扫描表不算有效截面，覆盖步骤应跳过而不是中断回测
+        return pd.DataFrame()
+    if df.empty or "symbol" not in df.columns:
+        return pd.DataFrame()
     df = df.copy()
     df["symbol"] = (
         df["symbol"]
