@@ -31,6 +31,10 @@ export type ThemeReviewReport = {
   tradeDate: string
   threshold: number
   memberCount: number
+  inputCount: number
+  dupSkipped: number
+  prefixSkipped: number
+  poolCount: number
   trackedCount: number
   themes: ThemeSlot[]
   rows: ThemeReviewRow[]
@@ -54,6 +58,10 @@ function mapReport(value: unknown): ThemeReviewReport | null {
     tradeDate: str(row.trade_date),
     threshold: num(row.threshold),
     memberCount: num(row.member_count),
+    inputCount: num(row.input_count),
+    dupSkipped: num(row.dup_skipped),
+    prefixSkipped: num(row.prefix_skipped),
+    poolCount: num(row.pool_count),
     trackedCount: num(row.tracked_count),
     themes: themes.map((item) => {
       const theme = item as Raw

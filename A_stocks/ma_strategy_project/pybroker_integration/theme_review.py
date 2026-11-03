@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""题材复盘：东财概念成分 → 百亚启动段 → 量价六组合标注。
+"""题材复盘：东财概念成分 → 股票代码清洗 → 百亚启动段 → 量价六组合标注。
 
 只读。不写观察池，不导出六组合观察表，不改六组合分类规则。
+清洗规则与前端 filterStockCodes 一致：纯 6 位、去重、剔除 300/301/688/920。
 """
 from __future__ import annotations
 
@@ -27,6 +28,9 @@ from capm.sources import OHLC_CACHE, fetch_act_bars, load_ohlc, store_ohlc
 
 SCHEMA_VERSION = "theme_review_v1"
 _SPLIT = re.compile(r"[\s,，;；、]+")
+_SIX_DIGIT = re.compile(r"\d{6}")
+# 与 workflow-platform/src/api/filterStockCodes.ts 的 EXCLUDED_CODE_PREFIXES 一致
+_EXCLUDED_PREFIXES = frozenset({"300", "301", "688", "920"})
 
 
 def _symbol(con_code: object) -> str | None:
@@ -114,6 +118,34 @@ def collect_members(matched: list[dict], members: pd.DataFrame) -> list[dict]:
     return [bucket[symbol] for symbol in order]
 
 
+def clean_stock_codes(members: list[dict]) -> tuple[list[dict], dict]:
+    """拉完成分后、拉日线前使用。去重计在前缀剔除之前，与清洗工具相同。"""
+    seen: set[str] = set()
+    kept: list[dict] = []
+    recognized = 0
+    dup_skipped = 0
+    prefix_skipped = 0
+    for member in members:
+        symbol = str(member.get("symbol") or "").strip()
+        if _SIX_DIGIT.fullmatch(symbol) is None:
+            continue
+        recognized += 1
+        if symbol in seen:
+            dup_skipped += 1
+            continue
+        seen.add(symbol)
+        if symbol[:3] in _EXCLUDED_PREFIXES:
+            prefix_skipped += 1
+            continue
+        kept.append(member)
+    return kept, {
+        "input_count": recognized,
+        "dup_skipped": dup_skipped,
+        "prefix_skipped": prefix_skipped,
+        "pool_count": len(kept),
+    }
+
+
 def score_members(members: list[dict], bars: pd.DataFrame) -> tuple[list[dict], list[str]]:
     template = measure_template(_symbol_frame(bars, TEMPLATE_SYMBOL))
     related: list[dict] = []
@@ -182,11 +214,17 @@ def review_themes(
         message = "没有可对照的成分。" if matched or missing else "请输入东财概念名。"
         return _payload(report, message, empty=True)
 
+    pool, clean = clean_stock_codes(members)
+    if not pool:
+        report = _report(trade_date, names, matched, missing, [], notes)
+        _apply_clean(report, members, clean)
+        return _payload(report, "清洗后没有剩余代码。", empty=True)
+
     try:
-        bars = bars_loader([item["symbol"] for item in members])
+        bars = bars_loader([item["symbol"] for item in pool])
     except Exception as exc:
         return _payload(None, f"没有取到日线：{exc}", ok=False)
-    related, short = score_members(members, bars)
+    related, short = score_members(pool, bars)
     if short:
         notes.append(f"{len(short)} 只日线不足 80 根，没有对照百亚启动段。")
     labels: dict[str, tuple[str, str]] = {}
@@ -210,10 +248,10 @@ def review_themes(
                 "reason": item.get("reason", ""),
             }
         )
-    if not rows and members:
-        notes.append(f"成分里没有相似度达到 {RELATED_MIN:.2f} 的股票。")
+    if not rows and pool:
+        notes.append(f"清洗后的股票里没有相似度达到 {RELATED_MIN:.2f} 的股票。")
     report = _report(trade_date, names, matched, missing, rows, notes)
-    report["member_count"] = len(members)
+    _apply_clean(report, members, clean)
     message = None if rows else f"没有相似度达到 {RELATED_MIN:.2f} 的股票。"
     return _payload(report, message, empty=not rows)
 
@@ -364,6 +402,10 @@ def _report(
         "trade_date": trade_date,
         "threshold": RELATED_MIN,
         "member_count": 0,
+        "input_count": 0,
+        "dup_skipped": 0,
+        "prefix_skipped": 0,
+        "pool_count": 0,
         "tracked_count": len(rows),
         "themes": themes,
         "rows": rows,
@@ -371,6 +413,14 @@ def _report(
         "unmatched": missing,
         "created_at": datetime.now().isoformat(timespec="seconds"),
     }
+
+
+def _apply_clean(report: dict, members: list[dict], clean: dict) -> None:
+    report["member_count"] = len(members)
+    report["input_count"] = int(clean["input_count"])
+    report["dup_skipped"] = int(clean["dup_skipped"])
+    report["prefix_skipped"] = int(clean["prefix_skipped"])
+    report["pool_count"] = int(clean["pool_count"])
 
 
 def _payload(report: dict | None, message: str | None, *, ok: bool = True, empty: bool = False) -> dict:

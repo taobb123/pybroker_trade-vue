@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from capm.sources import OHLC_CACHE
 from theme_review import (
     _load_bars,
+    clean_stock_codes,
     collect_members,
     combo_from_turnover,
     list_concepts,
@@ -133,6 +134,101 @@ class ReviewTest(unittest.TestCase):
         self.assertNotIn("000003", [row["symbol"] for row in report["rows"]])
         self.assertTrue(any("食品饮料" in note for note in report["notes"]))
         self.assertTrue(any("日线不足" in note for note in report["notes"]))
+        self.assertEqual(report["pool_count"], 3)
+        self.assertEqual(report["prefix_skipped"], 0)
+
+    def test_prefixes_are_removed_before_daily_bars(self) -> None:
+        index = pd.DataFrame({"ts_code": ["BK1"], "name": ["商业航天"]})
+        members = pd.DataFrame(
+            {
+                "concept_code": ["BK1"] * 5,
+                "con_code": ["000001.SZ", "300111.SZ", "301222.SZ", "688333.SH", "920444.BJ"],
+                "con_name": ["甲", "乙", "丙", "丁", "戊"],
+            }
+        )
+        fetched: list[str] = []
+
+        def score(frame, template):
+            del template
+            symbol = str(frame["symbol"].iloc[0])
+            return {
+                "similarity": 0.8 if symbol == "000001" else 0.1,
+                "spiral": 0.8,
+                "price": 0.8,
+                "volume": 0.8,
+                "yang": 0.8,
+                "yang_n": 3,
+                "vr": 3.0,
+                "related": symbol == "000001",
+                "reason": "",
+            }
+
+        def bars(symbols):
+            fetched.extend(symbols)
+            return _bars(symbols, 90)
+
+        with patch("theme_review.score_frame", score):
+            payload = review_themes(
+                "商业航天",
+                index_loader=lambda: ("20261103", index),
+                member_loader=lambda trade_date, codes: members,
+                bars_loader=bars,
+                combo_loader=lambda rows: {},
+            )
+        self.assertEqual(fetched, ["000001"])
+        report = payload["report"]
+        self.assertEqual([row["symbol"] for row in report["rows"]], ["000001"])
+        self.assertEqual(report["member_count"], 5)
+        self.assertEqual(report["dup_skipped"], 0)
+        self.assertEqual(report["prefix_skipped"], 4)
+        self.assertEqual(report["pool_count"], 1)
+
+    def test_empty_pool_does_not_fetch_bars(self) -> None:
+        index = pd.DataFrame({"ts_code": ["BK1"], "name": ["商业航天"]})
+        members = pd.DataFrame(
+            {
+                "concept_code": ["BK1", "BK1"],
+                "con_code": ["300001.SZ", "688001.SH"],
+                "con_name": ["乙", "丁"],
+            }
+        )
+        called = {"n": 0}
+
+        def bars(symbols):
+            called["n"] += 1
+            return _bars(symbols, 90)
+
+        payload = review_themes(
+            "商业航天",
+            index_loader=lambda: ("20261103", index),
+            member_loader=lambda trade_date, codes: members,
+            bars_loader=bars,
+            combo_loader=lambda rows: {},
+        )
+        self.assertEqual(called["n"], 0)
+        self.assertTrue(payload["empty"])
+        self.assertEqual(payload["message"], "清洗后没有剩余代码。")
+        report = payload["report"]
+        self.assertEqual(report["pool_count"], 0)
+        self.assertEqual(report["prefix_skipped"], 2)
+        self.assertFalse(any("相似度" in note for note in report["notes"]))
+
+    def test_clean_counts_duplicate_before_prefix(self) -> None:
+        kept, stats = clean_stock_codes(
+            [
+                {"symbol": "600519"},
+                {"symbol": "600519"},
+                {"symbol": "300001"},
+                {"symbol": "300001"},
+                {"symbol": "688111"},
+                {"symbol": "12"},
+            ]
+        )
+        self.assertEqual([item["symbol"] for item in kept], ["600519"])
+        self.assertEqual(stats["input_count"], 5)
+        self.assertEqual(stats["dup_skipped"], 2)
+        self.assertEqual(stats["prefix_skipped"], 2)
+        self.assertEqual(stats["pool_count"], 1)
 
     def test_blank_combo_when_turnover_missing(self) -> None:
         name, note = combo_from_turnover("下跌放量", float("nan"))

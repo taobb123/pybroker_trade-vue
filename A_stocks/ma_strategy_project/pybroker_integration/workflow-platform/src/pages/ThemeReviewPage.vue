@@ -27,14 +27,27 @@ const catalogDate = ref('')
 const catalogError = ref('')
 const catalogLoading = ref(false)
 const filterText = ref('')
-const picked = ref('')
 
 const tracked = computed(() => report.value?.rows ?? [])
+const selectedNames = computed(() => splitThemeNames(themes.value))
+const selectedSet = computed(() => new Set(selectedNames.value))
 const visibleNames = computed(() => {
   const query = filterText.value.trim()
   if (!query) return catalog.value
   return catalog.value.filter((name) => name.includes(query))
 })
+
+function splitThemeNames(text: string): string[] {
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const part of text.split(/[\s,，;；、]+/)) {
+    const name = part.trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    names.push(name)
+  }
+  return names
+}
 
 async function run() {
   loading.value = true
@@ -53,11 +66,13 @@ async function run() {
   }
 }
 
-async function pickTheme(name: string) {
+function toggleTheme(name: string) {
   if (loading.value) return
-  picked.value = name
-  themes.value = name
-  await run()
+  const names = splitThemeNames(themes.value)
+  const index = names.indexOf(name)
+  if (index >= 0) names.splice(index, 1)
+  else names.push(name)
+  themes.value = names.join('\n')
 }
 
 async function loadCatalog() {
@@ -99,7 +114,7 @@ async function copyCodes() {
       <CardHeader>
         <CardTitle>题材复盘</CardTitle>
         <CardDescription>
-          点一个东财概念标签，或在下面手填概念名。系统拉全部成分，留下百亚启动段相似度达到 0.52 的股票，再标上量价六组合。只在本页展示，不写入观察池。
+          点选一个或多个东财概念标签，或在下面手填概念名。系统拉全部成分，先去重并剔除 300/301/688/920 开头，再对剩下的股票拉日线，留下百亚启动段相似度达到 0.52 的股票，再标上量价六组合。只在本页展示，不写入观察池。
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-3">
@@ -114,6 +129,7 @@ async function copyCodes() {
               {{ catalogLoading ? '正在读取东财概念…' : `东财概念 ${catalog.length} 个` }}
               <template v-if="catalogDate"> · {{ catalogDate }}</template>
               <template v-if="filterText.trim()"> · 显示 {{ visibleNames.length }} 个</template>
+              · 已选 {{ selectedNames.length }} 个
             </span>
           </div>
           <p v-if="catalogError" class="text-xs text-destructive">{{ catalogError }}</p>
@@ -124,9 +140,9 @@ async function copyCodes() {
                 :key="name"
                 size="sm"
                 class="h-7 px-2 text-xs"
-                :variant="picked === name ? 'default' : 'outline'"
+                :variant="selectedSet.has(name) ? 'default' : 'outline'"
                 :disabled="loading"
-                @click="pickTheme(name)"
+                @click="toggleTheme(name)"
               >
                 {{ name }}
               </Button>
@@ -148,12 +164,12 @@ async function copyCodes() {
           </Button>
         </div>
         <p v-if="loading" class="text-xs text-muted-foreground">
-          正在拉成分、对照百亚启动段，并给跟踪股票标注六组合。成分多时会多等一会儿。
+          正在拉成分、清洗代码、对照百亚启动段，并给跟踪股票标注六组合。成分多时会多等一会儿。
         </p>
         <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
         <p v-else-if="message" class="text-xs text-muted-foreground">{{ message }}</p>
         <p v-if="report" class="text-xs text-muted-foreground">
-          成分日期 {{ report.tradeDate || '—' }}。成分 {{ report.memberCount }} 只，跟踪 {{ report.trackedCount }} 只。
+          成分日期 {{ report.tradeDate || '—' }}。成分 {{ report.memberCount }} 只，去重 {{ report.dupSkipped }}，剔除前缀 {{ report.prefixSkipped }}，进入对照 {{ report.poolCount }} 只，跟踪 {{ report.trackedCount }} 只。
           <template v-for="theme in report.themes" :key="theme.name">
             {{ theme.name }} {{ theme.matched ? `${theme.memberCount} 只` : '未匹配' }}。
           </template>
@@ -194,7 +210,8 @@ async function copyCodes() {
             </TableBody>
           </Table>
         </div>
-        <p v-else-if="report && report.memberCount > 0" class="text-xs text-muted-foreground">这次没有达到 0.52 的股票。</p>
+        <p v-else-if="report && report.memberCount > 0 && report.poolCount === 0" class="text-xs text-muted-foreground">清洗后没有剩余代码。</p>
+        <p v-else-if="report && report.poolCount > 0" class="text-xs text-muted-foreground">这次没有达到 0.52 的股票。</p>
         <ul v-if="report?.notes.length" class="space-y-1 text-xs text-muted-foreground">
           <li v-for="note in report.notes" :key="note">{{ note }}</li>
         </ul>
