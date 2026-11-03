@@ -4,7 +4,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_hk_workflow_api.ps1
 REPO_DIR=/root/pybroker_trade-vue DEPLOY_BRANCH=main SERVICE_NAME=workflow-api bash /root/pybroker_trade-vue/A_stocks/ma_strategy_project/pybroker_integration/scripts/sync_workflow_api_on_server.sh
 
 
-
+假设我这样复盘：1.判断主力进攻方向，从早盘20分钟找出“三季报增长”。2.判断情绪强度，找出了空间龙青岛食品对应的“食品饮料”。3.判断资金持续性，通过连板找出了“脑机接口“。然后从这三个题材选两到三只个股持续跟踪，跟踪个股需要先拉区对应题材板块全部成员，然后调用”收益归因“页的”百亚启动形态“筛选。以上的复盘步骤你能帮我做到什么程度，只要我点开复盘接口就可以得到需要追踪的个股？复述需求，与我讨论。
 
 我通过观察量价形态，发现启动前的形态如果算上后期的正常主升，想象一个画面：就像展翅的老鹰（价）站立山巅（量），当然老鹰可以顺时针逆时针旋转，都会嵌入整个图形；我觉得这个发现很有意思，你通过用和百亚股份形态找相似的思路，把这种启动前的形态找出来，这种思想的特点是不如百亚找相似更仔细，但是保留了交易量价启动前的精髓、核心要点清晰明了，也等于把这种大道至简的方法量化。复述需求，与我讨论。
 

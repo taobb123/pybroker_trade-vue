@@ -8,6 +8,7 @@ import RunsPage from '@/pages/RunsPage.vue'
 import ReportsPage from '@/pages/ReportsPage.vue'
 import RiskReturnPage from '@/pages/RiskReturnPage.vue'
 import CapmPage from '@/pages/CapmPage.vue'
+import ThemeReviewPage from '@/pages/ThemeReviewPage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import OnboardingPage from '@/pages/OnboardingPage.vue'
 import AccountPage from '@/pages/AccountPage.vue'
@@ -52,6 +53,7 @@ export const router = createRouter({
         { path: 'reports', name: 'reports', component: ReportsPage, meta: { title: '报告' } },
         { path: 'risk-return', name: 'risk-return', component: RiskReturnPage, meta: { title: '风险收益' } },
         { path: 'capm', name: 'capm', component: CapmPage, meta: { title: '收益归因' } },
+        { path: 'theme-review', name: 'theme-review', component: ThemeReviewPage, meta: { title: '题材复盘' } },
         {
           path: 'account',
           name: 'account',

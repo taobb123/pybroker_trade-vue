@@ -55,6 +55,7 @@ from db import init_db
 from market_radar_api import router as market_radar_router
 from risk_return_api import router as risk_return_router
 from capm_api import router as capm_router
+from theme_review_api import router as theme_review_router
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "workflow_runner.yaml"
@@ -456,6 +457,7 @@ app.include_router(admin_router)
 app.include_router(market_radar_router)
 app.include_router(risk_return_router)
 app.include_router(capm_router)
+app.include_router(theme_review_router)
 
 
 @app.on_event("startup")
