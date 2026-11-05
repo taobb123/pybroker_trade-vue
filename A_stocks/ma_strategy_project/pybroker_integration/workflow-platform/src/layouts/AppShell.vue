@@ -69,7 +69,8 @@ const pageTitle = computed(() => {
 
 const isNarrow = computed(() => route.path === '/account')
 const contentMax = computed(() => {
-  if (route.path === '/risk-return' || route.path === '/capm' || route.path === '/theme-review') return 'max-w-6xl'
+  if (route.path === '/theme-review') return 'max-w-none'
+  if (route.path === '/risk-return' || route.path === '/capm') return 'max-w-6xl'
   if (route.path.startsWith('/billing') || route.path === '/usage' || route.path === '/admin') {
     return 'max-w-5xl'
   }

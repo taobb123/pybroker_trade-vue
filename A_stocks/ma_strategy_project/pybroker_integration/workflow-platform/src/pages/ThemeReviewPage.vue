@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import MarkdownReportPanel from '@/components/reports/MarkdownReportPanel.vue'
 import {
   Table,
   TableBody,
@@ -16,6 +18,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 import { fetchThemeCatalog, runThemeReview, type ThemeReviewReport } from '@/api/themeReview'
 
+const tab = ref('daily')
+const dailyPath = computed(() => {
+  const day = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+  return `reports/${day}.md`
+})
 const themes = ref('')
 const loading = ref(false)
 const error = ref('')
@@ -110,6 +122,21 @@ async function copyCodes() {
 
 <template>
   <div class="space-y-3">
+    <Tabs v-model="tab">
+      <TabsList>
+        <TabsTrigger value="daily">今日复盘</TabsTrigger>
+        <TabsTrigger value="themes">题材复盘</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="daily">
+        <Card size="sm" class="bg-transparent py-0 shadow-none ring-0 data-[size=sm]:py-0">
+          <CardContent class="px-0 group-data-[size=sm]/card:px-0">
+            <MarkdownReportPanel :path="dailyPath" compact />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="themes" class="space-y-3">
     <Card>
       <CardHeader>
         <CardTitle>题材复盘</CardTitle>
@@ -217,5 +244,7 @@ async function copyCodes() {
         </ul>
       </CardContent>
     </Card>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>
