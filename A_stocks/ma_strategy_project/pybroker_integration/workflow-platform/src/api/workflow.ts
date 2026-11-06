@@ -450,6 +450,28 @@ export async function fetchWorkspaceTable(path: string, maxRows = 500): Promise<
   }
 }
 
+export type DailyBriefItem = {
+  date: string
+  path: string
+}
+
+export async function fetchDailyBriefs(): Promise<DailyBriefItem[]> {
+  try {
+    const res = await fetch(apiUrl('/api/daily-briefs'))
+    if (!res.ok) return []
+    const data = (await res.json()) as { items?: { date?: string; path?: string }[] }
+    const items = Array.isArray(data.items) ? data.items : []
+    return items
+      .map((item) => ({
+        date: String(item.date ?? ''),
+        path: String(item.path ?? ''),
+      }))
+      .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.path.startsWith('reports/'))
+  } catch {
+    return []
+  }
+}
+
 export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     const q = new URLSearchParams({ path })

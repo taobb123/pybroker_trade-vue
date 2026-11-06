@@ -679,6 +679,24 @@ def api_workspace_latest(glob: str):
     }
 
 
+_BRIEF_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
+
+
+@app.get("/api/daily-briefs")
+def api_daily_briefs():
+    """列出已归档的收盘复盘简报 reports/YYYY-MM-DD.md，新的在前。"""
+    cfg = load_config()
+    folder = resolve_project_root(cfg) / "reports"
+    items: list[dict[str, str]] = []
+    if folder.is_dir():
+        for path in folder.iterdir():
+            match = _BRIEF_NAME.match(path.name)
+            if match and path.is_file():
+                items.append({"date": match.group(1), "path": f"reports/{path.name}"})
+    items.sort(key=lambda item: item["date"], reverse=True)
+    return _no_store_json({"items": items})
+
+
 @app.get("/api/workspace/column-text")
 def api_workspace_column_text(
     path: str,

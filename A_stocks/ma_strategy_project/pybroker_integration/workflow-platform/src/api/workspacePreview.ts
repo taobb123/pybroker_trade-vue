@@ -67,6 +67,8 @@ const DAILY_BRIEF_SECTIONS = [
   '龙虎榜净买额前五',
 ] as const
 
+const LEADER_SECTION = '每日龙头切换'
+
 export function isDailyBriefMarkdown(src: string): boolean {
   const text = String(src || '')
   if (!text.includes('A股复盘简报')) return false
@@ -98,9 +100,15 @@ function compactLhbTable(body: string): string {
 }
 
 function emphasizeLogicItem(text: string): string {
-  const matched = text.trim().match(/^(.+?)\s*[—\-]\s*(.+)$/)
-  if (!matched) return `<b class="brief-theme">${text}</b>`
-  return `<b class="brief-theme">${matched[1]}</b><span class="brief-logic-title">${matched[2]}</span>`
+  const bar = text.indexOf('｜')
+  const head = (bar >= 0 ? text.slice(0, bar) : text).trim()
+  const news = bar >= 0 ? text.slice(bar + 1).trim() : ''
+  const matched = head.match(/^(.+?)\s*[—\-]\s*(.+)$/)
+  const body = matched
+    ? `<b class="brief-theme">${matched[1]}</b><span class="brief-logic-title">${matched[2]}</span>`
+    : `<b class="brief-theme">${head}</b>`
+  const newsHtml = news ? `<span class="brief-logic-news">${news}</span>` : ''
+  return body + newsHtml
 }
 
 function kpiDownClass(label: string, value: string): string {
@@ -176,59 +184,118 @@ function markBoardHeads(body: string): string {
   })
 }
 
-function emphasizeSection(index: number, body: string): string {
-  if (index === 0) return emphasizeKpi(body)
-  if (index === 1) {
-    const chips = body.replace(
-      /<li>([\s\S]*?)<\/li>/g,
-      (_, inner: string) => `<li class="brief-chip">${emphasizeLadderItem(inner)}</li>`,
-    )
-    return markBoardHeads(chips)
-  }
-  if (index === 2) {
-    return body.replace(
-      /<li>([\s\S]*?)<\/li>/g,
-      (_, inner: string) => `<li class="brief-theme-row">${emphasizeThemeItem(inner)}</li>`,
-    )
-  }
-  return body
+function emphasizeLadder(body: string): string {
+  const chips = body.replace(
+    /<li>([\s\S]*?)<\/li>/g,
+    (_, inner: string) => `<li class="brief-chip">${emphasizeLadderItem(inner)}</li>`,
+  )
+  return markBoardHeads(chips)
 }
 
-/** 收盘简报四段并排。其它 Markdown 原样返回。 */
+function emphasizeThemes(body: string): string {
+  return body.replace(
+    /<li>([\s\S]*?)<\/li>/g,
+    (_, inner: string) => `<li class="brief-theme-row">${emphasizeThemeItem(inner)}</li>`,
+  )
+}
+
+function parseLeaderLine(text: string): { label: string; body: string } | null {
+  const matched = text.trim().match(/^(今日|昨日(?:（[^）]*）)?|切换)：\s*(.*)$/)
+  if (!matched) return null
+  let label = matched[1] ?? ''
+  const dated = label.match(/^昨日（(.+)）$/)
+  if (dated) label = `昨日 ${dated[1]}`
+  return { label, body: (matched[2] ?? '').trim() }
+}
+
+function leaderSwitchHtml(body: string): string {
+  const legacy = body.match(/^龙头\s+(.+?)\s+切换\s+(.+)$/)
+  const arrow = body.match(/^(.+?)\s*(?:→|->)\s*(.+)$/)
+  const pair = legacy || arrow
+  if (pair?.[1] && pair[2]) {
+    return `<span class="brief-leader-flow"><span class="brief-kpi-value">${escapeHtmlText(pair[1])}</span><span class="brief-leader-arrow">→</span><span class="brief-kpi-value">${escapeHtmlText(pair[2])}</span></span>`
+  }
+  const stay = body.match(/^(?:龙头\s+)?(.+?)\s+未切换$/)
+  if (stay?.[1]) {
+    return `<span class="brief-kpi-value">${escapeHtmlText(stay[1])}</span><span class="brief-theme">未切换</span>`
+  }
+  return `<span class="brief-stock">${escapeHtmlText(body)}</span>`
+}
+
+function leaderValueHtml(label: string, body: string): string {
+  if (label === '切换') return leaderSwitchHtml(body)
+  const named = body.match(/^(.+?)（([^）]+)）$/)
+  if (named?.[1]) {
+    return `<span class="brief-kpi-value">${escapeHtmlText(named[1])}</span><span class="brief-theme">${escapeHtmlText(named[2] ?? '')}</span>`
+  }
+  return `<span class="brief-kpi-value">${escapeHtmlText(body)}</span>`
+}
+
+function emphasizeLeader(body: string): string {
+  const tiles: string[] = []
+  const re = /<li>([\s\S]*?)<\/li>/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(body))) {
+    const text = String(match[1] ?? '').replace(/<[^>]+>/g, '')
+    const parsed = parseLeaderLine(text)
+    if (!parsed) continue
+    tiles.push(
+      `<div class="brief-kpi-tile"><span class="brief-kpi">${escapeHtmlText(parsed.label)}</span>${leaderValueHtml(parsed.label, parsed.body)}</div>`,
+    )
+  }
+  if (!tiles.length) return body
+  return body.replace(/<ul>[\s\S]*?<\/ul>/, `<div class="brief-leader-row">${tiles.join('')}</div>`)
+}
+
+function peelBriefFoot(body: string): { body: string; foot: string[] } {
+  const chunks = body.split(/(?=<p>)/)
+  const bodyChunks: string[] = []
+  const foot: string[] = []
+  for (const chunk of chunks) {
+    if (chunk.startsWith('<p>原文：') || chunk.startsWith('<p>数据来源：')) foot.push(chunk)
+    else bodyChunks.push(chunk)
+  }
+  return { body: bodyChunks.join(''), foot }
+}
+
+/** 收盘简报分段排布。其它 Markdown 原样返回。 */
 export function layoutDailyBriefHtml(html: string): string {
   if (!html.includes('A股复盘简报')) return html
   const parts = html.split('<h2>')
   if (parts.length < 5) return html
-  const sections: { title: string; body: string }[] = []
+  const sections: { title: string; plain: string; body: string }[] = []
   for (let i = 1; i < parts.length; i += 1) {
     const chunk = parts[i] ?? ''
     const end = chunk.indexOf('</h2>')
     if (end < 0) return html
-    sections.push({ title: chunk.slice(0, end), body: chunk.slice(end + 5) })
+    const title = chunk.slice(0, end)
+    sections.push({
+      title,
+      plain: title.replace(/<[^>]+>/g, ''),
+      body: chunk.slice(end + 5),
+    })
   }
-  if (sections.length < 4) return html
-  for (let i = 0; i < DAILY_BRIEF_SECTIONS.length; i += 1) {
-    const plain = (sections[i]?.title ?? '').replace(/<[^>]+>/g, '')
-    if (plain !== DAILY_BRIEF_SECTIONS[i]) return html
-  }
-  const last = sections[3]
-  if (!last) return html
-  const chunks = last.body.split(/(?=<p>)/)
-  const bodyChunks: string[] = []
-  const footPs: string[] = []
-  for (const chunk of chunks) {
-    if (chunk.startsWith('<p>原文：') || chunk.startsWith('<p>数据来源：')) footPs.push(chunk)
-    else bodyChunks.push(chunk)
-  }
-  last.body = compactLhbTable(bodyChunks.join(''))
-  const bodies = sections.slice(0, 4).map((section, index) => emphasizeSection(index, section.body))
-  const panel = (title: string, body: string, extra = '') =>
-    `<section class="brief-panel${extra}"><h2>${title}</h2>${body}</section>`
+  const byPlain = new Map(sections.map((section) => [section.plain, section]))
+  if (!DAILY_BRIEF_SECTIONS.every((title) => byPlain.has(title))) return html
+  const kpi = byPlain.get('行情 KPI')
+  const ladder = byPlain.get('连板天梯前三档')
+  const themes = byPlain.get('涨停家数最多的三个题材')
+  const lhb = byPlain.get('龙虎榜净买额前五')
+  if (!kpi || !ladder || !themes || !lhb) return html
+  const peeled = peelBriefFoot(lhb.body)
+  lhb.body = compactLhbTable(peeled.body)
+  const known = new Set<string>([...DAILY_BRIEF_SECTIONS, LEADER_SECTION])
   const extra = sections
-    .slice(4)
+    .filter((section) => !known.has(section.plain))
     .map((section) => `<h2>${section.title}</h2>${section.body}`)
     .join('')
-  return `<div class="brief-board"><div class="brief-head">${parts[0] ?? ''}</div>${panel(sections[0]?.title ?? '', bodies[0] ?? '', ' brief-kpis')}<div class="brief-split">${panel(sections[1]?.title ?? '', bodies[1] ?? '', ' brief-ladder')}<div class="brief-side">${panel(sections[2]?.title ?? '', bodies[2] ?? '')}${panel(sections[3]?.title ?? '', bodies[3] ?? '', ' brief-lhb-panel')}</div></div><div class="brief-foot">${footPs.join('')}${extra}</div></div>`
+  const panel = (title: string, body: string, extraClass = '') =>
+    `<section class="brief-panel${extraClass}"><h2>${title}</h2>${body}</section>`
+  const leader = byPlain.get(LEADER_SECTION)
+  const leaderHtml = leader
+    ? panel(leader.title, emphasizeLeader(leader.body), ' brief-leader')
+    : ''
+  return `<div class="brief-board"><div class="brief-head">${parts[0] ?? ''}</div>${panel(kpi.title, emphasizeKpi(kpi.body), ' brief-kpis')}${leaderHtml}<div class="brief-split">${panel(ladder.title, emphasizeLadder(ladder.body), ' brief-ladder')}<div class="brief-side">${panel(themes.title, emphasizeThemes(themes.body))}${panel(lhb.title, lhb.body, ' brief-lhb-panel')}</div></div><div class="brief-foot">${peeled.foot.join('')}${extra}</div></div>`
 }
 
 /** 轻量 Markdown → HTML（与 stock_pool_workflow.html 对齐，先转义再内联） */

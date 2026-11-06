@@ -221,6 +221,15 @@ watch(
   font-weight: 450;
   line-height: 1.45;
 }
+.md-report :deep(.brief-logic-news) {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 450;
+  line-height: 1.45;
+}
+.md-report :deep(.brief-logic-news a) {
+  color: inherit;
+}
 .md-report :deep(.brief-kpi-tile) {
   display: flex;
   flex-direction: column;
@@ -352,6 +361,31 @@ watch(
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+.md-report :deep(.brief-leader) {
+  margin-bottom: 0.85rem;
+}
+.md-report :deep(.brief-leader-row) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.md-report :deep(.brief-leader .brief-kpi-tile) {
+  gap: 0.45rem;
+}
+.md-report :deep(.brief-leader-flow) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+.md-report :deep(.brief-leader-arrow) {
+  color: var(--muted-foreground);
+  font-size: 1rem;
+  font-weight: 650;
+}
+.md-report :deep(.brief-leader .brief-theme) {
+  align-self: flex-start;
+}
 .md-report :deep(.brief-foot) {
   margin-top: 0.85rem;
   color: var(--muted-foreground);
@@ -365,6 +399,9 @@ watch(
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .md-report :deep(.brief-split) {
+    grid-template-columns: 1fr;
+  }
+  .md-report :deep(.brief-leader-row) {
     grid-template-columns: 1fr;
   }
 }

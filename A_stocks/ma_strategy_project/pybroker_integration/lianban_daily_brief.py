@@ -1,5 +1,5 @@
 # 数据来源：连板网 lianban.net（MCP https://lianban.net/mcp ，CC BY 4.0）
-"""每个交易日 17:30 拉取连板网复盘与龙虎榜，写成 reports/YYYY-MM-DD.md。"""
+"""每个交易日 17:30 拉取连板网复盘、龙虎榜，以及题材发酵逻辑和新闻，写成 reports/YYYY-MM-DD.md。"""
 
 from __future__ import annotations
 
@@ -252,6 +252,7 @@ def _coerce_stocks(value) -> list[dict]:
             stocks.append(
                 {
                     "name": str(name),
+                    "code": str(item.get("code") or item.get("symbol") or item.get("c") or "").strip(),
                     "rhythm": str(item.get("rhythm") or item.get("days") or ""),
                     "theme": str(item.get("theme") or item.get("reason") or item.get("r") or ""),
                 }
@@ -307,9 +308,11 @@ def _stocks_in_cell(cell: str) -> list[dict]:
         theme_match = re.search(r'<div class="r">([^<]*)</div>', part)
         meta_match = re.search(r'<div class="m[^"]*">([^<]*)</div>', part)
         rhythm_match = re.search(r"(\d+天\d+板)", meta_match.group(1)) if meta_match else None
+        code_match = re.search(r'data-c="([^"]*)"', part)
         stocks.append(
             {
                 "name": unescape(name_match.group(1)).strip(),
+                "code": unescape(code_match.group(1)).strip() if code_match else "",
                 "rhythm": rhythm_match.group(1) if rhythm_match else "",
                 "theme": unescape(theme_match.group(1)).strip() if theme_match else "",
             }
@@ -317,27 +320,33 @@ def _stocks_in_cell(cell: str) -> list[dict]:
     return stocks
 
 
-def ladder_from_tianti(html: str, day: str) -> list[dict]:
-    month_day = day[5:]
+def ladders_from_tianti(html: str) -> dict[str, list[dict]]:
+    """连板天梯页按列表头日期（MM-DD）分列。"""
     thead_match = re.search(r"<thead>(.*?)</thead>", html, re.S)
     if not thead_match:
-        return []
+        return {}
     headers = re.findall(r"<th\b[^>]*>(.*?)</th>", thead_match.group(1), re.S)
-    column = None
+    columns: list[tuple[int, str]] = []
     for index, header in enumerate(headers):
         plain = re.sub(r"<[^>]+>", "", header)
-        if month_day in plain:
-            column = index - 1
-            break
-    if column is None or column < 0:
-        return []
-    rows = []
+        found = re.search(r"(\d{2}-\d{2})", plain)
+        if not found:
+            continue
+        columns.append((index - 1, found.group(1)))
+    if not columns:
+        return {}
+    buckets: dict[str, list[dict]] = {label: [] for _, label in columns}
     for board, row_html in re.findall(r'<tr data-h="(\d+)"[^>]*>(.*?)</tr>', html, re.S):
         cells = re.findall(r"<td\b[^>]*>(.*?)</td>", row_html, re.S)
-        if column >= len(cells):
-            continue
-        rows.append({"board": int(board), "stocks": _stocks_in_cell(cells[column])})
-    return rows
+        for column, label in columns:
+            if column < 0 or column >= len(cells):
+                continue
+            buckets[label].append({"board": int(board), "stocks": _stocks_in_cell(cells[column])})
+    return buckets
+
+
+def ladder_from_tianti(html: str, day: str) -> list[dict]:
+    return ladders_from_tianti(html).get(day[5:], [])
 
 
 def top_tiers(rows: list[dict], limit: int = 3) -> list[dict]:
@@ -441,10 +450,15 @@ _QUESTION_RE = re.compile(r"[?？]|有哪些|为什么|为何|是什么|如何")
 _LOGIC_WORDS = ("景气", "拐点", "扩产", "订单", "涨价", "政策", "需求", "逻辑", "催化", "产能", "回暖", "商业化")
 _DRIVER_WORDS = _LOGIC_WORDS + ("签约", "大单")
 _REACTION_RE = re.compile(r"涨幅|涨超|大涨|爆火|反弹|走高|走强|ETF|港股|领涨")
+_TEASER_RE = re.compile(r"曝光|有哪些|发生了什么|一文看懂|揭秘|一图速览|背后催化因素")
 
 
 def _is_question(text: str) -> bool:
     return bool(_QUESTION_RE.search(text or ""))
+
+
+def _is_teaser(text: str) -> bool:
+    return bool(_TEASER_RE.search(text or ""))
 
 
 def logic_score(title: str, keywords: list[str]) -> int:
@@ -457,6 +471,8 @@ def logic_score(title: str, keywords: list[str]) -> int:
         score -= 3
     if _is_question(title):
         score -= 5
+    if _is_teaser(title):
+        score -= 8
     if len(title) <= 22:
         score += 1
     return score
@@ -483,6 +499,8 @@ def _driver_bit(clause: str) -> str:
         has_driver = any(word in bit for word in _DRIVER_WORDS)
         reaction = bool(_REACTION_RE.search(bit))
         if reaction and not has_driver:
+            continue
+        if _is_teaser(bit):
             continue
         drivers.append(bit)
     hinted = [bit for bit in drivers if any(word in bit for word in _DRIVER_WORDS)]
@@ -518,14 +536,19 @@ def summarize_logic(title: str, content: str, theme: str = "") -> str:
     return best
 
 
-def pick_theme_logic(rows: list[dict], name: str, day: str) -> str:
+def _news_title(row: dict) -> str:
+    text = re.sub(r"\s+", " ", str(row.get("title") or "")).strip()
+    return text.replace("｜", " ").replace("[", " ").replace("]", " ")
+
+
+def pick_theme_story(rows: list[dict], name: str, day: str) -> dict:
     keywords = _theme_keywords(name)
     best: dict | None = None
     best_score = -10**9
     for row in rows:
         if not str(row.get("date") or "").startswith(day):
             continue
-        title = re.sub(r"\s+", " ", str(row.get("title") or "")).strip()
+        title = _news_title(row)
         if not title:
             continue
         has_keyword = any(key in title for key in keywords)
@@ -539,8 +562,33 @@ def pick_theme_logic(rows: list[dict], name: str, day: str) -> str:
             best_score = score
             best = row
     if not best:
-        return ""
-    return summarize_logic(str(best.get("title") or ""), str(best.get("content") or ""), name)
+        return {"logic": "", "news": "", "url": ""}
+    title = _news_title(best)
+    logic = summarize_logic(title, str(best.get("content") or ""), name)
+    url = str(best.get("url") or "").strip()
+    if url and not url.startswith("http"):
+        url = ""
+    return {"logic": logic, "news": title, "url": url}
+
+
+def pick_theme_logic(rows: list[dict], name: str, day: str) -> str:
+    return pick_theme_story(rows, name, day)["logic"]
+
+
+def _collect_news(keyword: str, day: str, page_limit: int = 12) -> list[dict]:
+    rows: list[dict] = []
+    for _page in range(1, page_limit + 1):
+        batch = _news_page(keyword, _page)
+        if not batch:
+            break
+        rows.extend(batch)
+        newest = str(batch[0].get("date") or "")
+        oldest = str(batch[-1].get("date") or "")
+        if newest and newest < day:
+            break
+        if oldest and oldest < day:
+            break
+    return rows
 
 
 def _kline_bar(secid: str, day: str) -> dict | None:
@@ -629,22 +677,94 @@ def fetch_theme_logics(themes: list[dict], day: str) -> list[dict]:
         if not name:
             continue
         keyword = _theme_keywords(name)[-1]
-        rows: list[dict] = []
-        for page in range(1, 7):
-            batch = _news_page(keyword, page)
-            if not batch:
-                break
-            rows.extend(batch)
-            newest = str(batch[0].get("date") or "")
-            oldest = str(batch[-1].get("date") or "")
-            if newest and newest < day:
-                break
-            if oldest and oldest.startswith(day):
-                continue
-            if oldest and oldest < day:
-                break
-        logics.append({"name": name, "title": pick_theme_logic(rows, name, day)})
+        rows = _collect_news(keyword, day)
+        story = pick_theme_story(rows, name, day)
+        logics.append(
+            {
+                "name": name,
+                "title": story["logic"],
+                "news": story["news"],
+                "url": story["url"],
+            }
+        )
     return logics
+
+
+def first_board_leader(rows: list[dict] | None) -> dict | None:
+    """龙头 = 最高板名单里的第一只。"""
+    leaders = highest_leaders(rows or [])
+    return leaders[0] if leaders else None
+
+
+def highest_leaders(rows: list[dict]) -> list[dict]:
+    """最高板且有个股的那一档，顺序与天梯页一致。"""
+    ranked: list[tuple[int, list]] = []
+    for row in rows or []:
+        board = row.get("board")
+        stocks = row.get("stocks") or []
+        if not isinstance(board, int) or not stocks:
+            continue
+        ranked.append((board, stocks))
+    if not ranked:
+        return []
+    top = max(board for board, _stocks in ranked)
+    leaders = []
+    for board, stocks in ranked:
+        if board != top:
+            continue
+        for stock in stocks:
+            item = dict(stock)
+            item["board"] = board
+            leaders.append(item)
+    return leaders
+
+
+def _rows_have_stocks(rows: list[dict] | None) -> bool:
+    return any(row.get("stocks") for row in (rows or []))
+
+
+def _leaders_have_codes(rows: list[dict] | None) -> bool:
+    leaders = highest_leaders(rows or [])
+    return bool(leaders) and all(str(stock.get("code") or "").strip() for stock in leaders)
+
+
+def _leader_name(stock: dict | None) -> str:
+    return str((stock or {}).get("name") or "").strip()
+
+
+def _format_board_leader(stock: dict | None) -> str:
+    name = _leader_name(stock)
+    if not name:
+        return "未取到"
+    theme = str((stock or {}).get("theme") or "").strip()
+    if theme:
+        return f"{name}（{theme}）"
+    return name
+
+
+def leader_section(
+    today_rows: list[dict],
+    prev_rows: list[dict] | None,
+    prev_day: str | None,
+) -> list[str]:
+    today = first_board_leader(today_rows)
+    prev = first_board_leader(prev_rows) if prev_day else None
+    lines = ["## 每日龙头切换", "", "最高板的第一只。", ""]
+    lines.append(f"- 今日：{_format_board_leader(today)}")
+    if prev_day:
+        lines.append(f"- 昨日（{prev_day}）：{_format_board_leader(prev)}")
+    else:
+        lines.append("- 昨日：未取到上一交易日")
+    today_name = _leader_name(today)
+    prev_name = _leader_name(prev)
+    if not prev_day or not prev_name:
+        lines.append("- 切换：无法对照上一交易日")
+    elif today_name and today_name == prev_name:
+        lines.append(f"- 切换：{today_name} 未切换")
+    else:
+        lines.append(f"- 切换：{prev_name} → {today_name or '—'}")
+    lines.append("")
+    return lines
 
 
 def change_alert(today_up, prev_up, prev_day: str) -> str | None:
@@ -679,6 +799,8 @@ def render_report(
     ladder_note: str,
     market: dict | None = None,
     logics: list[dict] | None = None,
+    today_ladder: list[dict] | None = None,
+    prev_ladder: list[dict] | None = None,
 ) -> str:
     kpi = review.get("kpi") or {}
     prev_kpi = (prev_review or {}).get("kpi") or {}
@@ -714,9 +836,24 @@ def render_report(
     )
     for index, item in enumerate(logics or [], 1):
         title = item.get("title") or "—"
-        lines.append(f"{index}. {item.get('name', '—')} — {title}")
+        line = f"{index}. {item.get('name', '—')} — {title}"
+        news = str(item.get("news") or "").strip()
+        url = str(item.get("url") or "").strip()
+        if news and news != title:
+            if url:
+                line += f"｜[{news}]({url})"
+            else:
+                line += f"｜{news}"
+        lines.append(line)
     if logics:
         lines.append("")
+    lines.extend(
+        leader_section(
+            today_ladder if today_ladder is not None else tiers,
+            prev_ladder,
+            prev_day,
+        )
+    )
     lines.extend(["## 连板天梯前三档", ""])
     if ladder_note:
         lines.extend([ladder_note, ""])
@@ -822,17 +959,30 @@ def build(day: str, dates: list[str], token: str) -> Path:
             prev_review = mcp_call("get_daily_review", token, date=prev_day)
     ladder_note = ""
     rows = ladder_from_review(review)
-    if rows and any(row["stocks"] for row in rows):
-        ladder_note = ""
-    else:
+    prev_rows = ladder_from_review(prev_review) if prev_review else []
+    tianti_map: dict[str, list[dict]] = {}
+    need_tianti = not _rows_have_stocks(rows) or (bool(prev_day) and not _rows_have_stocks(prev_rows))
+    if need_tianti or not _leaders_have_codes(rows) or (prev_day and not _leaders_have_codes(prev_rows)):
         try:
-            html = fetch_html(TIANTI_URL)
-            rows = ladder_from_tianti(html, day)
-            if rows:
-                ladder_note = "个股名单取自连板天梯页（当日复盘接口未附逐只名单）。"
+            tianti_map = ladders_from_tianti(fetch_html(TIANTI_URL))
         except Exception as exc:
             log(f"天梯页获取失败：{exc}")
-            rows = rows or []
+            tianti_map = {}
+    if not _rows_have_stocks(rows):
+        rows = tianti_map.get(day[5:], [])
+        if rows:
+            ladder_note = "个股名单取自连板天梯页（当日复盘接口未附逐只名单）。"
+    if prev_day and not _rows_have_stocks(prev_rows):
+        prev_rows = tianti_map.get(prev_day[5:], [])
+    leader_today = rows
+    leader_prev = prev_rows
+    today_tianti = tianti_map.get(day[5:], [])
+    if _rows_have_stocks(today_tianti) and not _leaders_have_codes(rows):
+        leader_today = today_tianti
+    if prev_day:
+        prev_tianti = tianti_map.get(prev_day[5:], [])
+        if _rows_have_stocks(prev_tianti) and not _leaders_have_codes(prev_rows):
+            leader_prev = prev_tianti
     tiers = top_tiers(rows, 3)
     market = {"indices": [], "turnover": None}
     logics: list[dict] = []
@@ -841,11 +991,24 @@ def build(day: str, dates: list[str], token: str) -> Path:
     except Exception as exc:
         log(f"指数与成交额获取失败：{exc}")
     try:
+        # 每日简报固定带上涨停家数前三题材的发酵逻辑和新闻。
         logics = fetch_theme_logics(top_themes(review, 3), day)
     except Exception as exc:
         log(f"题材新闻获取失败：{exc}")
         logics = [{"name": item.get("name") or "—", "title": ""} for item in top_themes(review, 3)]
-    text = render_report(day, review, prev_review, prev_day, lhb, tiers, ladder_note, market, logics)
+    text = render_report(
+        day,
+        review,
+        prev_review,
+        prev_day,
+        lhb,
+        tiers,
+        ladder_note,
+        market,
+        logics,
+        leader_today,
+        leader_prev,
+    )
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"{day}.md"
     path.write_text(text, encoding="utf-8", newline="\n")
@@ -859,7 +1022,9 @@ def self_test() -> None:
       <tr data-h="4"><th>4板</th><td>
         <div class="tti-s" data-c="002578"><a data-nm="闽发铝业">闽发铝业</a><div class="r">光伏支架</div></div>
         <div class="tti-s" data-c="601599"><a data-nm="浙文影业">浙文影业</a><div class="r">AI视频</div></div>
-      </td><td></td></tr>
+      </td><td>
+        <div class="tti-s" data-c="600000"><a data-nm="昨日龙头">昨日龙头</a><div class="r">机器人</div></div>
+      </td></tr>
       <tr data-h="3"><th>3板</th><td>
         <div class="tti-s"><a data-nm="鲁阳节能">鲁阳节能</a><div class="m">5天4板104万</div><div class="r">锂电池</div></div>
       </td><td></td></tr>
@@ -871,11 +1036,26 @@ def self_test() -> None:
       </td><td></td></tr>
     </tbody></table>
     """
-    rows = ladder_from_tianti(html, "2026-11-05")
+    columns = ladders_from_tianti(html)
+    rows = columns["11-05"]
     tiers = top_tiers(rows, 3)
     assert [row["board"] for row in tiers] == [4, 3, 2], tiers
     assert [stock["name"] for stock in tiers[0]["stocks"]] == ["闽发铝业", "浙文影业"]
+    assert tiers[0]["stocks"][0]["code"] == "002578"
     assert tiers[0]["stocks"][0]["theme"] == "光伏支架"
+    prev_rows = columns["11-04"]
+    assert highest_leaders(prev_rows)[0]["code"] == "600000"
+    assert first_board_leader(rows)["name"] == "闽发铝业"
+    assert first_board_leader(prev_rows)["name"] == "昨日龙头"
+    switched = "\n".join(leader_section(rows, prev_rows, "2026-11-04"))
+    assert "今日：闽发铝业（光伏支架）" in switched
+    assert "切换：昨日龙头 → 闽发铝业" in switched
+    assert "002578" not in switched
+    assert "浙文影业" not in switched
+    same = "\n".join(leader_section(rows, rows, "2026-11-04"))
+    assert "切换：闽发铝业 未切换" in same
+    missing = "\n".join(leader_section(rows, [], None))
+    assert "无法对照上一交易日" in missing
     assert tiers[1]["stocks"][0]["rhythm"] == "5天4板"
     assert tiers[2]["stocks"][0]["name"] == "深中华A"
     alert = change_alert(84, 118, "2026-11-04")
@@ -891,6 +1071,23 @@ def self_test() -> None:
         {"date": "2026-11-05 18:00:00", "title": "光储产业链景气度边际回暖"},
     ]
     assert pick_theme_logic(news_rows, "光伏", "2026-11-05") == "光储产业链景气度边际回暖"
+    teaser_rows = [
+        {
+            "date": "2026-11-05 16:23:50",
+            "title": "光伏设备板块两日累计涨幅超11%，背后催化因素曝光",
+            "content": "",
+        },
+        {
+            "date": "2026-11-05 20:26:04",
+            "title": "董事长透露“明年储能订单翻倍”后，阳光电源股价躁动",
+            "content": "",
+            "url": "https://finance.eastmoney.com/a/example.html",
+        },
+    ]
+    story = pick_theme_story(teaser_rows, "光伏", "2026-11-05")
+    assert story["logic"] == "明年储能订单翻倍"
+    assert "阳光电源" in story["news"]
+    assert story["url"].startswith("https://")
     question = "两日累计涨幅超11%！光伏设备板块爆火，背后催化因素有哪些？"
     assert summarize_logic(question, "光伏主链订单回暖。", "光伏") == "光伏主链订单回暖"
     assert "？" not in summarize_logic(question, "光伏主链订单回暖。", "光伏")
@@ -912,18 +1109,38 @@ def self_test() -> None:
     report = render_report(
         "2026-11-05",
         review,
-        None,
-        None,
+        {"themes": [{"name": "机器人", "limit_up": 9}]},
+        "2026-11-04",
         {},
         [],
         "",
         {"indices": [{"name": "上证", "pct": 0.1}], "turnover": 2.12e12},
-        [{"name": "光伏", "title": "光储产业链景气度边际回暖"}],
+        [
+            {
+                "name": "光伏",
+                "title": "光储产业链景气度边际回暖",
+                "news": "董事长透露明年储能订单翻倍",
+                "url": "https://finance.eastmoney.com/a/1.html",
+            },
+            {
+                "name": "AI应用",
+                "title": "AI应用商业化",
+                "news": "国产大模型商业化加速",
+                "url": "https://finance.eastmoney.com/a/2.html",
+            },
+        ],
+        rows,
+        prev_rows,
     )
     assert "| 炸板 | 48 |" in report
+    assert "## 每日龙头切换" in report
+    assert "今日：闽发铝业（光伏支架）" in report
+    assert "切换：昨日龙头 → 闽发铝业" in report
+    assert "002578" not in report
     assert "| 两市成交额 | 2.12万亿 |" in report
     assert "上证 +0.10%" in report
-    assert "1. 光伏 — 光储产业链景气度边际回暖" in report
+    assert "1. 光伏 — 光储产业链景气度边际回暖｜[董事长透露明年储能订单翻倍](https://finance.eastmoney.com/a/1.html)" in report
+    assert "2. AI应用 — AI应用商业化｜[国产大模型商业化加速](https://finance.eastmoney.com/a/2.html)" in report
     assert "东方财富" in report
     print("self-test ok")
 

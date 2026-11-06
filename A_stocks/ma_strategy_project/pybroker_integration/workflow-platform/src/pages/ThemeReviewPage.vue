@@ -17,10 +17,18 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 import { fetchThemeCatalog, runThemeReview, type ThemeReviewReport } from '@/api/themeReview'
-import { fetchWorkspaceFile } from '@/api/workflow'
+import { fetchDailyBriefs, fetchWorkspaceFile, type DailyBriefItem } from '@/api/workflow'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const tab = ref('daily')
 const dailyPath = ref('')
+const briefs = ref<DailyBriefItem[]>([])
 
 function shanghaiDay(offsetDays = 0): string {
   const today = new Intl.DateTimeFormat('en-CA', {
@@ -41,6 +49,19 @@ async function resolveDailyPath() {
   const todayPath = `reports/${shanghaiDay(0)}.md`
   const today = await fetchWorkspaceFile(todayPath)
   dailyPath.value = today.exists ? todayPath : `reports/${shanghaiDay(-1)}.md`
+}
+
+async function loadBriefs() {
+  const items = await fetchDailyBriefs()
+  if (items.length) {
+    briefs.value = items
+    const todayPath = `reports/${shanghaiDay(0)}.md`
+    dailyPath.value = items.some((item) => item.path === todayPath) ? todayPath : items[0].path
+    return
+  }
+  await resolveDailyPath()
+  const date = dailyPath.value.replace(/^reports\//, '').replace(/\.md$/, '')
+  briefs.value = /^\d{4}-\d{2}-\d{2}$/.test(date) ? [{ date, path: dailyPath.value }] : []
 }
 const themes = ref('')
 const loading = ref(false)
@@ -120,7 +141,7 @@ async function loadCatalog() {
 
 onMounted(() => {
   void loadCatalog()
-  void resolveDailyPath()
+  void loadBriefs()
 })
 
 async function copyCodes() {
@@ -145,7 +166,24 @@ async function copyCodes() {
         <TabsTrigger value="themes">题材复盘</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="daily">
+      <TabsContent value="daily" class="space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-muted-foreground">归档</span>
+          <Select
+            :model-value="dailyPath || undefined"
+            @update:model-value="(value) => value && (dailyPath = String(value))"
+          >
+            <SelectTrigger class="h-8 w-44" size="sm">
+              <SelectValue placeholder="选择日期" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="item in briefs" :key="item.path" :value="item.path">
+                {{ item.date }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <span class="text-xs text-muted-foreground">{{ briefs.length }} 份</span>
+        </div>
         <Card size="sm" class="bg-transparent py-0 shadow-none ring-0 data-[size=sm]:py-0">
           <CardContent class="px-0 group-data-[size=sm]/card:px-0">
             <p v-if="!dailyPath" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>

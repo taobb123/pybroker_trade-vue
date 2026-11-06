@@ -5,3 +5,10 @@
 2026-11-06 09:00:11 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
 2026-11-06 09:09:03 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
 2026-11-06 09:10:14 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
+2026-11-06 15:47:07 生成失败：请求失败 https://lianban.net/mcp: curl: (28) Failed to connect to lianban.net port 443 after 21224 ms: Could not connect to server
+2026-11-06 15:59:43 生成失败：{'content': [{'type': 'text', 'text': '{"error": "2026-11-06 无龙虎榜数据(非交易日或尚未定版, 收盘后更新)。"}'}], 'isError': True}
+2026-11-06 16:00:21 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
+2026-11-06 16:06:33 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
+2026-11-06 16:11:00 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
+2026-11-06 16:19:18 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
+2026-11-06 16:24:38 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-05.md
