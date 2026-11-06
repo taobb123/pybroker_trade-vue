@@ -97,17 +97,55 @@ function compactLhbTable(body: string): string {
   return body.replace(match[0], `<ol class="brief-lhb">${items.join('')}</ol>`)
 }
 
+function emphasizeLogicItem(text: string): string {
+  const matched = text.trim().match(/^(.+?)\s*[—\-]\s*(.+)$/)
+  if (!matched) return `<b class="brief-theme">${text}</b>`
+  return `<b class="brief-theme">${matched[1]}</b><span class="brief-logic-title">${matched[2]}</span>`
+}
+
+function kpiDownClass(label: string, value: string): string {
+  const name = label.replace(/<[^>]+>/g, '').trim()
+  const text = value.replace(/<[^>]+>/g, '').trim()
+  if (name.includes('炸板')) return ' brief-down'
+  const numeric = Number(text.replace(/,/g, '').replace(/%|板|万亿|亿|万|元|\+/g, ''))
+  if (text.startsWith('-') || text.startsWith('−') || (Number.isFinite(numeric) && numeric < 0)) {
+    return ' brief-down'
+  }
+  return ''
+}
+
+function decorateKpiExtras(body: string): string {
+  let next = body.replace(/<p>([\s\S]*?)<\/p>/, (full, inner: string) => {
+    const text = inner.replace(/<[^>]+>/g, '')
+    if (!text.includes('上证') || !text.includes('深证')) return full
+    const bits = text.split('、').map((bit) => {
+      const piece = bit.trim().match(/^(\S+)\s+([+\-]?\d+(?:\.\d+)?%)$/)
+      if (!piece) return ''
+      const down = piece[2].startsWith('-') ? ' brief-down' : ''
+      return `<span class="brief-index"><span>${piece[1]}</span><b class="${down.trim()}">${piece[2]}</b></span>`
+    })
+    return `<p class="brief-indices">${bits.join('')}</p>`
+  })
+  next = next.replace(
+    /<li>([\s\S]*?)<\/li>/g,
+    (_, inner: string) => `<li class="brief-logic">${emphasizeLogicItem(inner)}</li>`,
+  )
+  return next
+}
+
 function emphasizeKpi(body: string): string {
   const rows: string[] = []
   const re = /<tr>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<\/tr>/g
   let match: RegExpExecArray | null
   while ((match = re.exec(body))) {
     rows.push(
-      `<div class="brief-kpi-tile"><span class="brief-kpi">${match[1]}</span><span class="brief-kpi-value">${match[2]}</span></div>`,
+      `<div class="brief-kpi-tile"><span class="brief-kpi">${match[1]}</span><span class="brief-kpi-value${kpiDownClass(match[1] ?? '', match[2] ?? '')}">${match[2]}</span></div>`,
     )
   }
-  if (!rows.length) return body
-  return body.replace(/<table>[\s\S]*?<\/table>/, `<div class="brief-kpi-row">${rows.join('')}</div>`)
+  const withTiles = rows.length
+    ? body.replace(/<table>[\s\S]*?<\/table>/, `<div class="brief-kpi-row">${rows.join('')}</div>`)
+    : body
+  return decorateKpiExtras(withTiles)
 }
 
 function emphasizeLadderItem(text: string): string {

@@ -17,17 +17,31 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 import { fetchThemeCatalog, runThemeReview, type ThemeReviewReport } from '@/api/themeReview'
+import { fetchWorkspaceFile } from '@/api/workflow'
 
 const tab = ref('daily')
-const dailyPath = computed(() => {
-  const day = new Intl.DateTimeFormat('en-CA', {
+const dailyPath = ref('')
+
+function shanghaiDay(offsetDays = 0): string {
+  const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(new Date())
-  return `reports/${day}.md`
-})
+  const [year, month, day] = today.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, month - 1, day + offsetDays))
+  const y = shifted.getUTCFullYear()
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+async function resolveDailyPath() {
+  const todayPath = `reports/${shanghaiDay(0)}.md`
+  const today = await fetchWorkspaceFile(todayPath)
+  dailyPath.value = today.exists ? todayPath : `reports/${shanghaiDay(-1)}.md`
+}
 const themes = ref('')
 const loading = ref(false)
 const error = ref('')
@@ -104,7 +118,10 @@ async function loadCatalog() {
   }
 }
 
-onMounted(loadCatalog)
+onMounted(() => {
+  void loadCatalog()
+  void resolveDailyPath()
+})
 
 async function copyCodes() {
   const text = stockCodesToCopyText(
@@ -131,7 +148,8 @@ async function copyCodes() {
       <TabsContent value="daily">
         <Card size="sm" class="bg-transparent py-0 shadow-none ring-0 data-[size=sm]:py-0">
           <CardContent class="px-0 group-data-[size=sm]/card:px-0">
-            <MarkdownReportPanel :path="dailyPath" compact />
+            <p v-if="!dailyPath" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
+            <MarkdownReportPanel v-else :path="dailyPath" compact />
           </CardContent>
         </Card>
       </TabsContent>

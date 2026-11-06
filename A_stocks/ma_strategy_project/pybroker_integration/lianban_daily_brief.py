@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from html import unescape
@@ -24,6 +25,17 @@ REPORTS = ROOT / "reports"
 LOG_PATH = REPORTS / "lianban_brief.log"
 MCP_URL = "https://lianban.net/mcp"
 TIANTI_URL = "https://lianban.net/tianti.html"
+KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+NEWS_URL = "https://search-api-web.eastmoney.com/search/jsonp"
+INDEXES = (
+    ("上证", "1.000001"),
+    ("深证", "0.399001"),
+    ("创业板", "0.399006"),
+    ("科创50", "1.000688"),
+    ("上证50", "1.000016"),
+    ("北证50", "0.899050"),
+)
+NEWS_NOISE = ("龙虎榜", "提示风险", "回购", "美股", "盘前", "晨会", "快报", "速览", "期货")
 MCP_CONFIG = Path.home() / ".cursor" / "mcp.json"
 TZ = ZoneInfo("Asia/Shanghai")
 CHANGE_ALERT = 0.30
@@ -396,6 +408,245 @@ def stock_label(stock: dict) -> str:
     return text
 
 
+def fmt_turnover_market(value) -> str:
+    if value is None:
+        return "—"
+    number = float(value)
+    if number >= 1e12:
+        return f"{number / 1e12:.2f}万亿"
+    if number >= 1e8:
+        return f"{number / 1e8:.2f}亿"
+    return fmt_yuan(number)
+
+
+def index_line(indices: list[dict]) -> str:
+    parts = []
+    for item in indices:
+        name = str(item.get("name") or "").strip()
+        if not name or item.get("pct") is None:
+            continue
+        parts.append(f"{name} {fmt_pct_point(item.get('pct'))}")
+    return "、".join(parts)
+
+
+def _theme_keywords(name: str) -> list[str]:
+    text = (name or "").strip()
+    keys = [text] if text else []
+    if text.endswith("概念") and len(text) > 2:
+        keys.append(text[:-2])
+    return keys
+
+
+_QUESTION_RE = re.compile(r"[?？]|有哪些|为什么|为何|是什么|如何")
+_LOGIC_WORDS = ("景气", "拐点", "扩产", "订单", "涨价", "政策", "需求", "逻辑", "催化", "产能", "回暖", "商业化")
+_DRIVER_WORDS = _LOGIC_WORDS + ("签约", "大单")
+_REACTION_RE = re.compile(r"涨幅|涨超|大涨|爆火|反弹|走高|走强|ETF|港股|领涨")
+
+
+def _is_question(text: str) -> bool:
+    return bool(_QUESTION_RE.search(text or ""))
+
+
+def logic_score(title: str, keywords: list[str]) -> int:
+    score = 0
+    if any(key and key in title for key in keywords):
+        score += 2
+    if any(word in title for word in _LOGIC_WORDS):
+        score += 4
+    if any(word in title for word in NEWS_NOISE):
+        score -= 3
+    if _is_question(title):
+        score -= 5
+    if len(title) <= 22:
+        score += 1
+    return score
+
+
+def _logic_clauses(text: str) -> list[str]:
+    raw = re.sub(r"\s+", "", text or "")
+    raw = re.sub(r"【[^】]*】", "", raw)
+    found = []
+    for part in re.split(r"[。！!？?；;]", raw):
+        part = part.strip("，,、：:")
+        if len(part) < 6 or _is_question(part):
+            continue
+        found.append(part)
+    return found
+
+
+def _driver_bit(clause: str) -> str:
+    bits = [bit.strip() for bit in re.split(r"[，,]", clause) if bit.strip()]
+    drivers = []
+    for bit in bits:
+        if _is_question(bit):
+            continue
+        has_driver = any(word in bit for word in _DRIVER_WORDS)
+        reaction = bool(_REACTION_RE.search(bit))
+        if reaction and not has_driver:
+            continue
+        drivers.append(bit)
+    hinted = [bit for bit in drivers if any(word in bit for word in _DRIVER_WORDS)]
+    chosen = hinted[0] if hinted else (drivers[0] if drivers else "")
+    quoted = re.search(r"[“\"]([^”\"]{4,24})[”\"]", chosen)
+    if quoted and any(word in quoted.group(1) for word in _DRIVER_WORDS):
+        return quoted.group(1)
+    if "：" in chosen:
+        tail = chosen.split("：")[-1].strip()
+        if any(word in tail for word in _DRIVER_WORDS) and 4 <= len(tail) <= 22:
+            return tail
+    if len(chosen) > 22:
+        short = [bit for bit in hinted if len(bit) <= 22]
+        return short[0] if short else ""
+    return chosen
+
+
+def summarize_logic(title: str, content: str, theme: str = "") -> str:
+    best = ""
+    best_score = -10**9
+    for clause in _logic_clauses(title) + _logic_clauses(content):
+        bit = _driver_bit(clause)
+        if not bit or _is_question(bit):
+            continue
+        score = 1
+        if any(word in bit for word in _DRIVER_WORDS):
+            score += 4
+        if theme and any(key and key in bit for key in _theme_keywords(theme)):
+            score += 1
+        if score > best_score:
+            best_score = score
+            best = bit
+    return best
+
+
+def pick_theme_logic(rows: list[dict], name: str, day: str) -> str:
+    keywords = _theme_keywords(name)
+    best: dict | None = None
+    best_score = -10**9
+    for row in rows:
+        if not str(row.get("date") or "").startswith(day):
+            continue
+        title = re.sub(r"\s+", " ", str(row.get("title") or "")).strip()
+        if not title:
+            continue
+        has_keyword = any(key in title for key in keywords)
+        noisy = any(word in title for word in NEWS_NOISE)
+        score = logic_score(title, keywords)
+        if not has_keyword and score < 2:
+            continue
+        if noisy and not has_keyword:
+            continue
+        if score > best_score:
+            best_score = score
+            best = row
+    if not best:
+        return ""
+    return summarize_logic(str(best.get("title") or ""), str(best.get("content") or ""), name)
+
+
+def _kline_bar(secid: str, day: str) -> dict | None:
+    end = day.replace("-", "")
+    query = urllib.parse.urlencode(
+        {
+            "secid": secid,
+            "klt": "101",
+            "fqt": "1",
+            "end": end,
+            "lmt": "5",
+            "fields1": "f1",
+            "fields2": "f51,f57,f59",
+        }
+    )
+    body, _ctype = _request(
+        f"{KLINE_URL}?{query}",
+        None,
+        {"User-Agent": BROWSER_UA, "Accept": "application/json", "Referer": "https://quote.eastmoney.com/"},
+        timeout=20,
+    )
+    data = json.loads(body)
+    for item in ((data.get("data") or {}).get("klines") or []):
+        parts = str(item).split(",")
+        if len(parts) < 3 or parts[0] != day:
+            continue
+        return {"amount": float(parts[1]), "pct": float(parts[2])}
+    return None
+
+
+def fetch_market(day: str) -> dict:
+    indices = []
+    amounts: dict[str, float] = {}
+    for name, secid in INDEXES:
+        bar = _kline_bar(secid, day)
+        if bar is None:
+            continue
+        indices.append({"name": name, "pct": bar["pct"]})
+        amounts[name] = bar["amount"]
+    turnover = None
+    if "上证" in amounts and "深证" in amounts:
+        turnover = amounts["上证"] + amounts["深证"]
+    return {"indices": indices, "turnover": turnover}
+
+
+def _news_page(keyword: str, page: int) -> list[dict]:
+    param = {
+        "uid": "",
+        "keyword": keyword,
+        "type": ["cmsArticleWebOld"],
+        "client": "web",
+        "clientType": "web",
+        "clientVersion": "curr",
+        "param": {
+            "cmsArticleWebOld": {
+                "searchScope": "default",
+                "sort": "time",
+                "pageIndex": page,
+                "pageSize": 20,
+                "preTag": "",
+                "postTag": "",
+            }
+        },
+    }
+    query = urllib.parse.urlencode({"cb": "cb", "param": json.dumps(param, ensure_ascii=False)})
+    body, _ctype = _request(
+        f"{NEWS_URL}?{query}",
+        None,
+        {"User-Agent": BROWSER_UA, "Accept": "*/*", "Referer": "https://so.eastmoney.com/"},
+        timeout=20,
+    )
+    text = body.strip()
+    start = text.find("(")
+    end = text.rfind(")")
+    if start >= 0 and end > start:
+        text = text[start + 1 : end]
+    data = json.loads(text)
+    rows = (data.get("result") or {}).get("cmsArticleWebOld") or []
+    return rows if isinstance(rows, list) else []
+
+
+def fetch_theme_logics(themes: list[dict], day: str) -> list[dict]:
+    logics = []
+    for theme in themes:
+        name = str(theme.get("name") or "").strip()
+        if not name:
+            continue
+        keyword = _theme_keywords(name)[-1]
+        rows: list[dict] = []
+        for page in range(1, 7):
+            batch = _news_page(keyword, page)
+            if not batch:
+                break
+            rows.extend(batch)
+            newest = str(batch[0].get("date") or "")
+            oldest = str(batch[-1].get("date") or "")
+            if newest and newest < day:
+                break
+            if oldest and oldest.startswith(day):
+                continue
+            if oldest and oldest < day:
+                break
+        logics.append({"name": name, "title": pick_theme_logic(rows, name, day)})
+    return logics
+
+
 def change_alert(today_up, prev_up, prev_day: str) -> str | None:
     if today_up is None or prev_up is None:
         return None
@@ -426,6 +677,8 @@ def render_report(
     lhb: dict,
     tiers: list[dict],
     ladder_note: str,
+    market: dict | None = None,
+    logics: list[dict] | None = None,
 ) -> str:
     kpi = review.get("kpi") or {}
     prev_kpi = (prev_review or {}).get("kpi") or {}
@@ -441,21 +694,30 @@ def render_report(
         bits = [bit for bit in (status, phase) if bit]
         lines.append(" / ".join(bits))
         lines.append("")
+    market = market or {}
+    lines.extend(["## 行情 KPI", ""])
+    indices = index_line(market.get("indices") or [])
+    if indices:
+        lines.extend([indices, ""])
     lines.extend(
         [
-            "## 行情 KPI",
-            "",
             "| 指标 | 数值 |",
             "| --- | --- |",
             f"| 涨停 | {kpi.get('limit_up', '—')} |",
             f"| 连板 | {kpi.get('lianban', '—')} |",
             f"| 最高板 | {kpi.get('max_board', '—')}板 |",
             f"| 封板率 | {kpi.get('seal_rate_pct', '—')}% |",
-            "",
-            "## 连板天梯前三档",
+            f"| 炸板 | {kpi.get('zhaban', '—')} |",
+            f"| 两市成交额 | {fmt_turnover_market(market.get('turnover'))} |",
             "",
         ]
     )
+    for index, item in enumerate(logics or [], 1):
+        title = item.get("title") or "—"
+        lines.append(f"{index}. {item.get('name', '—')} — {title}")
+    if logics:
+        lines.append("")
+    lines.extend(["## 连板天梯前三档", ""])
     if ladder_note:
         lines.extend([ladder_note, ""])
     if not tiers:
@@ -512,11 +774,14 @@ def render_report(
             )
         lines.append("")
     page = review.get("page") or f"https://lianban.net/days/{day}.html"
+    sources = ["连板网 lianban.net"]
+    if indices or market.get("turnover") is not None or any((item.get("title") or "") for item in (logics or [])):
+        sources.append("指数、成交额与题材新闻：东方财富")
     lines.extend(
         [
             f"原文：{page}",
             "",
-            "数据来源：连板网 lianban.net",
+            "数据来源：" + "；".join(sources),
             "",
         ]
     )
@@ -569,7 +834,18 @@ def build(day: str, dates: list[str], token: str) -> Path:
             log(f"天梯页获取失败：{exc}")
             rows = rows or []
     tiers = top_tiers(rows, 3)
-    text = render_report(day, review, prev_review, prev_day, lhb, tiers, ladder_note)
+    market = {"indices": [], "turnover": None}
+    logics: list[dict] = []
+    try:
+        market = fetch_market(day)
+    except Exception as exc:
+        log(f"指数与成交额获取失败：{exc}")
+    try:
+        logics = fetch_theme_logics(top_themes(review, 3), day)
+    except Exception as exc:
+        log(f"题材新闻获取失败：{exc}")
+        logics = [{"name": item.get("name") or "—", "title": ""} for item in top_themes(review, 3)]
+    text = render_report(day, review, prev_review, prev_day, lhb, tiers, ladder_note, market, logics)
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"{day}.md"
     path.write_text(text, encoding="utf-8", newline="\n")
@@ -606,6 +882,49 @@ def self_test() -> None:
     assert alert is None
     assert change_alert(150, 100, "2026-11-04")
     assert change_alert(70, 118, "2026-11-04")
+    assert fmt_turnover_market(2.12e12) == "2.12万亿"
+    assert index_line([{"name": "上证", "pct": 0.1}, {"name": "深证", "pct": -1.21}]) == "上证 +0.10%、深证 -1.21%"
+    news_rows = [
+        {"date": "2026-11-06 08:00:00", "title": "次日晨会看光伏"},
+        {"date": "2026-11-05 21:13:17", "title": "深股通现身16只个股龙虎榜"},
+        {"date": "2026-11-05 21:00:00", "title": "金刚光伏子公司签不超15.36亿元算力大单"},
+        {"date": "2026-11-05 18:00:00", "title": "光储产业链景气度边际回暖"},
+    ]
+    assert pick_theme_logic(news_rows, "光伏", "2026-11-05") == "光储产业链景气度边际回暖"
+    question = "两日累计涨幅超11%！光伏设备板块爆火，背后催化因素有哪些？"
+    assert summarize_logic(question, "光伏主链订单回暖。", "光伏") == "光伏主链订单回暖"
+    assert "？" not in summarize_logic(question, "光伏主链订单回暖。", "光伏")
+    assert summarize_logic("国产大模型商业化加速，催化AI应用行情，传媒ETF鹏涨超4%", "", "AI应用") == "国产大模型商业化加速"
+    assert summarize_logic("智能驾驶与机器人催化升温，港股汽车板块迎来反弹", "", "机器人概念") == "智能驾驶与机器人催化升温"
+    assert summarize_logic("董事长透露“明年储能订单翻倍”后，阳光电源股价躁动", "", "光伏") == "明年储能订单翻倍"
+    review = {
+        "status_label": "收盘复盘",
+        "kpi": {
+            "limit_up": 84,
+            "lianban": 21,
+            "max_board": 4,
+            "seal_rate_pct": 63.6,
+            "zhaban": 48,
+            "emotion_phase": "升温期",
+        },
+        "themes": [{"name": "光伏", "limit_up": 18}],
+    }
+    report = render_report(
+        "2026-11-05",
+        review,
+        None,
+        None,
+        {},
+        [],
+        "",
+        {"indices": [{"name": "上证", "pct": 0.1}], "turnover": 2.12e12},
+        [{"name": "光伏", "title": "光储产业链景气度边际回暖"}],
+    )
+    assert "| 炸板 | 48 |" in report
+    assert "| 两市成交额 | 2.12万亿 |" in report
+    assert "上证 +0.10%" in report
+    assert "1. 光伏 — 光储产业链景气度边际回暖" in report
+    assert "东方财富" in report
     print("self-test ok")
 
 

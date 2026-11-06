@@ -178,8 +178,48 @@ watch(
 }
 .md-report :deep(.brief-kpi-row) {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.75rem;
+}
+.md-report :deep(.brief-kpis .brief-indices) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin: 0 0 0.85rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+.md-report :deep(.brief-index) {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.md-report :deep(.brief-index b) {
+  color: oklch(0.5 0.18 28);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.md-report :deep(.brief-kpi-value.brief-down),
+.md-report :deep(.brief-index b.brief-down) {
+  color: oklch(0.55 0.16 145);
+}
+.md-report :deep(.brief-kpis ol) {
+  margin: 0.85rem 0 0;
+}
+.md-report :deep(.brief-logic) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.md-report :deep(.brief-logic-title) {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 450;
+  line-height: 1.45;
 }
 .md-report :deep(.brief-kpi-tile) {
   display: flex;
@@ -321,7 +361,9 @@ watch(
   margin: 0.15rem 0 0;
 }
 @media (max-width: 860px) {
-  .md-report :deep(.brief-kpi-row),
+  .md-report :deep(.brief-kpi-row) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .md-report :deep(.brief-split) {
     grid-template-columns: 1fr;
   }
