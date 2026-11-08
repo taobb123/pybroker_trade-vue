@@ -64,8 +64,19 @@ export const useWatchlistStore = defineStore('watchlist', () => {
     return lim < 0 ? HARD_MAX : lim
   })
 
+  function symbolCode(symbol: string) {
+    const digits = symbol.replace(/\D/g, '')
+    return digits.length >= 6 ? digits.slice(0, 6) : ''
+  }
+
   function has(opportunityId: string) {
     return items.value.some((i) => i.opportunityId === opportunityId)
+  }
+
+  function hasSymbol(symbol: string) {
+    const code = symbolCode(symbol)
+    if (!code) return false
+    return items.value.some((item) => symbolCode(item.symbol) === code)
   }
 
   function getZone(item: WatchItem): WatchZoneStatus {
@@ -113,6 +124,24 @@ export const useWatchlistStore = defineStore('watchlist', () => {
     return { ok: true }
   }
 
+  function addSymbol(input: {
+    symbol: string
+    name?: string
+    price?: number | null
+  }): { ok: true } | { ok: false; reason: string; upgrade?: boolean } {
+    const code = symbolCode(input.symbol)
+    if (!code) return { ok: false, reason: '没有股票代码' }
+    if (hasSymbol(code)) return { ok: false, reason: '已在观察池' }
+    return addFromOpportunity({
+      opportunityId: `dingpan:${code}`,
+      symbol: code,
+      name: input.name?.trim() || code,
+      price: input.price ?? undefined,
+      thesis: '盯盘观察',
+      risk: '只保存盯盘结果',
+    })
+  }
+
   function remove(id: string) {
     items.value = items.value.filter((i) => i.id !== id)
     persist(items.value)
@@ -136,8 +165,10 @@ export const useWatchlistStore = defineStore('watchlist', () => {
     count,
     planCap,
     has,
+    hasSymbol,
     getZone,
     addFromOpportunity,
+    addSymbol,
     remove,
     removeByOpportunity,
     updateZone,

@@ -423,7 +423,7 @@ class DataFetcher:
                     adj='qfq',   # 前复权
                     freq='D',
                     asset='E',
-                    fields='trade_date,open,high,low,close,vol'
+                    fields='trade_date,open,high,low,close,vol,amount'
                 )
                 logger.debug(f"ts.pro_bar 调用成功，返回数据行数: {len(df) if df is not None else 0}")
             except Exception as e1:
@@ -492,17 +492,20 @@ class DataFetcher:
                 logger.warning(f"tushare返回数据缺少列: {missing_cols}")
                 return None
             
-            # 选择并排序
-            df = df[required_cols].copy()
+            # 选择并排序。成交额留给事件 VWAP，缺了也不挡行情。
+            keep_cols = required_cols + (["amount"] if "amount" in df.columns else [])
+            df = df[keep_cols].copy()
             df = df.sort_values('date').reset_index(drop=True)
             
             # 数据类型转换
             numeric_cols = ['open', 'high', 'low', 'close', 'volume']
             for col in numeric_cols:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+            if 'amount' in df.columns:
+                df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
             
-            # 删除NaN行
-            df = df.dropna()
+            # 删除价格缺失的行。成交额缺失仍保留。
+            df = df.dropna(subset=required_cols)
             
             if df.empty:
                 logger.warning(f"tushare数据清洗后为空")

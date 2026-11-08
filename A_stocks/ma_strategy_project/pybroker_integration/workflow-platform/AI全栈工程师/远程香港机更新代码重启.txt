@@ -4,6 +4,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_hk_workflow_api.ps1
 REPO_DIR=/root/pybroker_trade-vue DEPLOY_BRANCH=main SERVICE_NAME=workflow-api bash /root/pybroker_trade-vue/A_stocks/ma_strategy_project/pybroker_integration/scripts/sync_workflow_api_on_server.sh
 
 
+
+
+我想做一个追踪主力意图的量化工具，规则就是把趋势分成低点、回调、压力、突破的阶段，做到持仓成本心里有数，可进可退，能清晰知道盯盘的价格位置。这需要把当前的经验归纳总结为量化规则，以后可以批量分析不同股票的各个价格位置。复述需求，完成量化归纳，并对照我给出的思源电气的价格位置验证调整归纳质量。复述需求，与我讨论。
+
+用 lianban 这个 MCP（工具：get_daily_review 每日复盘 / get_lhb 龙虎榜 /
+get_stock_history 个股涨停史 / list_trade_dates 交易日历）写一个 Python 脚本：
+1. 每个交易日 17:30 运行，取当日复盘与龙虎榜；
+2. 生成 Markdown 简报存到 reports/YYYY-MM-DD.md：涨停/连板/最高板/封板率 KPI、
+   连板天梯前三档名单、涨停家数最多的三个题材、龙虎榜净买额前五（标注游资席位）；
+3. 涨停家数比上一交易日变化超过 30% 时，在简报开头加一行显著提醒；
+4. 简报末尾注明"数据来源：连板网 lianban.net"。
+
+
 根据宁波东力最近的成交额和换手率分析，主力有没有出货的意图，未来的价格有多少上涨空间？
 
 假设我这样复盘：1.判断主力进攻方向，从早盘20分钟找出“三季报增长”。2.判断情绪强度，找出了空间龙青岛食品对应的“食品饮料”。3.判断资金持续性，通过连板找出了“脑机接口“。然后从这三个题材选两到三只个股持续跟踪，跟踪个股需要先拉区对应题材板块全部成员，然后调用”收益归因“页的”百亚启动形态“筛选。以上的复盘步骤你能帮我做到什么程度，只要我点开复盘接口就可以得到需要追踪的个股？复述需求，与我讨论。

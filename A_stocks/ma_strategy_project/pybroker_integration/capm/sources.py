@@ -358,11 +358,15 @@ def load_ohlc(
         return pd.DataFrame(columns=empty_cols)
     if "open" not in frame.columns:
         frame["open"] = np.nan
+    if "amount" in frame.columns:
+        empty_cols.append("amount")
     frame = frame[empty_cols].copy()
     frame["symbol"] = frame["symbol"].map(_code)
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
     for col in ("open", "high", "low", "close", "volume"):
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    if "amount" in frame.columns:
+        frame["amount"] = pd.to_numeric(frame["amount"], errors="coerce")
     frame = frame.dropna(subset=["symbol", "date", "high", "low", "close", "volume"])
     if symbols is not None:
         frame = frame[frame["symbol"].isin(symbols)]
@@ -376,6 +380,7 @@ def store_ohlc(new_rows: pd.DataFrame, cache_path: Path) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     fresh = new_rows[list(needed)].copy()
     fresh["open"] = pd.to_numeric(new_rows["open"], errors="coerce") if "open" in new_rows.columns else np.nan
+    fresh["amount"] = pd.to_numeric(new_rows["amount"], errors="coerce") if "amount" in new_rows.columns else np.nan
     fresh["symbol"] = fresh["symbol"].map(_code)
     fresh["date"] = pd.to_datetime(fresh["date"], errors="coerce").dt.normalize()
     for col in ("high", "low", "close", "volume"):
@@ -396,7 +401,7 @@ def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
     """补齐主力表演所需的开高低收和成交量。失败的代码跳过。"""
     from backtest_sy_002028_threshold import fetch_ohlc_qfq
 
-    columns = ["date", "symbol", "open", "high", "low", "close", "volume"]
+    columns = ["date", "symbol", "open", "high", "low", "close", "volume", "amount"]
     frames: list[pd.DataFrame] = []
     for index, symbol in enumerate(symbols):
         try:
@@ -405,6 +410,7 @@ def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
             raw = None
         if raw is not None and not raw.empty and {"date", "high", "low", "close", "volume"}.issubset(raw.columns):
             opened = pd.to_numeric(raw["open"], errors="coerce") if "open" in raw.columns else np.nan
+            amount_col = next((name for name in ("amount", "成交额") if name in raw.columns), None)
             frames.append(
                 pd.DataFrame(
                     {
@@ -415,6 +421,7 @@ def fetch_act_bars(symbols: list[str], start: str, end: str) -> pd.DataFrame:
                         "low": pd.to_numeric(raw["low"], errors="coerce"),
                         "close": pd.to_numeric(raw["close"], errors="coerce"),
                         "volume": pd.to_numeric(raw["volume"], errors="coerce"),
+                        "amount": pd.to_numeric(raw[amount_col], errors="coerce") if amount_col else np.nan,
                     }
                 )
             )
