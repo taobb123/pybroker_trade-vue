@@ -62,7 +62,7 @@ function colIndex(headers: string[], name: string): number {
 
 function cellNum(row: unknown[], idx: number): number | null {
   if (idx < 0) return null
-  const n = Number(row[idx])
+  const n = parseFloat(String(row[idx] ?? ''))
   return Number.isFinite(n) ? n : null
 }
 

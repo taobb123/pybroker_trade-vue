@@ -1,0 +1,7 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+001289,龙源电力,2026-11-09,1,底部缩量,14.73,-1.4716,15.2,15.04,14.73,31946.02,0.9131,0.9131,False,70.0,True,bottom,
+002385,大北农,2026-11-09,1,底部缩量,3.01,0.3333,3.22,3.03,3.01,391251.5,0.8924,0.8924,False,70.0,True,bottom,
+200596,,2026-11-04,1,底部缩量,54.08,-4.4523,58.39,56.72,54.08,4681.0,3.6395,3.6395,False,52.0,False,bottom,
+600132,重庆啤酒,2026-11-04,1,底部缩量,39.36,-1.6737,40.14,40.6,39.36,69331.36,2.0285,2.0285,False,64.0,True,bottom,
+600986,浙文互联,2026-11-04,1,底部缩量,6.95,1.9062,7.49,6.99,6.95,562853.1,1.2418,1.2418,False,62.0,True,bottom,
+603486,科沃斯,2026-11-04,1,底部缩量,47.19,0.2336,50.29,47.48,47.19,58474.61,1.3136,1.3136,False,70.0,True,bottom,

@@ -48,7 +48,7 @@ function colIndex(headers: string[], name: string): number {
 function centsOf(cell: unknown): number | null {
   const raw = String(cell ?? '').trim()
   if (!raw) return null
-  const n = Number(raw)
+  const n = parseFloat(raw)
   if (!Number.isFinite(n)) return null
   return Math.round(n * 100)
 }

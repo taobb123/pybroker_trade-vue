@@ -41,6 +41,23 @@ function cellToStockCode6(cell: unknown, headerNorm: string): string {
   return raw
 }
 
+/** 价差保留元，括号里是占收盘价的百分比，例如 0.73 (0.65%)。 */
+export function formatHighLowDiff(cell: unknown): string {
+  const raw = String(cell ?? '').trim()
+  if (!raw) return ''
+  const annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\(([+-]?\d+(?:\.\d+)?)%\)$/)
+  if (annotated) {
+    const yuan = Number(annotated[1])
+    const pct = Number(annotated[2])
+    if (Number.isFinite(yuan) && Number.isFinite(pct)) {
+      return `${yuan.toFixed(2)} (${pct.toFixed(2)}%)`
+    }
+  }
+  const n = parseFloat(raw)
+  if (!Number.isNaN(n)) return n.toFixed(2)
+  return raw
+}
+
 /** 浮点数展示保留两位；整数、代码、非数字原样返回 */
 export function formatDecimalTwoPlaces(cell: unknown): string | null {
   if (cell == null) return null
@@ -63,9 +80,12 @@ export function formatPreviewCell(header: string, cell: unknown, relPath: string
     if (h === 'symbol' || h === 'code6' || h.includes('ts_code')) {
       return cellToStockCode6(cell, h) || String(cell ?? '')
     }
-    if (h === 'today_high' || h === 'today_low' || h === 'high_low_diff') {
+    if (h === 'today_high' || h === 'today_low') {
       const n = parseFloat(String(cell))
       if (!Number.isNaN(n)) return n.toFixed(2)
+    }
+    if (h === 'high_low_diff') {
+      return formatHighLowDiff(cell)
     }
   }
   const rounded = formatDecimalTwoPlaces(cell)

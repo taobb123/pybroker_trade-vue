@@ -1,3 +1,2 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-思源电气,红柱,跌,2026-11-05,2026-11-06,2026-11-03|2026-11-04|2026-11-05,红红红,红红红,3,0,后续不同概率偏高,down,red,diff_bias,002028
-郑中设计,红柱,跌,2026-11-05,2026-11-06,2026-11-03|2026-11-04|2026-11-05,红红红,红红红,3,0,后续不同概率偏高,down,red,diff_bias,002811
+思源电气,绿柱,涨,2026-11-09,2026-11-10,2026-11-05|2026-11-06|2026-11-09,红绿绿,红红绿,2,1,后续不同概率偏高,up,green,diff_bias,002028

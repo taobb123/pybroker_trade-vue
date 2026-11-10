@@ -156,14 +156,47 @@ CONDITIONAL_ORDER_PCT = '0.3%'
 
 
 def _price_cents(value) -> int | None:
-    """报价收到分（四舍五入）。无效值返回 None。"""
+    """报价收到分（四舍五入）。无效值返回 None。
+
+    单元格可以是纯数字，也可以是「0.73 (0.65%)」这种带收盘价百分比的标注，只取前面的元。
+    """
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
+    text = str(value).strip()
+    if not text:
+        return None
+    number = []
+    for i, ch in enumerate(text):
+        if ch in '+-' and i == 0:
+            number.append(ch)
+            continue
+        if ch.isdigit() or ch == '.':
+            number.append(ch)
+            continue
+        break
+    if not number or number in (['+'], ['-'], ['.'], ['+.'], ['-.']):
+        return None
     try:
-        q = Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        q = Decimal(''.join(number)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     except Exception:
         return None
     return int(q * 100)
+
+
+def _diff_with_close_pct(diff, close) -> str:
+    """价差保留元，并在括号里标出占收盘价的百分比。"""
+    cents = _price_cents(diff)
+    if cents is None:
+        return ''
+    yuan = _cents_text(cents)
+    try:
+        price = float(close)
+    except (TypeError, ValueError):
+        return yuan
+    if price != price or price == 0:
+        return yuan
+    pct = (cents / 100) / price * 100
+    return f'{yuan} ({pct:.2f}%)'
 
 
 def _cents_text(cents: int) -> str:
@@ -325,11 +358,15 @@ def main():
         normalize_a_share_symbol(str(s)): (float(h), float(l))
         for s, h, l in zip(merge_df['symbol'], merge_df['today_high'], merge_df['today_low'])
     }
+    orders = build_conditional_orders(final)
+    closes = pd.to_numeric(merge_df['yesterday_price'], errors='coerce').reset_index(drop=True)
+    final['high_low_diff'] = [
+        _diff_with_close_pct(diff, close)
+        for diff, close in zip(final['high_low_diff'].tolist(), closes.tolist())
+    ]
     final_path = os.path.join(script_dir, 'today_high_low_result.csv')
     final.to_csv(final_path, index=False, encoding='utf-8-sig')
     print(f"当日高低价结果已写入: {final_path}")
-
-    orders = build_conditional_orders(final)
     orders_path = os.path.join(script_dir, CONDITIONAL_ORDERS_CSV)
     orders.to_csv(orders_path, index=False, encoding='utf-8-sig')
     kept = len(orders) // 5

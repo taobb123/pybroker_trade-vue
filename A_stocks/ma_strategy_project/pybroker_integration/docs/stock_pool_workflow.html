@@ -1858,6 +1858,22 @@
           .indexOf("today_high_low_result.csv") >= 0;
       }
 
+      function formatHighLowDiff(cell) {
+        var raw = String(cell == null ? "" : cell).trim();
+        if (!raw) return "";
+        var annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\(([+-]?\d+(?:\.\d+)?)%\)$/);
+        if (annotated) {
+          var yuan = Number(annotated[1]);
+          var pct = Number(annotated[2]);
+          if (isFinite(yuan) && isFinite(pct)) {
+            return yuan.toFixed(2) + " (" + pct.toFixed(2) + "%)";
+          }
+        }
+        var n = parseFloat(raw);
+        if (!isNaN(n)) return n.toFixed(2);
+        return raw;
+      }
+
       function formatDecimalTwoPlaces(cell) {
         if (cell == null) return null;
         var raw = String(cell).trim();
@@ -1882,11 +1898,14 @@
             var code = cellToStockCode6(cell, h);
             return code || String(cell == null ? "" : cell);
           }
-          if (h === "today_high" || h === "today_low" || h === "high_low_diff") {
+          if (h === "today_high" || h === "today_low") {
             var n = parseFloat(cell);
             if (!isNaN(n)) {
               return n.toFixed(2);
             }
+          }
+          if (h === "high_low_diff") {
+            return formatHighLowDiff(cell);
           }
         }
         var rounded = formatDecimalTwoPlaces(cell);
