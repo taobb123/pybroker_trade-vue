@@ -39,6 +39,7 @@ export type DingpanBreakout = {
 
 export type DingpanItem = {
   symbol: string
+  name: string
   asof: string | null
   close: number | null
   stage: string
@@ -78,6 +79,7 @@ type RawZone = {
 
 type RawItem = {
   symbol?: string
+  name?: string
   asof?: string | null
   close?: number | null
   stage?: string
@@ -100,6 +102,7 @@ function mapItem(raw: RawItem): DingpanItem {
   const breakout = raw.breakout
   return {
     symbol: String(raw.symbol ?? ''),
+    name: String(raw.name ?? '').trim(),
     asof: raw.asof ?? null,
     close: num(raw.close),
     stage: String(raw.stage ?? '未形成'),

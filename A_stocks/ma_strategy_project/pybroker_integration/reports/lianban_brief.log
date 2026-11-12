@@ -16,3 +16,16 @@
 2026-11-07 17:30:09 2026-11-07 不是可查交易日（最近交易日 2026-11-06），跳过
 2026-11-08 17:30:05 2026-11-08 不是可查交易日（最近交易日 2026-11-06），跳过
 2026-11-09 17:30:26 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-09.md
+2026-11-10 17:30:31 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-10.md
+2026-11-11 17:30:26 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 18:23:32 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 18:26:22 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 20:51:57 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 21:00:10 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 21:04:03 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 21:10:52 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-11 21:19:59 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-11.md
+2026-11-12 17:31:41 生成失败：请求失败 https://lianban.net/mcp: curl: (28) Failed to connect to lianban.net port 443 after 21073 ms: Could not connect to server
+2026-11-12 18:23:17 2026-11-11.md 次日开盘低开，已改第一票
+2026-11-12 18:23:17 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-12.md
+2026-11-12 18:24:18 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-12.md

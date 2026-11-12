@@ -1,0 +1,5 @@
+﻿symbol,stock_name,signal_date,combo_id,combo_name,close,pct_change,platform_level,breakout_high,breakout_close,breakout_vol,breakout_vol_ratio,vol_ratio,is_breakout,resonance_score,resonance_ok,position_stage,ma5_score_total
+002036,联创电子,2026-11-11,2,底部放量上涨,6.02,5.9859,5.88,6.05,6.02,993351.65,3.7843,3.7843,True,88.0,True,uptrend,
+002432,九安医疗,2026-11-11,2,底部放量上涨,59.54,3.2784,58.57,60.42,59.54,423312.95,2.7386,2.7386,True,88.0,True,uptrend,
+002902,铭普光磁,2026-11-11,2,底部放量上涨,20.69,5.3999,23.6,21.5,20.69,264583.39,2.7838,2.7838,False,94.0,True,bottom,
+002957,科瑞技术,2026-11-11,2,底部放量上涨,28.55,10.0193,31.22,28.55,28.55,213606.08,1.6892,1.6892,False,94.0,True,bottom,

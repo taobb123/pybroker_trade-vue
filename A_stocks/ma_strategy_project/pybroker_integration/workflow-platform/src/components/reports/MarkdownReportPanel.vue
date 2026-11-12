@@ -391,6 +391,20 @@ watch(
   color: var(--muted-foreground);
   font-size: 0.8rem;
 }
+.md-report :deep(.brief-more) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+.md-report :deep(.brief-seam .brief-leader-row) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.md-report :deep(.brief-seam .brief-kpi-value) {
+  font-size: 1rem;
+}
 .md-report :deep(.brief-foot p) {
   margin: 0.15rem 0 0;
 }

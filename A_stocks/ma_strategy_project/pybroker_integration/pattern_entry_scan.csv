@@ -1,10 +1,4 @@
 ﻿symbol,stock_name,pattern_id,combo_id,combo_name,state,state_code,select_tag,entry,position_frac,trial_ok,add_ok,score,signal_date,breakout_day,platform_level,breakout_high,breakout_close,breakout_vol,panic_low,close,pullback_bars,bars_since_breakout,pullback_ok,ma5_hold,macd_ok,turnover_fade,notes
-002624,完美世界,breakout_pullback_rebreak,4,上涨放量突破,缩量回踩确认,confirming,待选,False,0.6,False,True,22.0,2026-11-09,2026-11-04,10.89,11.31,11.18,1233711.64,,11.01,2,3,True,False,True,True,缩量回踩确认2日；MACD红柱健康；换手递减站住
-601012,隆基绿能,breakout_pullback_rebreak,4,上涨放量突破,缩量回踩确认,confirming,待选,False,0.0,False,False,22.0,2026-11-09,2026-11-04,11.83,12.12,12.0,1378842.73,,12.02,0,3,False,False,True,True,MACD红柱健康；换手递减站住
-002241,歌尔股份,breakout_pullback_rebreak,4,上涨放量突破,缩量回踩确认,confirming,待选,False,0.0,False,False,16.0,2026-11-09,2026-11-04,23.77,23.66,23.63,1392060.95,,24.74,0,3,False,False,True,False,MACD红柱健康
-600371,万向德农,breakout_pullback_rebreak,4,上涨放量突破,观察,watch,,False,0.0,False,False,0.0,2026-11-09,2026-11-09,16.47,13.63,13.51,959020.36,,13.51,0,0,False,False,False,False,突破当日，等待缩量回踩
-000810,创维数字,breakout_pullback_rebreak,4,上涨放量突破,作废,invalid,,False,0.0,False,False,5.0,2026-11-09,2026-11-04,11.61,10.97,10.8,582930.91,,11.04,0,3,False,False,True,False,收盘跌破平台 11.6100；MACD红柱健康
-002475,立讯精密,breakout_pullback_rebreak,4,上涨放量突破,作废,invalid,,False,0.0,False,False,5.0,2026-11-09,2026-11-04,50.76,49.98,49.51,1370743.77,,50.78,0,3,False,False,True,True,收盘跌破平台 50.7600；MACD红柱健康；换手递减站住
-002517,恺英网络,breakout_pullback_rebreak,4,上涨放量突破,作废,invalid,,False,0.0,False,False,5.0,2026-11-09,2026-11-04,16.98,17.05,16.93,653493.78,,16.67,0,3,False,False,True,False,收盘跌破平台 16.9800；MACD红柱健康
-002646,天佑德酒,breakout_pullback_rebreak,4,上涨放量突破,作废,invalid,,False,0.0,False,False,5.0,2026-11-09,2026-11-04,7.37,7.33,7.22,197843.62,,7.02,0,3,False,False,True,False,收盘跌破平台 7.3700；MACD红柱健康
-600715,文投控股,breakout_pullback_rebreak,4,上涨放量突破,作废,invalid,,False,0.0,False,False,5.0,2026-11-09,2026-11-04,2.46,2.71,2.47,8201508.65,,2.59,0,3,False,False,True,True,收盘跌破平台 2.4600；MACD红柱健康；换手递减站住
+002369,卓翼科技,breakout_pullback_rebreak,4,上涨放量突破,观察,watch,,False,0.0,False,False,6.0,2026-11-12,2026-11-11,5.72,5.73,5.66,203934.0,,5.86,0,1,False,False,True,False,MACD红柱健康
+603158,腾龙股份,breakout_pullback_rebreak,4,上涨放量突破,观察,watch,,False,0.0,False,False,6.0,2026-11-12,2026-11-11,10.6,11.35,11.16,312979.92,,10.86,1,1,False,False,True,False,MACD红柱健康
+603283,赛腾股份,breakout_pullback_rebreak,4,上涨放量突破,观察,watch,,False,0.0,False,False,6.0,2026-11-12,2026-11-11,40.23,43.0,42.9,317637.6,,45.29,0,1,False,False,True,False,MACD红柱健康

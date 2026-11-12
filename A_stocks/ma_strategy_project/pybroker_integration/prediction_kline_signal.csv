@@ -1,2 +1,2 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-思源电气,绿柱,涨,2026-11-09,2026-11-10,2026-11-05|2026-11-06|2026-11-09,红绿绿,红红绿,2,1,后续不同概率偏高,up,green,diff_bias,002028
+浙文互联,绿柱,涨,2026-11-11,2026-11-12,2026-11-09|2026-11-10|2026-11-11,绿红红,绿绿红,2,1,后续不同概率偏高,up,green,diff_bias,600986

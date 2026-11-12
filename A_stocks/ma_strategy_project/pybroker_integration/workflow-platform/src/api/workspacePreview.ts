@@ -68,6 +68,7 @@ const DAILY_BRIEF_SECTIONS = [
 ] as const
 
 const LEADER_SECTION = '每日龙头切换'
+const MORE_SECTIONS = ['炸板名单', '晋级名单', '分歧转一致'] as const
 
 export function isDailyBriefMarkdown(src: string): boolean {
   const text = String(src || '')
@@ -231,6 +232,23 @@ function leaderValueHtml(label: string, body: string): string {
   return `<span class="brief-kpi-value">${escapeHtmlText(body)}</span>`
 }
 
+function emphasizeSeam(body: string): string {
+  const tiles: string[] = []
+  const re = /<li>([\s\S]*?)<\/li>/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(body))) {
+    const text = String(match[1] ?? '').replace(/<[^>]+>/g, '')
+    const parsed = text.trim().match(/^(.+?)：\s*(.*)$/)
+    if (!parsed) continue
+    const label = parsed[1] ?? ''
+    tiles.push(
+      `<div class="brief-kpi-tile"><span class="brief-kpi">${escapeHtmlText(label)}</span>${leaderValueHtml(label, parsed[2] ?? '')}</div>`,
+    )
+  }
+  if (!tiles.length) return body
+  return body.replace(/<ul>[\s\S]*?<\/ul>/, `<div class="brief-leader-row">${tiles.join('')}</div>`)
+}
+
 function emphasizeLeader(body: string): string {
   const tiles: string[] = []
   const re = /<li>([\s\S]*?)<\/li>/g
@@ -284,7 +302,7 @@ export function layoutDailyBriefHtml(html: string): string {
   if (!kpi || !ladder || !themes || !lhb) return html
   const peeled = peelBriefFoot(lhb.body)
   lhb.body = compactLhbTable(peeled.body)
-  const known = new Set<string>([...DAILY_BRIEF_SECTIONS, LEADER_SECTION])
+  const known = new Set<string>([...DAILY_BRIEF_SECTIONS, LEADER_SECTION, ...MORE_SECTIONS])
   const extra = sections
     .filter((section) => !known.has(section.plain))
     .map((section) => `<h2>${section.title}</h2>${section.body}`)
@@ -295,7 +313,14 @@ export function layoutDailyBriefHtml(html: string): string {
   const leaderHtml = leader
     ? panel(leader.title, emphasizeLeader(leader.body), ' brief-leader')
     : ''
-  return `<div class="brief-board"><div class="brief-head">${parts[0] ?? ''}</div>${panel(kpi.title, emphasizeKpi(kpi.body), ' brief-kpis')}${leaderHtml}<div class="brief-split">${panel(ladder.title, emphasizeLadder(ladder.body), ' brief-ladder')}<div class="brief-side">${panel(themes.title, emphasizeThemes(themes.body))}${panel(lhb.title, lhb.body, ' brief-lhb-panel')}</div></div><div class="brief-foot">${peeled.foot.join('')}${extra}</div></div>`
+  const more = MORE_SECTIONS.map((name) => {
+    const section = byPlain.get(name)
+    if (!section) return ''
+    if (name === '分歧转一致') return panel(section.title, emphasizeSeam(section.body), ' brief-seam')
+    return panel(section.title, emphasizeLadder(section.body), ' brief-ladder')
+  }).join('')
+  const moreHtml = more ? `<div class="brief-more">${more}</div>` : ''
+  return `<div class="brief-board"><div class="brief-head">${parts[0] ?? ''}</div>${panel(kpi.title, emphasizeKpi(kpi.body), ' brief-kpis')}${leaderHtml}<div class="brief-split">${panel(ladder.title, emphasizeLadder(ladder.body), ' brief-ladder')}<div class="brief-side">${panel(themes.title, emphasizeThemes(themes.body))}${panel(lhb.title, lhb.body, ' brief-lhb-panel')}</div></div>${moreHtml}<div class="brief-foot">${peeled.foot.join('')}${extra}</div></div>`
 }
 
 /** 轻量 Markdown → HTML（与 stock_pool_workflow.html 对齐，先转义再内联） */

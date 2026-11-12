@@ -166,6 +166,16 @@ async function loadDingpan(refresh = false) {
   }
 }
 
+function rowName(row: DingpanItem) {
+  const code = codeOf(row.symbol) || row.symbol
+  const pooled = nameBySymbol.value.get(code) || nameBySymbol.value.get(row.symbol) || ''
+  for (const raw of [row.name, pooled]) {
+    const name = (raw || '').trim()
+    if (name && name !== code && name !== row.symbol) return name
+  }
+  return ''
+}
+
 function rememberPoolRows(items: DingpanItem[]) {
   const keep = items.filter((item) => store.hasSymbol(item.symbol))
   if (keep.length) saveDingpanSnapshots(keep)
@@ -178,7 +188,7 @@ function addCodes(codes: string[]) {
     const row = dingpanRows.value.find((item) => codeOf(item.symbol) === code)
     const result = store.addSymbol({
       symbol: code,
-      name: nameBySymbol.value.get(code) || code,
+      name: (row && rowName(row)) || code,
       price: row?.close ?? null,
     })
     if (!result.ok) {
@@ -287,10 +297,13 @@ watch(symbolKey, () => {
           <tbody>
             <tr v-for="row in dingpanRows" :key="row.symbol" class="border-b last:border-0">
               <td class="py-2 pr-3">
-                <div v-if="nameBySymbol.get(row.symbol)" class="font-medium">
-                  {{ nameBySymbol.get(row.symbol) }}
+                <div v-if="rowName(row)" class="font-medium">{{ rowName(row) }}</div>
+                <div
+                  class="font-mono"
+                  :class="rowName(row) ? 'text-xs text-muted-foreground' : 'text-sm font-medium'"
+                >
+                  {{ codeOf(row.symbol) || row.symbol }}
                 </div>
-                <div class="font-mono text-xs text-muted-foreground">{{ row.symbol }}</div>
                 <Button
                   v-if="usingPaste && !store.hasSymbol(row.symbol)"
                   size="sm"

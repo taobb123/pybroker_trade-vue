@@ -1,5 +1,5 @@
 # 数据来源：连板网 lianban.net（MCP https://lianban.net/mcp ，CC BY 4.0）
-"""每个交易日 17:30 拉取连板网复盘、龙虎榜，以及题材发酵逻辑和新闻，写成 reports/YYYY-MM-DD.md。"""
+"""每个交易日 17:30 拉取连板网复盘、龙虎榜、炸板与晋级，以及题材发酵逻辑和新闻，写成 reports/YYYY-MM-DD.md。"""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ LOG_PATH = REPORTS / "lianban_brief.log"
 MCP_URL = "https://lianban.net/mcp"
 TIANTI_URL = "https://lianban.net/tianti.html"
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+ZB_POOL_URL = "https://push2ex.eastmoney.com/getTopicZBPool"
+INDUSTRY_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 NEWS_URL = "https://search-api-web.eastmoney.com/search/jsonp"
 INDEXES = (
     ("上证", "1.000001"),
@@ -341,18 +343,57 @@ def ladders_from_tianti(html: str) -> dict[str, list[dict]]:
         for column, label in columns:
             if column < 0 or column >= len(cells):
                 continue
-            buckets[label].append({"board": int(board), "stocks": _stocks_in_cell(cells[column])})
+            buckets[label].append(
+                {
+                    "board": int(board),
+                    "stocks": _stocks_in_cell(cells[column]),
+                    "rate": _cell_rate(cells[column]),
+                }
+            )
     return buckets
+
+
+def _cell_rate(cell: str) -> dict | None:
+    head = re.search(r'<div class="hd[^"]*">(.*?)</div>', cell, re.S)
+    if not head:
+        return None
+    plain = re.sub(r"<[^>]+>", " ", head.group(1))
+    plain = re.sub(r"\s+", " ", plain)
+    count_match = re.search(r"共(\d+)只", plain)
+    rate_match = re.search(r"(\d+)进(\d+)\s+([\d.]+)%", plain)
+    if not count_match and not rate_match:
+        return None
+    rate: dict = {"count": int(count_match.group(1)) if count_match else None}
+    if rate_match:
+        rate["from_board"] = int(rate_match.group(1))
+        rate["to_board"] = int(rate_match.group(2))
+        rate["pct"] = float(rate_match.group(3))
+    return rate
 
 
 def ladder_from_tianti(html: str, day: str) -> list[dict]:
     return ladders_from_tianti(html).get(day[5:], [])
 
 
-def top_tiers(rows: list[dict], limit: int = 3) -> list[dict]:
-    ranked = [row for row in rows if isinstance(row.get("board"), int)]
-    ranked.sort(key=lambda row: row["board"], reverse=True)
-    return ranked[:limit]
+def boards_from_two(rows: list[dict]) -> list[dict]:
+    """2 板及以上，从最高有个股的板位列到最低有个股的板位。
+
+    更高处的空行丢掉（多日表格留下的表头）。两端有个股时，中间缺档保留为空板。
+    """
+    by_board: dict[int, list] = {}
+    for row in rows or []:
+        board = row.get("board")
+        if not isinstance(board, int) or board < 2:
+            continue
+        stocks = list(row.get("stocks") or [])
+        prev = by_board.get(board)
+        if prev is None or (not prev and stocks):
+            by_board[board] = stocks
+    occupied = [board for board, stocks in by_board.items() if stocks]
+    if not occupied:
+        return []
+    high, low = max(occupied), min(occupied)
+    return [{"board": board, "stocks": by_board.get(board, [])} for board in range(high, low - 1, -1)]
 
 
 def top_themes(review: dict, limit: int = 3) -> list[dict]:
@@ -767,6 +808,559 @@ def leader_section(
     return lines
 
 
+UP_PHASES = {"修复期", "升温期"}
+DOWN_PHASES = {"高潮期", "降温期"}
+VOTE_SCORE = {
+    "守住": 1,
+    "收缩": 1,
+    "起板向上": 1,
+    "未守住": -1,
+    "炸板": -1,
+    "走弱": -1,
+    "扩张": -1,
+    "起板向下": -1,
+    "高位向下": -1,
+}
+
+
+def _phase_key(phase: str) -> str:
+    text = str(phase or "").strip()
+    if text in {"修复", "升温", "高潮", "降温", "退潮", "冰点"}:
+        return text + "期"
+    return text
+
+
+def _token_vote(token: str) -> int:
+    word = str(token or "").strip().split("（")[0].strip()
+    return VOTE_SCORE.get(word, 0)
+
+
+def _pct_direction(today: float | None, prev: float | None) -> str:
+    if today is None or prev is None:
+        return "缺失"
+    if today > prev:
+        return "向上"
+    if today < prev:
+        return "向下"
+    return "持平"
+
+
+def _stock_key(stock: dict) -> str:
+    code = str(stock.get("code") or "").strip()
+    if code:
+        return code
+    return str(stock.get("name") or "").strip()
+
+
+def promotion_levels(today_rows: list[dict], prev_rows: list[dict]) -> list[dict]:
+    """按天梯行头的 N进N+1 口径列出晋级与未晋级。"""
+    today_by = {row.get("board"): row for row in today_rows or []}
+    prev_by = {row.get("board"): row for row in prev_rows or []}
+    levels = []
+    for board, row in sorted(today_by.items(), reverse=True):
+        if not isinstance(board, int):
+            continue
+        rate = row.get("rate") or {}
+        if "pct" not in rate:
+            continue
+        src = rate.get("from_board")
+        promoted = list(row.get("stocks") or [])
+        promoted_keys = {_stock_key(stock) for stock in promoted}
+        failed = []
+        for stock in (prev_by.get(src) or {}).get("stocks") or []:
+            if _stock_key(stock) not in promoted_keys:
+                failed.append(stock)
+        prev_rate = (prev_by.get(board) or {}).get("rate") or {}
+        prev_pct = prev_rate.get("pct") if prev_rate.get("from_board") == src else None
+        levels.append(
+            {
+                "from_board": src,
+                "to_board": board,
+                "pct": rate.get("pct"),
+                "prev_pct": prev_pct,
+                "direction": _pct_direction(rate.get("pct"), prev_pct),
+                "promoted": promoted,
+                "failed": failed,
+            }
+        )
+    levels.sort(key=lambda item: item["from_board"] or 0)
+    return levels
+
+
+def promotion_vote(levels: list[dict]) -> str:
+    """起板段看 1进2、2进3，高位段看 3进4 及以上里最高的一档。"""
+    if not levels:
+        return "缺失"
+    low = [item["direction"] for item in levels if item["from_board"] in (1, 2)]
+    high = [item for item in levels if isinstance(item["from_board"], int) and item["from_board"] >= 3]
+    high_dir = ""
+    known_high = [item for item in high if item["direction"] in ("向上", "向下", "持平")]
+    if known_high:
+        high_dir = max(known_high, key=lambda item: item["from_board"])["direction"]
+    low_up = "向上" in low and "向下" not in low
+    low_down = "向下" in low
+    if high_dir == "向下" and low_up:
+        return "分裂"
+    if high_dir == "向下":
+        return "高位向下"
+    if low_up:
+        return "起板向上"
+    if low_down:
+        return "起板向下"
+    if high_dir == "向上":
+        return "起板向上"
+    if any(item["direction"] == "持平" for item in levels):
+        return "持平"
+    return "缺失"
+
+
+def review_page_blocked(html: str) -> bool:
+    if not html or not html.strip():
+        return True
+    return "FP_GATE" in html or "正在打开" in html or "浏览器校验" in html
+
+
+def parse_zhaban(html: str) -> list[dict]:
+    """从当日复盘页截取炸板卡片。校验页或没有炸板段时返回空列表。"""
+    if review_page_blocked(html) or "炸板" not in html:
+        return []
+    start = html.find("炸板")
+    rest = html[start:]
+    end = len(rest)
+    for marker in ("龙虎榜", "题材复盘", "热点题材", "连板天梯", "<footer"):
+        pos = rest.find(marker, 2)
+        if 0 < pos < end:
+            end = pos
+    section = rest[:end]
+    chunks = re.split(r'(?=<a\b[^>]*href="/gu/\d{6}\.html")', section)
+    if len(chunks) <= 1:
+        chunks = re.split(r'(?=<div\b[^>]*data-c="\d{6}")', section)
+    stocks = []
+    seen = set()
+    for chunk in chunks:
+        parsed = _zhaban_chunk(chunk)
+        if not parsed:
+            continue
+        key = parsed.get("code") or parsed["name"]
+        if key in seen:
+            continue
+        seen.add(key)
+        stocks.append(parsed)
+    if stocks:
+        return stocks
+    plain = unescape(re.sub(r"<[^>]+>", " ", section))
+    plain = re.sub(r"\s+", " ", plain)
+    for match in re.finditer(
+        r"([\u4e00-\u9fffA-Za-zＡ-Ｚ]{2,8})\s+(\d{2}:\d{2})封\s*·\s*[昨炸](\d+)",
+        plain,
+    ):
+        name = match.group(1)
+        if "炸" in name or "板" in name:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        stocks.append(
+            {
+                "name": name,
+                "code": "",
+                "time": match.group(2),
+                "prev_board": int(match.group(3)),
+                "theme": "",
+            }
+        )
+    return stocks
+
+
+def _zhaban_chunk(chunk: str) -> dict | None:
+    code_match = re.search(r'/gu/(\d{6})\.html|data-c="(\d{6})"', chunk)
+    text = unescape(re.sub(r"<[^>]+>", " ", chunk))
+    text = re.sub(r"\s+", " ", text).strip()
+    time_match = re.search(r"(\d{2}:\d{2})\s*封", text)
+    prev_match = re.search(r"[昨炸]\s*(\d+)", text)
+    if not time_match and not prev_match:
+        return None
+    name = ""
+    name_attr = re.search(r'data-nm="([^"]+)"', chunk)
+    if name_attr:
+        name = unescape(name_attr.group(1)).strip()
+    if not name:
+        name_match = re.search(r"([\u4e00-\u9fffA-Za-zＡ-Ｚ]{2,8})", text)
+        name = name_match.group(1) if name_match else ""
+    if not name or "炸" in name or name.startswith("昨"):
+        return None
+    theme_match = re.search(r'class="r"[^>]*>([^<]+)', chunk)
+    return {
+        "name": name,
+        "code": (code_match.group(1) or code_match.group(2)) if code_match else "",
+        "time": time_match.group(1) if time_match else "",
+        "prev_board": int(prev_match.group(1)) if prev_match else None,
+        "theme": unescape(theme_match.group(1)).strip() if theme_match else "",
+    }
+
+
+def theme_hit(theme: str, wanted: str) -> bool:
+    theme = str(theme or "").strip()
+    wanted = str(wanted or "").strip()
+    if len(theme) < 2 or len(wanted) < 2:
+        return False
+    return theme == wanted or theme in wanted or wanted in theme
+
+
+def _theme_indexes(rows: list[dict]) -> tuple[dict, dict]:
+    by_code: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    for row in rows or []:
+        for stock in row.get("stocks") or []:
+            theme = str(stock.get("theme") or "").strip()
+            if not theme:
+                continue
+            code = str(stock.get("code") or "").strip()
+            name = str(stock.get("name") or "").strip()
+            if code:
+                by_code[code] = theme
+            if name:
+                by_name[name] = theme
+    return by_code, by_name
+
+
+def _lookup_theme(item: dict, indexes: list[tuple[dict, dict]]) -> str:
+    theme = str(item.get("theme") or "").strip()
+    if theme:
+        return theme
+    code = str(item.get("code") or "").strip()
+    name = str(item.get("name") or "").strip()
+    for by_code, by_name in indexes:
+        if code and by_code.get(code):
+            return by_code[code]
+        if name and by_name.get(name):
+            return by_name[name]
+    return ""
+
+
+def follower_themes(leader: dict | None, themes: list[dict]) -> list[str]:
+    names = []
+    leader_theme = str((leader or {}).get("theme") or "").strip()
+    if leader_theme:
+        names.append(leader_theme)
+    if themes:
+        top = str((themes[0] or {}).get("name") or "").strip()
+        if top and top not in names:
+            names.append(top)
+    return names
+
+
+def filter_follower_zhaban(stocks: list[dict], themes: list[str]) -> list[dict]:
+    """天梯题材或东方财富行业与跟风题材同一行业即算跟风。"""
+    picked = []
+    for item in stocks or []:
+        labels = [item.get("theme") or "", item.get("industry") or ""]
+        if any(theme_hit(label, theme) for label in labels for theme in themes):
+            picked.append(item)
+    return picked
+
+
+def zhaban_vote(today_count: int | None, prev_count: int | None) -> str:
+    if today_count is None or prev_count is None:
+        return "缺失"
+    if today_count < prev_count:
+        return "收缩"
+    if today_count > prev_count:
+        return "扩张"
+    return "持平"
+
+
+def space_leader_fate(leader: dict | None, today_rows: list[dict], zhaban: list[dict]) -> tuple[str, str]:
+    """第一票收盘只看昨日空间龙：晋级为守住，在炸板名单里为炸板，否则未守住。"""
+    if not leader or not _leader_name(leader):
+        return "缺失", "未取到昨日空间龙"
+    name = _leader_name(leader)
+    code = str(leader.get("code") or "").strip()
+    board = leader.get("board")
+    for item in zhaban or []:
+        same = (code and item.get("code") == code) or item.get("name") == name
+        if same:
+            return "炸板", f"昨日{board}板，今日炸板"
+    for row in today_rows or []:
+        height = row.get("board")
+        if not isinstance(height, int) or not isinstance(board, int) or height <= board:
+            continue
+        for stock in row.get("stocks") or []:
+            same = (code and stock.get("code") == code) or stock.get("name") == name
+            if same:
+                return "守住", f"昨日{board}板，今日{height}板"
+    board_text = board if isinstance(board, int) else "—"
+    return "未守住", f"昨日{board_text}板，今日未晋级"
+
+
+def seam_conclusion(phase: str, tokens: list[str]) -> str:
+    if any(str(token).startswith("分裂") for token in tokens):
+        return "信号分裂"
+    votes = [_token_vote(token) for token in tokens]
+    known = [vote for vote in votes if vote]
+    if len(known) < 2:
+        return "观察"
+    if any(vote > 0 for vote in known) and any(vote < 0 for vote in known):
+        return "信号分裂"
+    phase_key = _phase_key(phase)
+    if known[0] > 0 and phase_key in UP_PHASES:
+        return "分歧转一致"
+    if known[0] < 0 and phase_key in DOWN_PHASES:
+        return "一致转分歧"
+    return "观察"
+
+
+def _fmt_names(stocks: list[dict]) -> str:
+    if not stocks:
+        return "无"
+    return "、".join(stock_label(stock) for stock in stocks)
+
+
+def _fmt_pct(value) -> str:
+    if value is None:
+        return "—"
+    number = float(value)
+    text = f"{number:.0f}%" if number == int(number) else f"{number:.1f}%"
+    return text
+
+
+def render_promotion_section(levels: list[dict]) -> list[str]:
+    lines = ["## 晋级名单", ""]
+    if not levels:
+        lines.extend(["未取到天梯晋级率。", ""])
+        return lines
+    lines.extend(["晋级率取自连板天梯行头，与当日复盘页同口径。", ""])
+    for level in levels:
+        src = level["from_board"]
+        dst = level["to_board"]
+        prev = f"前一交易日 {_fmt_pct(level['prev_pct'])}，" if level["prev_pct"] is not None else ""
+        lines.append(f"{src}进{dst} {_fmt_pct(level['pct'])}，{prev}{level['direction']}。")
+        lines.append("")
+        lines.append(f"### {src}进{dst} 晋级（{len(level['promoted'])}只）")
+        lines.append("")
+        if level["promoted"]:
+            for stock in level["promoted"]:
+                lines.append(f"- {stock_label(stock)}")
+        else:
+            lines.append("- 无")
+        lines.append("")
+        lines.append(f"### {src}进{dst} 未晋级（{len(level['failed'])}只）")
+        lines.append("")
+        if level["failed"]:
+            for stock in level["failed"]:
+                lines.append(f"- {stock_label(stock)}")
+        else:
+            lines.append("- 无")
+        lines.append("")
+    return lines
+
+
+def render_zhaban_section(
+    known: bool,
+    stocks: list[dict],
+    follower: list[dict],
+    themes: list[str],
+    kpi_count,
+    prev_known: bool,
+    prev_follower_count: int | None,
+    vote: str,
+) -> list[str]:
+    lines = ["## 炸板名单", ""]
+    theme_text = "、".join(themes) if themes else "未取到"
+    if not known:
+        count = kpi_count if kpi_count is not None else "—"
+        lines.append(f"跟风题材：{theme_text}。炸板池没有返回名单，连板网炸板家数为 {count}。")
+        lines.append("")
+        return lines
+    prev_text = str(prev_follower_count) if prev_known and prev_follower_count is not None else "—"
+    pool_note = f"全市场 {len(stocks)} 只"
+    if kpi_count is not None and int(kpi_count) != len(stocks):
+        pool_note += f"，连板网家数 {kpi_count}"
+    lines.append(
+        f"跟风题材：{theme_text}。{pool_note}，跟风 {len(follower)} 只，前一交易日跟风 {prev_text} 只，{vote}。"
+    )
+    lines.append("")
+    follower_keys = {_stock_key(item) for item in follower}
+    others = [item for item in stocks if _stock_key(item) not in follower_keys]
+    lines.extend(_zhaban_group("跟风", follower))
+    if others:
+        lines.extend(_zhaban_group("其余", others))
+    return lines
+
+
+def _zhaban_group(title: str, stocks: list[dict]) -> list[str]:
+    lines = [f"### {title}（{len(stocks)}只）", ""]
+    if not stocks:
+        lines.extend(["- 无", ""])
+        return lines
+    for item in stocks:
+        lines.append(f"- {_format_zhaban(item)}")
+    lines.append("")
+    return lines
+
+
+def _format_zhaban(item: dict) -> str:
+    name = item.get("name") or "—"
+    code = str(item.get("code") or "").strip()
+    head = f"{name} {code}".strip() if code else name
+    bits = []
+    if item.get("time"):
+        bits.append(f"{item['time']}封")
+    blows = item.get("blows")
+    if blows is None:
+        blows = item.get("prev_board")
+    if blows is not None and blows != "":
+        bits.append(f"炸{blows}次")
+    label = str(item.get("theme") or item.get("industry") or "").strip()
+    body = " · ".join([head, *bits]) if bits else head
+    if label:
+        return f"{body}（{label}）"
+    return body
+
+
+def render_seam_section(
+    leader: dict | None,
+    prev_leader: dict | None,
+    phase: str,
+    themes: list[str],
+    fate: str,
+    fate_detail: str,
+    vote2: str,
+    vote3: str,
+) -> list[str]:
+    phase_text = _phase_key(phase) or "缺失"
+    conclusion = seam_conclusion(phase_text, [fate, vote2, vote3])
+    leader_text = _format_board_leader(leader)
+    board = (leader or {}).get("board")
+    if leader_text != "未取到" and isinstance(board, int):
+        leader_text = f"{leader_text}，{board}板"
+    code = str((prev_leader or {}).get("code") or "").strip()
+    inspected = _leader_name(prev_leader) or "未取到"
+    if code:
+        inspected = f"{inspected}（{code}）"
+    theme_text = "、".join(themes) if themes else "未取到"
+    return [
+        "## 分歧转一致",
+        "",
+        "空间龙只取最高板第一只。收盘第一票看昨日空间龙是否晋级；次日开盘只按这一只的高开或低开改第一票。",
+        "",
+        f"- 空间龙：{leader_text}",
+        f"- 跟风题材：{theme_text}",
+        f"- 阶段：{phase_text}",
+        f"- 检验对象：{inspected}",
+        f"- 收盘：{fate}（{fate_detail}）",
+        f"- 第一票：{fate}",
+        f"- 第二票：{vote2}",
+        f"- 第三票：{vote3}",
+        f"- 结论：{conclusion}",
+        "- 次日开盘：待定",
+        "",
+    ]
+
+
+def _seam_line(text: str, label: str) -> str:
+    match = re.search(rf"^- {label}：(.+)$", text, re.M)
+    return match.group(1).strip() if match else ""
+
+
+def apply_open_revision(text: str, gap: str) -> str:
+    """次日开盘只改第一票，并按三票重写结论。平开不改第一票。"""
+    if "- 次日开盘：待定" not in text:
+        return text
+    if gap not in ("高开", "低开", "平开"):
+        return text
+    if gap == "平开":
+        return text.replace("- 次日开盘：待定", "- 次日开盘：平开，第一票不改", 1)
+    new_vote = "守住" if gap == "高开" else "走弱"
+    old_vote = _seam_line(text, "第一票")
+    verb = "维持" if old_vote == new_vote else "改为"
+    text = re.sub(r"^- 第一票：.+$", f"- 第一票：{new_vote}", text, count=1, flags=re.M)
+    conclusion = seam_conclusion(
+        _seam_line(text, "阶段"),
+        [new_vote, _seam_line(text, "第二票"), _seam_line(text, "第三票")],
+    )
+    text = re.sub(r"^- 结论：.+$", f"- 结论：{conclusion}", text, count=1, flags=re.M)
+    return text.replace("- 次日开盘：待定", f"- 次日开盘：{gap}，第一票{verb}{new_vote}", 1)
+
+
+def stock_secid(code: str) -> str:
+    text = str(code or "").strip()
+    if text.startswith("6"):
+        return "1." + text
+    if text.startswith("9") and not text.startswith("92"):
+        return "1." + text
+    return "0." + text
+
+
+def fetch_open_gap(code: str, day: str) -> str | None:
+    """当日开盘相对前收：高开、低开或平开。"""
+    end = day.replace("-", "")
+    query = urllib.parse.urlencode(
+        {
+            "secid": stock_secid(code),
+            "klt": "101",
+            "fqt": "1",
+            "end": end,
+            "lmt": "5",
+            "fields1": "f1",
+            "fields2": "f51,f52,f53",
+        }
+    )
+    body, _ctype = _request(
+        f"{KLINE_URL}?{query}",
+        None,
+        {"User-Agent": BROWSER_UA, "Accept": "application/json", "Referer": "https://quote.eastmoney.com/"},
+        timeout=20,
+    )
+    data = json.loads(body)
+    bars = []
+    for item in ((data.get("data") or {}).get("klines") or []):
+        parts = str(item).split(",")
+        if len(parts) < 3:
+            continue
+        bars.append((parts[0], float(parts[1]), float(parts[2])))
+    for index, (bar_day, open_price, _close) in enumerate(bars):
+        if bar_day != day or index == 0:
+            continue
+        prev_close = bars[index - 1][2]
+        if open_price > prev_close:
+            return "高开"
+        if open_price < prev_close:
+            return "低开"
+        return "平开"
+    return None
+
+
+def revise_previous_open(prev_path: Path, open_day: str) -> None:
+    if not prev_path.exists():
+        return
+    text = prev_path.read_text(encoding="utf-8")
+    if "- 次日开盘：待定" not in text:
+        return
+    code_match = re.search(r"^- 检验对象：.+（(\d{6})）\s*$", text, re.M)
+    if not code_match:
+        log(f"{prev_path.name} 缺少检验对象代码，次日开盘不改第一票")
+        return
+    gap = fetch_open_gap(code_match.group(1), open_day)
+    if gap is None:
+        log(f"{prev_path.name} 未取到 {open_day} 开盘，第一票保持待定")
+        return
+    revised = apply_open_revision(text, gap)
+    if revised == text:
+        return
+    prev_path.write_text(revised, encoding="utf-8", newline="\n")
+    log(f"{prev_path.name} 次日开盘{gap}，已改第一票")
+
+
+def _with_theme(stocks: list[dict], indexes: list[tuple[dict, dict]]) -> list[dict]:
+    themed = []
+    for item in stocks or []:
+        copied = dict(item)
+        copied["theme"] = _lookup_theme(copied, indexes)
+        themed.append(copied)
+    return themed
+
+
 def change_alert(today_up, prev_up, prev_day: str) -> str | None:
     if today_up is None or prev_up is None:
         return None
@@ -801,6 +1395,7 @@ def render_report(
     logics: list[dict] | None = None,
     today_ladder: list[dict] | None = None,
     prev_ladder: list[dict] | None = None,
+    seam_sections: list[str] | None = None,
 ) -> str:
     kpi = review.get("kpi") or {}
     prev_kpi = (prev_review or {}).get("kpi") or {}
@@ -910,10 +1505,12 @@ def render_report(
                 )
             )
         lines.append("")
+    if seam_sections:
+        lines.extend(seam_sections)
     page = review.get("page") or f"https://lianban.net/days/{day}.html"
     sources = ["连板网 lianban.net"]
     if indices or market.get("turnover") is not None or any((item.get("title") or "") for item in (logics or [])):
-        sources.append("指数、成交额与题材新闻：东方财富")
+        sources.append("指数、成交额、题材新闻与炸板池：东方财富")
     lines.extend(
         [
             f"原文：{page}",
@@ -961,13 +1558,11 @@ def build(day: str, dates: list[str], token: str) -> Path:
     rows = ladder_from_review(review)
     prev_rows = ladder_from_review(prev_review) if prev_review else []
     tianti_map: dict[str, list[dict]] = {}
-    need_tianti = not _rows_have_stocks(rows) or (bool(prev_day) and not _rows_have_stocks(prev_rows))
-    if need_tianti or not _leaders_have_codes(rows) or (prev_day and not _leaders_have_codes(prev_rows)):
-        try:
-            tianti_map = ladders_from_tianti(fetch_html(TIANTI_URL))
-        except Exception as exc:
-            log(f"天梯页获取失败：{exc}")
-            tianti_map = {}
+    try:
+        tianti_map = ladders_from_tianti(fetch_html(TIANTI_URL))
+    except Exception as exc:
+        log(f"天梯页获取失败：{exc}")
+        tianti_map = {}
     if not _rows_have_stocks(rows):
         rows = tianti_map.get(day[5:], [])
         if rows:
@@ -977,13 +1572,17 @@ def build(day: str, dates: list[str], token: str) -> Path:
     leader_today = rows
     leader_prev = prev_rows
     today_tianti = tianti_map.get(day[5:], [])
+    prev_tianti: list[dict] = []
     if _rows_have_stocks(today_tianti) and not _leaders_have_codes(rows):
         leader_today = today_tianti
     if prev_day:
         prev_tianti = tianti_map.get(prev_day[5:], [])
         if _rows_have_stocks(prev_tianti) and not _leaders_have_codes(prev_rows):
             leader_prev = prev_tianti
-    tiers = top_tiers(rows, 3)
+    today_board = today_tianti if _rows_have_stocks(today_tianti) else leader_today
+    prev_board = prev_tianti if _rows_have_stocks(prev_tianti) else leader_prev
+    seam_sections = _seam_sections(day, review, prev_review, prev_day, today_board, prev_board)
+    tiers = boards_from_two(rows)
     market = {"indices": [], "turnover": None}
     logics: list[dict] = []
     try:
@@ -1008,11 +1607,197 @@ def build(day: str, dates: list[str], token: str) -> Path:
         logics,
         leader_today,
         leader_prev,
+        seam_sections,
     )
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"{day}.md"
     path.write_text(text, encoding="utf-8", newline="\n")
+    if prev_day:
+        try:
+            revise_previous_open(REPORTS / f"{prev_day}.md", day)
+        except Exception as exc:
+            log(f"次日开盘修订失败：{exc}")
     return path
+
+
+def _fmt_seal_time(value) -> str:
+    digits = re.sub(r"\D", "", str(value or ""))
+    if not digits:
+        return ""
+    digits = digits.zfill(6)
+    return f"{digits[:2]}:{digits[2:4]}"
+
+
+def zhaban_from_pool(payload: dict) -> tuple[list[dict], int | None]:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        data = payload if isinstance(payload, dict) else {}
+    pool = data.get("pool") or []
+    total = data.get("tc")
+    stocks = []
+    for item in pool:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("n") or "").strip()
+        code = str(item.get("c") or "").strip()
+        if not name and not code:
+            continue
+        blows = item.get("zbc")
+        stocks.append(
+            {
+                "name": name,
+                "code": code,
+                "time": _fmt_seal_time(item.get("fbt")),
+                "blows": int(blows) if blows is not None and str(blows) != "" else None,
+                "industry": str(item.get("hybk") or "").strip(),
+                "theme": "",
+            }
+        )
+    return stocks, int(total) if total is not None else None
+
+
+def fetch_zhaban_pool(day: str) -> list[dict]:
+    """东方财富炸板池。请求失败时抛错，由调用方记为名单缺失。"""
+    date = day.replace("-", "")
+    stocks: list[dict] = []
+    total = None
+    for page in range(5):
+        query = urllib.parse.urlencode(
+            {
+                "ut": "7eea3edcaed734bea9cbfc24409ed989",
+                "dpt": "wz.ztzt",
+                "Pageindex": page,
+                "pagesize": 100,
+                "sort": "fbt:asc",
+                "date": date,
+            }
+        )
+        body, _ctype = _request(
+            f"{ZB_POOL_URL}?{query}",
+            None,
+            {
+                "User-Agent": BROWSER_UA,
+                "Accept": "application/json",
+                "Referer": "https://quote.eastmoney.com/",
+            },
+            timeout=20,
+        )
+        page_stocks, page_total = zhaban_from_pool(json.loads(body))
+        if total is None:
+            total = page_total
+        stocks.extend(page_stocks)
+        if not page_stocks or (total is not None and len(stocks) >= total):
+            break
+    return fill_industry_names(stocks)
+
+
+def apply_industry_names(stocks: list[dict], names: dict[str, str]) -> list[dict]:
+    """用行情接口的行业全称替换炸板池里被截断的 hybk。"""
+    for item in stocks:
+        full = str(names.get(str(item.get("code") or "").strip()) or "").strip()
+        if full and full != "-":
+            item["industry"] = full
+    return stocks
+
+
+def fetch_industry_names(codes: list[str]) -> dict[str, str]:
+    secids = [stock_secid(str(code).strip()) for code in codes if str(code or "").strip()]
+    found: dict[str, str] = {}
+    headers = {
+        "User-Agent": BROWSER_UA,
+        "Accept": "application/json",
+        "Referer": "https://quote.eastmoney.com/",
+    }
+    for start in range(0, len(secids), 50):
+        query = urllib.parse.urlencode(
+            {
+                "fltt": 2,
+                "np": 1,
+                "fields": "f12,f100",
+                "secids": ",".join(secids[start : start + 50]),
+            }
+        )
+        body, _ctype = _request(f"{INDUSTRY_URL}?{query}", None, headers, timeout=20)
+        rows = ((json.loads(body).get("data") or {}).get("diff")) or []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            code = str(row.get("f12") or "").strip()
+            name = str(row.get("f100") or "").strip()
+            if code and name and name != "-":
+                found[code] = name
+    return found
+
+
+def fill_industry_names(stocks: list[dict]) -> list[dict]:
+    if not stocks:
+        return stocks
+    try:
+        names = fetch_industry_names([item.get("code") for item in stocks])
+    except Exception as exc:
+        log(f"行业全称获取失败：{exc}")
+        return stocks
+    return apply_industry_names(stocks, names)
+
+
+def _seam_sections(
+    day: str,
+    review: dict,
+    prev_review: dict | None,
+    prev_day: str | None,
+    today_board: list[dict],
+    prev_board: list[dict],
+) -> list[str]:
+    leader = first_board_leader(today_board)
+    prev_leader = first_board_leader(prev_board) if prev_day else None
+    themes = follower_themes(leader, top_themes(review, 1))
+    levels = promotion_levels(today_board, prev_board if prev_day else [])
+    vote3 = promotion_vote(levels)
+    try:
+        today_zhaban = fetch_zhaban_pool(day)
+        today_known = True
+    except Exception as exc:
+        log(f"炸板池获取失败：{exc}")
+        today_zhaban = []
+        today_known = False
+    if prev_day:
+        try:
+            prev_zhaban = fetch_zhaban_pool(prev_day)
+            prev_known = True
+        except Exception as exc:
+            log(f"上一交易日炸板池获取失败：{exc}")
+            prev_zhaban = []
+            prev_known = False
+    else:
+        prev_zhaban = []
+        prev_known = False
+    kpi_count = (review.get("kpi") or {}).get("zhaban")
+    indexes = [_theme_indexes(prev_board), _theme_indexes(today_board)]
+    today_zhaban = _with_theme(today_zhaban, indexes)
+    prev_zhaban = _with_theme(prev_zhaban, indexes)
+    follower = filter_follower_zhaban(today_zhaban, themes) if today_known else []
+    prev_follower = len(filter_follower_zhaban(prev_zhaban, themes)) if prev_known else None
+    vote2 = zhaban_vote(len(follower) if today_known else None, prev_follower)
+    fate, detail = space_leader_fate(prev_leader, today_board, today_zhaban if today_known else [])
+    phase = str((review.get("kpi") or {}).get("emotion_phase") or "")
+    sections: list[str] = []
+    sections.extend(
+        render_zhaban_section(
+            today_known,
+            today_zhaban,
+            follower,
+            themes,
+            kpi_count,
+            prev_known,
+            prev_follower,
+            vote2,
+        )
+    )
+    sections.extend(render_promotion_section(levels))
+    sections.extend(
+        render_seam_section(leader, prev_leader, phase, themes, fate, detail, vote2, vote3)
+    )
+    return sections
 
 
 def self_test() -> None:
@@ -1038,8 +1823,19 @@ def self_test() -> None:
     """
     columns = ladders_from_tianti(html)
     rows = columns["11-05"]
-    tiers = top_tiers(rows, 3)
+    tiers = boards_from_two(rows)
     assert [row["board"] for row in tiers] == [4, 3, 2], tiers
+    gapped = [
+        {"board": 7, "stocks": []},
+        {"board": 6, "stocks": [{"name": "甲"}]},
+        {"board": 4, "stocks": []},
+        {"board": 2, "stocks": [{"name": "乙"}]},
+        {"board": 1, "stocks": [{"name": "丙"}]},
+    ]
+    gapped_tiers = boards_from_two(gapped)
+    assert [row["board"] for row in gapped_tiers] == [6, 5, 4, 3, 2], gapped_tiers
+    assert gapped_tiers[1]["stocks"] == []
+    assert gapped_tiers[0]["stocks"][0]["name"] == "甲"
     assert [stock["name"] for stock in tiers[0]["stocks"]] == ["闽发铝业", "浙文影业"]
     assert tiers[0]["stocks"][0]["code"] == "002578"
     assert tiers[0]["stocks"][0]["theme"] == "光伏支架"
@@ -1142,6 +1938,130 @@ def self_test() -> None:
     assert "1. 光伏 — 光储产业链景气度边际回暖｜[董事长透露明年储能订单翻倍](https://finance.eastmoney.com/a/1.html)" in report
     assert "2. AI应用 — AI应用商业化｜[国产大模型商业化加速](https://finance.eastmoney.com/a/2.html)" in report
     assert "东方财富" in report
+    assert "## 分歧转一致" not in report
+    rate_html = """
+    <table><thead><tr><th>板位</th><th><b>11-11</b></th><th><b>11-10</b></th></tr></thead>
+    <tbody>
+      <tr data-h="4"><th>4板</th>
+        <td><div class="hd">共1只 <span class="rt">3进4 50%</span></div>
+          <div class="tti-s" data-c="603366"><a data-nm="日出东方">日出东方</a><div class="r">光伏</div></div>
+        </td>
+        <td><div class="hd">共1只 <span class="rt">3进4 100%</span></div>
+          <div class="tti-s" data-c="002578"><a data-nm="闽发铝业">闽发铝业</a><div class="r">光伏支架</div></div>
+        </td>
+      </tr>
+      <tr data-h="2"><th>2板</th>
+        <td><div class="hd">共1只 <span class="rt">1进2 20%</span></div>
+          <div class="tti-s" data-c="600000"><a data-nm="甲">甲</a><div class="r">机器人概念</div></div>
+        </td>
+        <td><div class="hd">共1只 <span class="rt">1进2 10%</span></div>
+          <div class="tti-s" data-c="600001"><a data-nm="乙">乙</a><div class="r">机器人概念</div></div>
+        </td>
+      </tr>
+      <tr data-h="1"><th>1板</th>
+        <td><div class="hd">共2只</div></td>
+        <td><div class="hd">共2只</div>
+          <div class="tti-s" data-c="600000"><a data-nm="甲">甲</a><div class="r">机器人概念</div></div>
+          <div class="tti-s" data-c="600002"><a data-nm="丙">丙</a><div class="r">光伏</div></div>
+        </td>
+      </tr>
+    </tbody></table>
+    """
+    rated = ladders_from_tianti(rate_html)
+    levels = promotion_levels(rated["11-11"], rated["11-10"])
+    assert [item["from_board"] for item in levels] == [1, 3], levels
+    assert levels[0]["direction"] == "向上"
+    assert levels[0]["failed"][0]["name"] == "丙"
+    assert promotion_vote(levels) == "分裂"
+    low_only = [item for item in levels if item["from_board"] < 3]
+    for item in low_only:
+        item["direction"] = "向下"
+    assert promotion_vote(low_only) == "起板向下"
+    assert seam_conclusion("升温期", ["守住", "收缩", "起板向上"]) == "分歧转一致"
+    assert seam_conclusion("高潮期", ["未守住", "扩张", "起板向下"]) == "一致转分歧"
+    assert seam_conclusion("高潮期", ["守住", "收缩", "起板向下"]) == "信号分裂"
+    assert seam_conclusion("退潮期", ["未守住", "扩张", "起板向下"]) == "观察"
+    zhaban_html = """
+    <div>炸板 2只 · 封板后掉队</div>
+    <a href="/gu/002442.html" data-nm="保利联合">保利联合</a> 09:25封 · 昨1 <div class="r">光伏</div>
+    <a href="/gu/600715.html" data-nm="文投控股">文投控股</a> 09:40封 · 昨2 <div class="r">AI视频</div>
+    <a href="/gu/603017.html" data-nm="清源股份">清源股份</a> 09:30封 · 炸3
+    龙虎榜
+    """
+    blown = parse_zhaban(zhaban_html)
+    assert [item["name"] for item in blown] == ["保利联合", "文投控股", "清源股份"], blown
+    assert blown[0]["prev_board"] == 1 and blown[0]["theme"] == "光伏"
+    assert blown[2]["prev_board"] == 3
+    follow = filter_follower_zhaban(blown, ["光伏", "机器人概念"])
+    assert [item["name"] for item in follow] == ["保利联合"]
+    assert parse_zhaban("<script>window.FP_GATE=1</script>正在打开") == []
+    pool_rows, pool_total = zhaban_from_pool(
+        {
+            "data": {
+                "tc": 1,
+                "pool": [
+                    {
+                        "c": "603628",
+                        "n": "清源股份",
+                        "fbt": 93055,
+                        "zbc": 3,
+                        "hybk": "光伏设备",
+                    }
+                ],
+            }
+        }
+    )
+    assert pool_total == 1
+    assert pool_rows[0]["code"] == "603628"
+    assert pool_rows[0]["time"] == "09:30"
+    assert pool_rows[0]["blows"] == 3
+    themed = _with_theme(pool_rows, [({"603628": "光伏"}, {})])
+    assert themed[0]["theme"] == "光伏"
+    assert [item["name"] for item in filter_follower_zhaban(pool_rows, ["光伏"])] == ["清源股份"]
+    assert [item["name"] for item in filter_follower_zhaban(themed, ["光伏"])] == ["清源股份"]
+    assert "炸3次" in _format_zhaban(pool_rows[0])
+    assert _format_zhaban(pool_rows[0]).endswith("（光伏设备）")
+    assert "行业" not in _format_zhaban(pool_rows[0])
+    short_industry = [{"code": "603275", "name": "众辰科技", "time": "09:49", "blows": 2, "industry": "自动化设"}]
+    apply_industry_names(short_industry, {"603275": "自动化设备"})
+    assert short_industry[0]["industry"] == "自动化设备"
+    assert _format_zhaban(short_industry[0]).endswith("（自动化设备）")
+    assert review_page_blocked("<script>window.FP_GATE=1</script>")
+    leader = {"name": "闽发铝业", "code": "002578", "board": 6, "theme": "光伏支架"}
+    held, detail = space_leader_fate(leader, rated["11-11"], [])
+    assert held == "未守住", detail
+    promoted_rows = [
+        {"board": 7, "stocks": [{"name": "闽发铝业", "code": "002578", "theme": "光伏支架"}]}
+    ]
+    assert space_leader_fate(leader, promoted_rows, [])[0] == "守住"
+    assert space_leader_fate(leader, promoted_rows, [{"name": "闽发铝业", "code": "002578"}])[0] == "炸板"
+    themes = follower_themes(
+        {"name": "日出东方", "theme": "光伏", "board": 4},
+        [{"name": "机器人概念", "limit_up": 22}, {"name": "光通信", "limit_up": 13}],
+    )
+    assert themes == ["光伏", "机器人概念"]
+    sample = "\n".join(
+        [
+            "- 阶段：高潮期",
+            "- 第一票：未守住",
+            "- 第二票：扩张",
+            "- 第三票：起板向下",
+            "- 结论：一致转分歧",
+            "- 次日开盘：待定",
+        ]
+    )
+    revised = apply_open_revision(sample, "高开")
+    assert "- 第一票：守住" in revised
+    assert "- 结论：信号分裂" in revised
+    assert "次日开盘：高开，第一票改为守住" in revised
+    kept = apply_open_revision(sample, "低开")
+    assert "- 第一票：走弱" in kept
+    assert "- 结论：一致转分歧" in kept
+    assert "第一票改为走弱" in kept
+    assert apply_open_revision(sample, "平开") == sample.replace("待定", "平开，第一票不改")
+    assert stock_secid("600000") == "1.600000"
+    assert stock_secid("002442") == "0.002442"
+    assert stock_secid("920045") == "0.920045"
     print("self-test ok")
 
 
