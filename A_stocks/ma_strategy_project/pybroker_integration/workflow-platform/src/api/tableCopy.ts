@@ -41,20 +41,14 @@ function cellToStockCode6(cell: unknown, headerNorm: string): string {
   return raw
 }
 
-/** 价差保留元，括号里是占收盘价的百分比，例如 0.73 (0.65%)。 */
+/** 价差只保留元。旧数据里的「占收盘价百分比」括号去掉，例如 0.73 (0.65%) → 0.73。 */
 export function formatHighLowDiff(cell: unknown): string {
   const raw = String(cell ?? '').trim()
   if (!raw) return ''
-  const annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\(([+-]?\d+(?:\.\d+)?)%\)$/)
-  if (annotated) {
-    const yuan = Number(annotated[1])
-    const pct = Number(annotated[2])
-    if (Number.isFinite(yuan) && Number.isFinite(pct)) {
-      return `${yuan.toFixed(2)} (${pct.toFixed(2)}%)`
-    }
-  }
-  const n = parseFloat(raw)
-  if (!Number.isNaN(n)) return n.toFixed(2)
+  const annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\([+-]?\d+(?:\.\d+)?%\)$/)
+  const source = annotated ? annotated[1] : raw
+  const n = parseFloat(source)
+  if (Number.isFinite(n)) return n.toFixed(2)
   return raw
 }
 

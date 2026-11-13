@@ -151,8 +151,7 @@ def normalize_date_series(s: pd.Series) -> pd.Series:
 
 
 CONDITIONAL_ORDERS_CSV = 'today_conditional_orders.csv'
-CONDITIONAL_ORDER_COLUMNS = ['股票名称', '条件类型', '幅度', '触发价', '实行价', '触发档', '实行档']
-CONDITIONAL_ORDER_PCT = '0.3%'
+CONDITIONAL_ORDER_COLUMNS = ['股票名称', '条件类型', '成交价', '触发价']
 
 
 def _price_cents(value) -> int | None:
@@ -183,79 +182,48 @@ def _price_cents(value) -> int | None:
     return int(q * 100)
 
 
-def _diff_with_close_pct(diff, close) -> str:
-    """价差保留元，并在括号里标出占收盘价的百分比。"""
-    cents = _price_cents(diff)
-    if cents is None:
-        return ''
-    yuan = _cents_text(cents)
-    try:
-        price = float(close)
-    except (TypeError, ValueError):
-        return yuan
-    if price != price or price == 0:
-        return yuan
-    pct = (cents / 100) / price * 100
-    return f'{yuan} ({pct:.2f}%)'
-
-
 def _cents_text(cents: int) -> str:
     sign = '-' if cents < 0 else ''
     amount = abs(cents)
     return f'{sign}{amount // 100}.{amount % 100:02d}'
 
 
-def _plus_half_diff_cents(price_cents: int, diff_cents: int) -> int:
-    """price + d/2，结果四舍五入到分。"""
-    doubled = price_cents * 2 + diff_cents
-    if doubled >= 0:
-        return (doubled + 1) // 2
-    return -((abs(doubled) + 1) // 2)
-
-
 def build_conditional_orders(final: pd.DataFrame) -> pd.DataFrame:
-    """由高低价表生成条件单。high_low_diff 为 0 的股票不生成。
+    """由高低价表生成条件单。每只股票最多 4 行：
 
-    每只股票 5 行，顺序为：
-    反弹买入：触发买二/实行买三，触发买一/实行买二；
-    回落卖出：触发买一+d/2/实行 high，触发 high/实行卖一+d/2，触发卖一+d/2/实行卖三。
-    幅度固定 0.3%，不参与改价。
+    定价条件单1（卖出）：成交价 = 昨日收盘价 + 价差，触发价留空；
+    定价条件单2（卖出）：成交价 = 昨日收盘价 + 预测高价日变动中位数，触发价留空；
+    反弹买入条件单1：触发价 = 买二，反弹 1% 后买入，成交价留空；
+    反弹买入条件单2：触发价 = 买三，反弹 1% 后买入，成交价留空。
+    价格保留到分。某一档所需价格缺失时跳过该行。
     """
     rows: list[dict[str, str]] = []
     for _, row in final.iterrows():
-        diff = _price_cents(row.get('high_low_diff'))
-        if diff is None or diff == 0:
-            continue
         name = str(row.get('stock_name', '')).strip()
         if not name:
             continue
-        high = _price_cents(row.get('today_high'))
-        sell1 = _price_cents(row.get('卖一'))
-        sell3 = _price_cents(row.get('卖三'))
-        buy1 = _price_cents(row.get('买一'))
+        close = _price_cents(row.get('昨日收盘价'))
+        diff = _price_cents(row.get('high_low_diff'))
+        median = _price_cents(row.get('预测高价日变动中位数'))
         buy2 = _price_cents(row.get('买二'))
         buy3 = _price_cents(row.get('买三'))
-        if None in (high, sell1, sell3, buy1, buy2, buy3):
-            continue
-        buy1_half = _plus_half_diff_cents(buy1, diff)
-        sell1_half = _plus_half_diff_cents(sell1, diff)
-        specs = [
-            ('反弹买入', buy2, buy3, '买二', '买三'),
-            ('反弹买入', buy1, buy2, '买一', '买二'),
-            ('回落卖出', buy1_half, high, '买一+d/2', 'high'),
-            ('回落卖出', high, sell1_half, 'high', '卖一+d/2'),
-            ('回落卖出', sell1_half, sell3, '卖一+d/2', '卖三'),
-        ]
-        for kind, trigger, execute, trigger_label, execute_label in specs:
+
+        def append(kind: str, execute: str, trigger: str, stock: str = name) -> None:
             rows.append({
-                '股票名称': name,
+                '股票名称': stock,
                 '条件类型': kind,
-                '幅度': CONDITIONAL_ORDER_PCT,
-                '触发价': _cents_text(trigger),
-                '实行价': _cents_text(execute),
-                '触发档': trigger_label,
-                '实行档': execute_label,
+                '成交价': execute,
+                '触发价': trigger,
             })
+
+        if close is not None and diff is not None:
+            append('定价条件单1', _cents_text(close + diff), '')
+        if close is not None and median is not None:
+            append('定价条件单2', _cents_text(close + median), '')
+        if buy2 is not None:
+            append('反弹买入条件单1', '', _cents_text(buy2))
+        if buy3 is not None:
+            append('反弹买入条件单2', '', _cents_text(buy3))
     return pd.DataFrame(rows, columns=CONDITIONAL_ORDER_COLUMNS)
 
 
@@ -354,24 +322,18 @@ def main():
         axis=1,
     )
     final = final[['卖三', '卖二', '卖一', 'stock_name', *T_LEVEL_COLUMNS[3:]]]
+    final.insert(
+        final.columns.get_loc('stock_name') + 1,
+        '昨日收盘价',
+        pd.to_numeric(merge_df['yesterday_price'], errors='coerce').round(2).reset_index(drop=True),
+    )
     high_low_override = {
         normalize_a_share_symbol(str(s)): (float(h), float(l))
         for s, h, l in zip(merge_df['symbol'], merge_df['today_high'], merge_df['today_low'])
     }
-    orders = build_conditional_orders(final)
-    closes = pd.to_numeric(merge_df['yesterday_price'], errors='coerce').reset_index(drop=True)
-    final['high_low_diff'] = [
-        _diff_with_close_pct(diff, close)
-        for diff, close in zip(final['high_low_diff'].tolist(), closes.tolist())
-    ]
     final_path = os.path.join(script_dir, 'today_high_low_result.csv')
     final.to_csv(final_path, index=False, encoding='utf-8-sig')
     print(f"当日高低价结果已写入: {final_path}")
-    orders_path = os.path.join(script_dir, CONDITIONAL_ORDERS_CSV)
-    orders.to_csv(orders_path, index=False, encoding='utf-8-sig')
-    kept = len(orders) // 5
-    skipped = len(final) - kept
-    print(f"条件单已写入: {orders_path}（{len(orders)} 行，{kept} 只；高低价差为 0 跳过 {skipped} 只）\n")
 
     print("=" * 60)
     print("当日预测高价 / 低价（按股票）")
@@ -475,6 +437,13 @@ def main():
             )
     except Exception as e:
         print(f"生成预测 K 线 JSON 失败: {e}")
+
+    orders = build_conditional_orders(final)
+    orders_path = os.path.join(script_dir, CONDITIONAL_ORDERS_CSV)
+    orders.to_csv(orders_path, index=False, encoding='utf-8-sig')
+    kept = int(orders['股票名称'].nunique()) if not orders.empty else 0
+    priced = int(orders['条件类型'].isin(['定价条件单1', '定价条件单2']).sum()) if not orders.empty else 0
+    print(f"条件单已写入: {orders_path}（{len(orders)} 行，{kept} 只，定价卖出 {priced} 行）\n")
 
 
 if __name__ == '__main__':

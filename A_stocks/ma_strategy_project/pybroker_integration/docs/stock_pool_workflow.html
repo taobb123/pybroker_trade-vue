@@ -1861,15 +1861,9 @@
       function formatHighLowDiff(cell) {
         var raw = String(cell == null ? "" : cell).trim();
         if (!raw) return "";
-        var annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\(([+-]?\d+(?:\.\d+)?)%\)$/);
-        if (annotated) {
-          var yuan = Number(annotated[1]);
-          var pct = Number(annotated[2]);
-          if (isFinite(yuan) && isFinite(pct)) {
-            return yuan.toFixed(2) + " (" + pct.toFixed(2) + "%)";
-          }
-        }
-        var n = parseFloat(raw);
+        var annotated = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*\([+-]?\d+(?:\.\d+)?%\)$/);
+        var source = annotated ? annotated[1] : raw;
+        var n = parseFloat(source);
         if (!isNaN(n)) return n.toFixed(2);
         return raw;
       }

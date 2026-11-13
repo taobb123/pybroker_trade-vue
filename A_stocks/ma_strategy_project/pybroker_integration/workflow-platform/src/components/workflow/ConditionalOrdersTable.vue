@@ -87,10 +87,7 @@ function onDownload() {
       <div class="min-w-0">
         <p class="text-xs font-medium text-foreground">条件单</p>
         <p class="text-[11px] text-muted-foreground">
-          反弹买入、回落卖出；幅度 0.3%。价格保留到分。
-          <template v-if="built.skippedZeroDiff">
-            高低价差为 0 的 {{ built.skippedZeroDiff }} 只未生成。
-          </template>
+          卖出定价单只填成交价：条件单1 为昨收+价差，条件单2 为昨收+预测高价日变动中位数。反弹买入条件单1、2 的触发价为买二、买三，反弹 1% 后买入，不填成交价。价格保留到分。
           <template v-if="truncated">高低价表已截断，条件单只覆盖已加载行。</template>
         </p>
       </div>
@@ -117,11 +114,12 @@ function onDownload() {
       </div>
     </div>
 
-    <p v-if="!built.ready" class="text-xs text-amber-700">高低价表缺少档位列，无法生成条件单。</p>
-    <p v-else-if="!built.orders.length" class="text-xs text-muted-foreground">
-      高低价差为 0，未生成条件单。
+    <p v-if="!built.ready" class="text-xs text-amber-700">高低价表缺少股票名称，无法生成条件单。</p>
+    <p v-else-if="built.missingClose" class="text-xs text-amber-700">
+      高低价表没有「昨日收盘价」，定价条件单未生成。
     </p>
-    <template v-else>
+    <p v-if="built.ready && !built.orders.length" class="text-xs text-muted-foreground">没有可生成的条件单。</p>
+    <template v-if="built.orders.length">
       <p class="font-mono text-[11px] text-muted-foreground">today_conditional_orders.csv</p>
       <p class="text-[11px] text-muted-foreground">
         共 {{ built.orders.length }} 行。可选中表格单元格复制，或使用上方「复制全部」。

@@ -1,35 +1,31 @@
 /**
- * 由当日高低价表推导做 T 条件单。
- * 幅度 0.3% 只作为条件单参数，不参与改价。
- * high_low_diff 为 0 的股票不生成。
+ * 由当日高低价表推导条件单。每只股票最多 4 行，顺序固定：
+ * 定价条件单1（卖出）：成交价 = 昨日收盘价 + 价差，触发价留空（与成交价相同，不单列）；
+ * 定价条件单2（卖出）：成交价 = 昨日收盘价 + 预测高价日变动中位数，触发价留空；
+ * 反弹买入条件单1：触发价 = 买二，反弹 1% 后买入，成交价留空；
+ * 反弹买入条件单2：触发价 = 买三，反弹 1% 后买入，成交价留空。
+ * 价格保留到分。某一档所需价格缺失时跳过该行。
  */
 
-export const CONDITIONAL_ORDER_HEADERS = [
-  '股票名称',
-  '条件类型',
-  '幅度',
-  '触发价',
-  '实行价',
-  '触发档',
-  '实行档',
-] as const
+export const CONDITIONAL_ORDER_HEADERS = ['股票名称', '条件类型', '成交价', '触发价'] as const
 
-export const CONDITIONAL_ORDER_PCT = '0.3%'
+export type ConditionalOrderKind =
+  | '定价条件单1'
+  | '定价条件单2'
+  | '反弹买入条件单1'
+  | '反弹买入条件单2'
 
 export interface ConditionalOrderRow {
   股票名称: string
-  条件类型: '反弹买入' | '回落卖出'
-  幅度: string
+  条件类型: ConditionalOrderKind
+  成交价: string
   触发价: string
-  实行价: string
-  触发档: string
-  实行档: string
 }
 
 export interface ConditionalOrdersBuild {
   ready: boolean
   orders: ConditionalOrderRow[]
-  skippedZeroDiff: number
+  missingClose: boolean
 }
 
 function normHeader(h: unknown): string {
@@ -44,7 +40,7 @@ function colIndex(headers: string[], name: string): number {
   return headers.findIndex((h) => normHeader(h) === target)
 }
 
-/** 已是两位小数的报价转为分；无效返回 null。 */
+/** 报价转为分；「1.21 (2.50%)」只取前面的元。无效返回 null。 */
 function centsOf(cell: unknown): number | null {
   const raw = String(cell ?? '').trim()
   if (!raw) return null
@@ -59,75 +55,49 @@ function centsText(cents: number): string {
   return `${sign}${Math.floor(amount / 100)}.${String(amount % 100).padStart(2, '0')}`
 }
 
-/** price + d/2，四舍五入到分。 */
-function plusHalfDiff(priceCents: number, diffCents: number): number {
-  const doubled = priceCents * 2 + diffCents
-  if (doubled >= 0) return Math.floor((doubled + 1) / 2)
-  return -Math.floor((Math.abs(doubled) + 1) / 2)
-}
-
 export function buildConditionalOrders(
   headers: string[],
   rows: Array<Array<string | number | null | undefined>>,
 ): ConditionalOrdersBuild {
   const idx = {
     name: colIndex(headers, 'stock_name'),
-    high: colIndex(headers, 'today_high'),
+    close: colIndex(headers, '昨日收盘价'),
     diff: colIndex(headers, 'high_low_diff'),
-    sell1: colIndex(headers, '卖一'),
-    sell3: colIndex(headers, '卖三'),
-    buy1: colIndex(headers, '买一'),
+    median: colIndex(headers, '预测高价日变动中位数'),
     buy2: colIndex(headers, '买二'),
     buy3: colIndex(headers, '买三'),
   }
-  if (Object.values(idx).some((i) => i < 0)) {
-    return { ready: false, orders: [], skippedZeroDiff: 0 }
+  if (idx.name < 0) {
+    return { ready: false, orders: [], missingClose: false }
   }
 
   const orders: ConditionalOrderRow[] = []
-  let skippedZeroDiff = 0
+  const missingClose = idx.close < 0
 
   for (const row of rows) {
     const name = String(row[idx.name] ?? '').trim()
     if (!name) continue
-    const diff = centsOf(row[idx.diff])
-    if (diff == null) continue
-    if (diff === 0) {
-      skippedZeroDiff += 1
-      continue
+    const close = idx.close >= 0 ? centsOf(row[idx.close]) : null
+    const diff = idx.diff >= 0 ? centsOf(row[idx.diff]) : null
+    const median = idx.median >= 0 ? centsOf(row[idx.median]) : null
+    const buy2 = idx.buy2 >= 0 ? centsOf(row[idx.buy2]) : null
+    const buy3 = idx.buy3 >= 0 ? centsOf(row[idx.buy3]) : null
+
+    const push = (kind: ConditionalOrderKind, execute: string, trigger: string) => {
+      orders.push({ 股票名称: name, 条件类型: kind, 成交价: execute, 触发价: trigger })
     }
-    const high = centsOf(row[idx.high])
-    const sell1 = centsOf(row[idx.sell1])
-    const sell3 = centsOf(row[idx.sell3])
-    const buy1 = centsOf(row[idx.buy1])
-    const buy2 = centsOf(row[idx.buy2])
-    const buy3 = centsOf(row[idx.buy3])
-    if (high == null || sell1 == null || sell3 == null || buy1 == null || buy2 == null || buy3 == null) {
-      continue
+
+    if (close != null && diff != null) {
+      push('定价条件单1', centsText(close + diff), '')
     }
-    const buy1Half = plusHalfDiff(buy1, diff)
-    const sell1Half = plusHalfDiff(sell1, diff)
-    const specs: Array<[ConditionalOrderRow['条件类型'], number, number, string, string]> = [
-      ['反弹买入', buy2, buy3, '买二', '买三'],
-      ['反弹买入', buy1, buy2, '买一', '买二'],
-      ['回落卖出', buy1Half, high, '买一+d/2', 'high'],
-      ['回落卖出', high, sell1Half, 'high', '卖一+d/2'],
-      ['回落卖出', sell1Half, sell3, '卖一+d/2', '卖三'],
-    ]
-    for (const [kind, trigger, execute, triggerLabel, executeLabel] of specs) {
-      orders.push({
-        股票名称: name,
-        条件类型: kind,
-        幅度: CONDITIONAL_ORDER_PCT,
-        触发价: centsText(trigger),
-        实行价: centsText(execute),
-        触发档: triggerLabel,
-        实行档: executeLabel,
-      })
+    if (close != null && median != null) {
+      push('定价条件单2', centsText(close + median), '')
     }
+    if (buy2 != null) push('反弹买入条件单1', '', centsText(buy2))
+    if (buy3 != null) push('反弹买入条件单2', '', centsText(buy3))
   }
 
-  return { ready: true, orders, skippedZeroDiff }
+  return { ready: true, orders, missingClose }
 }
 
 export function conditionalOrdersToCopyText(orders: ConditionalOrderRow[]): string {
