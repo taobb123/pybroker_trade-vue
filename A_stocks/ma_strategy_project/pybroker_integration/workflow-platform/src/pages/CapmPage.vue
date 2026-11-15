@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   fetchCapmDesk,
   fetchCapmLaunch,
+  fetchCapmLaterLow,
   fetchCapmTip,
   fetchCapmSleeves,
   fetchCapmStocks,
@@ -24,6 +25,7 @@ import {
   type CapmRow,
   type CapmWindow,
   type DeskReport,
+  type LaterLowReport,
   type LaunchReport,
   type TipReport,
 } from '@/api/capm'
@@ -57,6 +59,13 @@ const loadingLaunch = ref(false)
 const launchPasted = ref('')
 const launchCopyFlash = ref('')
 let launchCopyTimer: ReturnType<typeof setTimeout> | undefined
+const laterLow = ref<LaterLowReport | null>(null)
+const laterLowMessage = ref('')
+const laterLowError = ref('')
+const loadingLaterLow = ref(false)
+const laterLowPasted = ref('')
+const laterLowCopyFlash = ref('')
+let laterLowCopyTimer: ReturnType<typeof setTimeout> | undefined
 const tip = ref<TipReport | null>(null)
 const tipMessage = ref('')
 const tipError = ref('')
@@ -508,6 +517,39 @@ async function loadLaunch(refresh = false) {
   }
 }
 
+async function loadLaterLow(refresh = false) {
+  loadingLaterLow.value = true
+  laterLowError.value = ''
+  laterLowMessage.value = ''
+  try {
+    const payload = await fetchCapmLaterLow(laterLowPasted.value, refresh)
+    laterLow.value = payload.report
+    if (payload.empty || !payload.report) laterLowMessage.value = payload.message || '没有可计算的股票。'
+  } catch (err) {
+    laterLowError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loadingLaterLow.value = false
+  }
+}
+
+async function copyLaterLowCodes() {
+  const rows = laterLow.value?.rows ?? []
+  const text = stockCodesToCopyText(
+    ['代码'],
+    rows.map((row) => [row.symbol]),
+  )
+  if (!text) {
+    laterLowCopyFlash.value = '没有代码'
+    return
+  }
+  const ok = await copyTextToClipboard(text)
+  laterLowCopyFlash.value = ok ? '已复制' : '复制失败'
+  if (laterLowCopyTimer) clearTimeout(laterLowCopyTimer)
+  laterLowCopyTimer = setTimeout(() => {
+    laterLowCopyFlash.value = ''
+  }, 1600)
+}
+
 async function loadTip(refresh = false) {
   loadingTip.value = true
   tipError.value = ''
@@ -568,12 +610,14 @@ onUnmounted(() => {
   unbindDeskBar()
   if (deskCopyTimer) clearTimeout(deskCopyTimer)
   if (launchCopyTimer) clearTimeout(launchCopyTimer)
+  if (laterLowCopyTimer) clearTimeout(laterLowCopyTimer)
   if (tipCopyTimer) clearTimeout(tipCopyTimer)
 })
 
 watch(tab, (value) => {
   if (value === 'desk' && !desk.value && !loadingDesk.value) void loadDesk()
   if (value === 'desk' && !launch.value && !loadingLaunch.value) void loadLaunch(false)
+  if (value === 'desk' && !laterLow.value && !loadingLaterLow.value) void loadLaterLow(false)
   if (value === 'desk' && !tip.value && !loadingTip.value) void loadTip(false)
 })
 
@@ -605,7 +649,7 @@ watch(deskReasonOptions, (options) => {
         主力表演看该股票最近 10 个交易日的组合序列；走完之后的 3 个交易日收益写在同一列。
         全部震仓洗盘和全部释放套牢盘默认按最近一个已收盘交易日的收盘涨幅从高到低排。
         这一页只对照，不写入观察池，也不改仓位。
-        交易部门只记下价格确认后的买入，不算止盈止损。百亚启动段和山尖只做形态对照。
+        交易部门只记下价格确认后的买入，不算止盈止损。百亚启动段和山尖只做形态对照。稍后低点单独计算，不并入启动段。
       </p>
     </div>
 
@@ -1072,6 +1116,69 @@ watch(deskReasonOptions, (options) => {
             </p>
             <ul v-if="launch" class="space-y-1 text-xs text-muted-foreground">
               <li v-for="note in launch.notes" :key="note">{{ note }}</li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>稍后低点</CardTitle>
+            <CardDescription v-if="laterLow">
+              螺旋低点之后、高出不超过 5% 的最后一根摆动低点，到最新收盘贴近 20%。
+              截止 {{ laterLow.asOf || '—' }}。达到 0.50 的有 {{ laterLow.relatedCount }} 只，其余 {{ laterLow.unrelatedCount }} 只没有。
+            </CardDescription>
+            <CardDescription v-else>{{ loadingLaterLow ? '计算稍后低点…' : '尚未载入' }}</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <Textarea
+              v-model="laterLowPasted"
+              class="min-h-16 font-mono text-xs"
+              placeholder="粘贴 6 位代码，用逗号、空格或换行分隔。和观察池一起计算，最多 80 只。"
+            />
+            <div class="flex flex-wrap gap-2">
+              <Button size="sm" :disabled="loadingLaterLow" @click="loadLaterLow(true)">
+                {{ loadingLaterLow ? '计算中' : '计算' }}
+              </Button>
+              <Button size="sm" variant="outline" :disabled="!laterLow?.rows.length" @click="copyLaterLowCodes">
+                {{ laterLowCopyFlash || `复制代码（${laterLow?.rows.length ?? 0}）` }}
+              </Button>
+            </div>
+            <p v-if="laterLowError" class="text-xs text-destructive">{{ laterLowError }}</p>
+            <p v-else-if="laterLowMessage" class="text-xs text-muted-foreground">{{ laterLowMessage }}</p>
+            <div v-if="laterLow?.rows.length" class="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>代码</TableHead>
+                    <TableHead>名称</TableHead>
+                    <TableHead class="text-right">涨幅</TableHead>
+                    <TableHead class="text-right">相似度</TableHead>
+                    <TableHead>说明</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in laterLow.rows" :key="row.symbol">
+                    <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
+                    <TableCell>
+                      {{ row.stockName || '—' }}
+                      <span v-if="row.pasted" class="ml-1 text-xs text-muted-foreground">粘贴</span>
+                    </TableCell>
+                    <TableCell class="text-right tabular-nums">{{ pct(row.gain) }}</TableCell>
+                    <TableCell class="text-right tabular-nums">{{ num(row.similarity, 2) }}</TableCell>
+                    <TableCell class="max-w-xl text-xs text-muted-foreground">{{ row.reason }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <p v-else-if="laterLow" class="text-xs text-muted-foreground">观察池里没有贴近 20% 的股票。</p>
+            <p v-if="laterLow?.unrelatedPasted.length" class="text-xs text-muted-foreground">
+              粘贴里没有贴近 20%：{{ laterLow.unrelatedPasted.join('、') }}
+            </p>
+            <p v-if="laterLow?.missingPasted.length" class="text-xs text-muted-foreground">
+              粘贴缺日线：{{ laterLow.missingPasted.join('、') }}
+            </p>
+            <ul v-if="laterLow" class="space-y-1 text-xs text-muted-foreground">
+              <li v-for="note in laterLow.notes" :key="note">{{ note }}</li>
             </ul>
           </CardContent>
         </Card>

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from capm.desk import desk_payload
+from capm.later_low import later_low_payload
 from capm.launch_match import launch_payload
 from capm.tip_match import tip_payload
 from capm.service import sleeves_payload, stocks_payload
@@ -43,6 +44,17 @@ def launch(symbols: str = Query(default="")) -> dict:
 def launch_refresh(body: LaunchBody | None = None) -> dict:
     params = body or LaunchBody()
     return launch_payload(symbols=params.symbols, fetch_missing=True)
+
+
+@router.get("/later-low")
+def later_low(symbols: str = Query(default="")) -> dict:
+    return later_low_payload(symbols=symbols, fetch_missing=False)
+
+
+@router.post("/later-low")
+def later_low_refresh(body: LaunchBody | None = None) -> dict:
+    params = body or LaunchBody()
+    return later_low_payload(symbols=params.symbols, fetch_missing=True)
 
 
 @router.get("/tip")

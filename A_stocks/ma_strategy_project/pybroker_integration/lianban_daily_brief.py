@@ -1,5 +1,5 @@
 # 数据来源：连板网 lianban.net（MCP https://lianban.net/mcp ，CC BY 4.0）
-"""每个交易日 17:30 拉取连板网复盘、龙虎榜、炸板与晋级，以及题材发酵逻辑和新闻，写成 reports/YYYY-MM-DD.md。"""
+"""每个交易日收盘后拉取连板网复盘，并追加量化段落，写成 reports/YYYY-MM-DD.md。非交易日不生成。"""
 
 from __future__ import annotations
 
@@ -1396,6 +1396,7 @@ def render_report(
     today_ladder: list[dict] | None = None,
     prev_ladder: list[dict] | None = None,
     seam_sections: list[str] | None = None,
+    quant_text: str | None = None,
 ) -> str:
     kpi = review.get("kpi") or {}
     prev_kpi = (prev_review or {}).get("kpi") or {}
@@ -1507,10 +1508,15 @@ def render_report(
         lines.append("")
     if seam_sections:
         lines.extend(seam_sections)
+    if quant_text:
+        lines.append(quant_text.rstrip())
+        lines.append("")
     page = review.get("page") or f"https://lianban.net/days/{day}.html"
     sources = ["连板网 lianban.net"]
     if indices or market.get("turnover") is not None or any((item.get("title") or "") for item in (logics or [])):
         sources.append("指数、成交额、题材新闻与炸板池：东方财富")
+    if quant_text:
+        sources.append("量化复盘：Tushare Pro")
     lines.extend(
         [
             f"原文：{page}",
@@ -1522,26 +1528,92 @@ def render_report(
     return "\n".join(lines)
 
 
-def resolve_day(token: str, explicit: str | None) -> tuple[str, list[str]] | None:
+def resolve_day(token: str, explicit: str | None) -> tuple[str, list[str], str] | None:
+    """先用上交所交易日历。周末、休市日不生成行情结论。日历不可用时才回退连板网。"""
+    now = datetime.now(TZ)
+    try:
+        from daily_brief_quant import resolve_brief_day, sse_open_days
+
+        open_days = sse_open_days(now, explicit)
+        day, gate = resolve_brief_day(explicit, now, open_days)
+        if day is None:
+            log(gate)
+            return None
+    except Exception as exc:
+        log(f"上交所交易日历不可用，改用连板网日历：{exc}")
+        return _resolve_day_lianban(token, explicit)
+
+    note = gate
+    try:
+        calendar = mcp_call("list_trade_dates", token, limit=10)
+        dates = [str(item) for item in (calendar.get("dates") or [])]
+    except Exception as exc:
+        log(f"连板网交易日获取失败：{exc}")
+        dates = []
+    if day not in dates:
+        log(f"上交所交易日 {day} 不在连板网最近交易日中，仍生成简报")
+        extra = f"连板网日历未列出 {day}，交易日以上交所为准。"
+        note = f"{note} {extra}".strip()
+        dates = [day] + [item for item in dates if item != day]
+    return day, dates, note
+
+
+def _resolve_day_lianban(token: str, explicit: str | None) -> tuple[str, list[str], str] | None:
     calendar = mcp_call("list_trade_dates", token, limit=10)
     dates = [str(item) for item in (calendar.get("dates") or [])]
+    note = "交易日历回退连板网。"
     if explicit:
         if explicit not in dates:
             log(f"{explicit} 不在连板网可查交易日中，跳过")
             return None
-        return explicit, dates
+        return explicit, dates, note
     today = datetime.now(TZ).strftime("%Y-%m-%d")
     if today in dates:
-        return today, dates
+        return today, dates, note
     latest = mcp_call("get_daily_review", token)
     latest_day = str((latest.get("kpi") or {}).get("date") or "")
     if latest_day == today:
-        return today, dates
+        return today, dates, note
     log(f"{today} 不是可查交易日（最近交易日 {dates[0] if dates else latest_day or '未知'}），跳过")
     return None
 
 
-def build(day: str, dates: list[str], token: str) -> Path:
+def _quant_section(
+    day: str,
+    today_board: list[dict],
+    prev_board: list[dict],
+    review: dict,
+    prev_day: str | None,
+    calendar_note: str,
+) -> str:
+    """量化段落失败时仍保留七个标题，并写明无法计算，不中断连板简报。"""
+    try:
+        from daily_brief_quant import render_quant_report
+
+        return render_quant_report(
+            day,
+            promotion_levels=promotion_levels(today_board, prev_board),
+            lianban_phase=str((review.get("kpi") or {}).get("emotion_phase") or ""),
+            calendar_note=calendar_note,
+            prev_day_hint=prev_day,
+            log=log,
+            now=datetime.now(TZ),
+        )
+    except Exception as exc:
+        log(f"量化复盘失败：{exc}")
+        from daily_brief_quant import failure_ctx, render_markdown
+
+        return render_markdown(
+            failure_ctx(
+                day,
+                str(exc),
+                str((review.get("kpi") or {}).get("emotion_phase") or ""),
+                calendar_note,
+            )
+        )
+
+
+def build(day: str, dates: list[str], token: str, calendar_note: str = "") -> Path:
     review = mcp_call("get_daily_review", token, date=day)
     actual = str((review.get("kpi") or {}).get("date") or day)
     if actual != day:
@@ -1595,6 +1667,7 @@ def build(day: str, dates: list[str], token: str) -> Path:
     except Exception as exc:
         log(f"题材新闻获取失败：{exc}")
         logics = [{"name": item.get("name") or "—", "title": ""} for item in top_themes(review, 3)]
+    quant_text = _quant_section(day, today_board, prev_board if prev_day else [], review, prev_day, calendar_note)
     text = render_report(
         day,
         review,
@@ -1608,6 +1681,7 @@ def build(day: str, dates: list[str], token: str) -> Path:
         leader_today,
         leader_prev,
         seam_sections,
+        quant_text,
     )
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"{day}.md"
@@ -1927,8 +2001,12 @@ def self_test() -> None:
         ],
         rows,
         prev_rows,
+        quant_text="## 柏拉爱空\n\n口径\n",
     )
     assert "| 炸板 | 48 |" in report
+    assert "## 柏拉爱空" in report
+    assert report.index("## 柏拉爱空") < report.index("数据来源")
+    assert "Tushare Pro" in report
     assert "## 每日龙头切换" in report
     assert "今日：闽发铝业（光伏支架）" in report
     assert "切换：昨日龙头 → 闽发铝业" in report
@@ -2062,6 +2140,9 @@ def self_test() -> None:
     assert stock_secid("600000") == "1.600000"
     assert stock_secid("002442") == "0.002442"
     assert stock_secid("920045") == "0.920045"
+    import daily_brief_quant
+
+    daily_brief_quant.self_test()
     print("self-test ok")
 
 
@@ -2078,8 +2159,8 @@ def main(argv: list[str] | None = None) -> int:
         resolved = resolve_day(token, args.date)
         if resolved is None:
             return 0
-        day, dates = resolved
-        path = build(day, dates, token)
+        day, dates, note = resolved
+        path = build(day, dates, token, note)
     except Exception as exc:
         log(f"生成失败：{exc}")
         return 1
