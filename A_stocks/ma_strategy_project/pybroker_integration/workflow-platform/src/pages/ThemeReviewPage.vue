@@ -68,7 +68,8 @@ const loading = ref(false)
 const error = ref('')
 const message = ref('')
 const report = ref<ThemeReviewReport | null>(null)
-const copyFlash = ref('')
+const launchCopyFlash = ref('')
+const laterCopyFlash = ref('')
 const catalog = ref<string[]>([])
 const catalogDate = ref('')
 const catalogError = ref('')
@@ -76,6 +77,7 @@ const catalogLoading = ref(false)
 const filterText = ref('')
 
 const tracked = computed(() => report.value?.rows ?? [])
+const laterTracked = computed(() => report.value?.laterRows ?? [])
 const selectedNames = computed(() => splitThemeNames(themes.value))
 const selectedSet = computed(() => new Set(selectedNames.value))
 const visibleNames = computed(() => {
@@ -144,17 +146,30 @@ onMounted(() => {
   void loadBriefs()
 })
 
-async function copyCodes() {
+async function copyCodes(rows: { symbol: string }[], flash: { value: string }) {
   const text = stockCodesToCopyText(
     ['代码'],
-    tracked.value.map((row) => [row.symbol]),
+    rows.map((row) => [row.symbol]),
   )
   if (!text) return
   const ok = await copyTextToClipboard(text)
-  copyFlash.value = ok ? '已复制' : '复制失败'
+  flash.value = ok ? '已复制' : '复制失败'
   window.setTimeout(() => {
-    copyFlash.value = ''
+    flash.value = ''
   }, 1500)
+}
+
+function copyLaunchCodes() {
+  void copyCodes(tracked.value, launchCopyFlash)
+}
+
+function copyLaterCodes() {
+  void copyCodes(laterTracked.value, laterCopyFlash)
+}
+
+function pct(value: number | null): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  return `${(value * 100).toFixed(2)}%`
 }
 </script>
 
@@ -197,7 +212,7 @@ async function copyCodes() {
       <CardHeader>
         <CardTitle>题材复盘</CardTitle>
         <CardDescription>
-          点选一个或多个东财概念标签，或在下面手填概念名。系统拉全部成分，先去重并剔除 300/301/688/920 开头，再对剩下的股票拉日线，留下百亚启动段相似度达到 0.52 的股票，再标上量价六组合。只在本页展示，不写入观察池。
+          点选一个或多个东财概念标签，或在下面手填概念名。系统拉全部成分，先去重并剔除 300/301/688/920 开头，再对剩下的股票拉日线。同一批股票分开计算两份跟踪名单：百亚启动段相似度达到 0.52 的留下，并标上量价六组合；稍后低点按贴近 20% 单独计算，相似度达到 0.50 的留下。两份名单不合并。只在本页展示，不写入观察池。
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-3">
@@ -242,27 +257,33 @@ async function copyCodes() {
           <Button size="sm" :disabled="loading || !themes.trim()" @click="run">
             {{ loading ? '对照中' : '生成跟踪名单' }}
           </Button>
-          <Button size="sm" variant="outline" :disabled="!tracked.length" @click="copyCodes">
-            {{ copyFlash || `复制代码（${tracked.length}）` }}
+          <Button size="sm" variant="outline" :disabled="!tracked.length" @click="copyLaunchCodes">
+            {{ launchCopyFlash || `复制启动段（${tracked.length}）` }}
+          </Button>
+          <Button size="sm" variant="outline" :disabled="!laterTracked.length" @click="copyLaterCodes">
+            {{ laterCopyFlash || `复制稍后低点（${laterTracked.length}）` }}
           </Button>
         </div>
         <p v-if="loading" class="text-xs text-muted-foreground">
-          正在拉成分、清洗代码、对照百亚启动段，并给跟踪股票标注六组合。成分多时会多等一会儿。
+          正在拉成分、清洗代码，对照百亚启动段并标注六组合，同时计算稍后低点。成分多时会多等一会儿。
         </p>
         <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
         <p v-else-if="message" class="text-xs text-muted-foreground">{{ message }}</p>
         <p v-if="report" class="text-xs text-muted-foreground">
-          成分日期 {{ report.tradeDate || '—' }}。成分 {{ report.memberCount }} 只，去重 {{ report.dupSkipped }}，剔除前缀 {{ report.prefixSkipped }}，进入对照 {{ report.poolCount }} 只，跟踪 {{ report.trackedCount }} 只。
+          成分日期 {{ report.tradeDate || '—' }}。成分 {{ report.memberCount }} 只，去重 {{ report.dupSkipped }}，剔除前缀 {{ report.prefixSkipped }}，进入对照 {{ report.poolCount }} 只。百亚启动段 {{ report.trackedCount }} 只，稍后低点 {{ report.laterTrackedCount }} 只。
           <template v-for="theme in report.themes" :key="theme.name">
             {{ theme.name }} {{ theme.matched ? `${theme.memberCount} 只` : '未匹配' }}。
           </template>
         </p>
+        <ul v-if="report?.notes.length" class="space-y-1 text-xs text-muted-foreground">
+          <li v-for="note in report.notes" :key="note">{{ note }}</li>
+        </ul>
       </CardContent>
     </Card>
 
     <Card>
       <CardHeader>
-        <CardTitle>跟踪股票</CardTitle>
+        <CardTitle>跟踪名单 · 百亚启动段</CardTitle>
         <CardDescription>按相似度从高到低。六组合只说明当前形态，不从名单里剔除。</CardDescription>
       </CardHeader>
       <CardContent class="space-y-3">
@@ -294,10 +315,41 @@ async function copyCodes() {
           </Table>
         </div>
         <p v-else-if="report && report.memberCount > 0 && report.poolCount === 0" class="text-xs text-muted-foreground">清洗后没有剩余代码。</p>
-        <p v-else-if="report && report.poolCount > 0" class="text-xs text-muted-foreground">这次没有达到 0.52 的股票。</p>
-        <ul v-if="report?.notes.length" class="space-y-1 text-xs text-muted-foreground">
-          <li v-for="note in report.notes" :key="note">{{ note }}</li>
-        </ul>
+        <p v-else-if="report && report.poolCount > 0" class="text-xs text-muted-foreground">这次没有达到 {{ report.threshold.toFixed(2) }} 的股票。</p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>跟踪名单 · 稍后低点</CardTitle>
+        <CardDescription>螺旋低点之后、高出不超过 5% 的最后一根摆动低点，到最新收盘贴近 20%。按相似度从高到低。不并入百亚启动段。</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div v-if="laterTracked.length" class="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>题材</TableHead>
+                <TableHead>代码</TableHead>
+                <TableHead>名称</TableHead>
+                <TableHead class="text-right">涨幅</TableHead>
+                <TableHead class="text-right">相似度</TableHead>
+                <TableHead>说明</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="row in laterTracked" :key="row.symbol">
+                <TableCell>{{ row.themes }}</TableCell>
+                <TableCell class="font-medium tabular-nums">{{ row.symbol }}</TableCell>
+                <TableCell>{{ row.stockName || '—' }}</TableCell>
+                <TableCell class="text-right tabular-nums">{{ pct(row.gain) }}</TableCell>
+                <TableCell class="text-right tabular-nums">{{ row.similarity.toFixed(2) }}</TableCell>
+                <TableCell class="max-w-xl text-xs text-muted-foreground">{{ row.reason || '—' }}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+        <p v-else-if="report && report.poolCount > 0" class="text-xs text-muted-foreground">这次没有达到 {{ report.laterThreshold.toFixed(2) }} 的股票。</p>
       </CardContent>
     </Card>
       </TabsContent>

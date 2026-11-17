@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""题材复盘：精确匹配、0.52 门槛、六组合只标注。不写观察池。"""
+"""题材复盘：精确匹配、0.52 门槛、六组合只标注启动段。稍后低点单独成名单。不写观察池。"""
 from __future__ import annotations
 
 import math
@@ -136,6 +136,172 @@ class ReviewTest(unittest.TestCase):
         self.assertTrue(any("日线不足" in note for note in report["notes"]))
         self.assertEqual(report["pool_count"], 3)
         self.assertEqual(report["prefix_skipped"], 0)
+        self.assertIn("later_rows", report)
+        self.assertTrue(any("稍后低点" in note for note in report["notes"]))
+
+    def test_later_low_list_stays_separate_from_launch(self) -> None:
+        index = pd.DataFrame({"ts_code": ["BK1"], "name": ["脑机接口"]})
+        members = pd.DataFrame(
+            {
+                "concept_code": ["BK1", "BK1", "BK1"],
+                "con_code": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                "con_name": ["甲", "乙", "丙"],
+            }
+        )
+        seen: list[str] = []
+
+        def score(frame, template):
+            del template
+            symbol = str(frame["symbol"].iloc[0])
+            related = symbol == "000001"
+            return {
+                "similarity": 0.80 if related else 0.10,
+                "spiral": 0.8,
+                "price": 0.8,
+                "volume": 0.8,
+                "yang": 0.8,
+                "yang_n": 3,
+                "vr": 3.0,
+                "related": related,
+                "reason": "",
+            }
+
+        def later(frame):
+            symbol = str(frame["symbol"].iloc[0])
+            related = symbol == "000002"
+            return {
+                "similarity": 0.90 if related else 0.10,
+                "gain": 0.20 if related else 0.01,
+                "low_date": "2026-02-01" if related else "",
+                "low_price": 10.0 if related else None,
+                "related": related,
+                "reason": "",
+            }
+
+        def combos(rows):
+            seen.extend(row["symbol"] for row in rows)
+            return {"000001": ("上涨放量突破", "")}
+
+        with (
+            patch("theme_review.score_frame", score),
+            patch("theme_review.score_later_low", later),
+        ):
+            payload = review_themes(
+                "脑机接口",
+                index_loader=lambda: ("20261103", index),
+                member_loader=lambda trade_date, codes: members,
+                bars_loader=lambda symbols: _bars(symbols, 90),
+                combo_loader=combos,
+            )
+        report = payload["report"]
+        self.assertFalse(payload["empty"])
+        self.assertIsNone(payload["message"])
+        self.assertEqual([row["symbol"] for row in report["rows"]], ["000001"])
+        self.assertEqual([row["symbol"] for row in report["later_rows"]], ["000002"])
+        self.assertEqual(report["rows"][0]["combo_name"], "上涨放量突破")
+        self.assertNotIn("combo_name", report["later_rows"][0])
+        self.assertEqual(report["later_rows"][0]["themes"], "脑机接口")
+        self.assertEqual(report["later_rows"][0]["gain"], 0.20)
+        self.assertIn("稍后低点", report["later_rows"][0]["reason"])
+        self.assertEqual(seen, ["000001"])
+        self.assertEqual(report["tracked_count"], 1)
+        self.assertEqual(report["later_tracked_count"], 1)
+        self.assertEqual(report["later_threshold"], 0.50)
+
+    def test_later_low_alone_still_returns_a_list(self) -> None:
+        index = pd.DataFrame({"ts_code": ["BK1"], "name": ["脑机接口"]})
+        members = pd.DataFrame(
+            {
+                "concept_code": ["BK1"],
+                "con_code": ["000002.SZ"],
+                "con_name": ["乙"],
+            }
+        )
+        seen: list[str] = []
+
+        def score(frame, template):
+            del frame, template
+            return {
+                "similarity": 0.10,
+                "spiral": 0.1,
+                "price": 0.1,
+                "volume": 0.1,
+                "yang": 0.1,
+                "yang_n": 0,
+                "vr": 1.0,
+                "related": False,
+                "reason": "",
+            }
+
+        def later(frame):
+            del frame
+            return {
+                "similarity": 0.70,
+                "gain": 0.18,
+                "low_date": "2026-03-02",
+                "low_price": 8.5,
+                "related": True,
+                "reason": "",
+            }
+
+        with (
+            patch("theme_review.score_frame", score),
+            patch("theme_review.score_later_low", later),
+        ):
+            payload = review_themes(
+                "脑机接口",
+                index_loader=lambda: ("20261103", index),
+                member_loader=lambda trade_date, codes: members,
+                bars_loader=lambda symbols: _bars(symbols, 90),
+                combo_loader=lambda rows: seen.extend(row["symbol"] for row in rows) or {},
+            )
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["empty"])
+        self.assertIsNone(payload["message"])
+        report = payload["report"]
+        self.assertEqual(report["rows"], [])
+        self.assertEqual([row["symbol"] for row in report["later_rows"]], ["000002"])
+        self.assertEqual(seen, [])
+        self.assertTrue(any("百亚启动段" in note for note in report["notes"]))
+
+    def test_both_lists_can_miss(self) -> None:
+        index = pd.DataFrame({"ts_code": ["BK1"], "name": ["脑机接口"]})
+        members = pd.DataFrame(
+            {
+                "concept_code": ["BK1", "BK1"],
+                "con_code": ["000001.SZ", "000002.SZ"],
+                "con_name": ["甲", "乙"],
+            }
+        )
+
+        def score(frame, template):
+            del frame, template
+            return {
+                "similarity": 0.10,
+                "spiral": 0.1,
+                "price": 0.1,
+                "volume": 0.1,
+                "yang": 0.1,
+                "yang_n": 0,
+                "vr": 1.0,
+                "related": False,
+                "reason": "",
+            }
+
+        with patch("theme_review.score_frame", score):
+            payload = review_themes(
+                "脑机接口",
+                index_loader=lambda: ("20261103", index),
+                member_loader=lambda trade_date, codes: members,
+                bars_loader=lambda symbols: _bars(symbols, 90),
+                combo_loader=lambda rows: {},
+            )
+        self.assertTrue(payload["empty"])
+        self.assertIn("0.52", payload["message"])
+        self.assertIn("0.50", payload["message"])
+        report = payload["report"]
+        self.assertEqual(report["rows"], [])
+        self.assertEqual(report["later_rows"], [])
 
     def test_prefixes_are_removed_before_daily_bars(self) -> None:
         index = pd.DataFrame({"ts_code": ["BK1"], "name": ["商业航天"]})

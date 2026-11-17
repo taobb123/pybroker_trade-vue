@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""题材复盘：东财概念成分 → 股票代码清洗 → 百亚启动段 → 量价六组合标注。
+"""题材复盘：东财概念成分 → 股票代码清洗 → 百亚启动段与稍后低点两份跟踪名单。
 
 只读。不写观察池，不导出六组合观察表，不改六组合分类规则。
+百亚启动段按原门槛筛选并标注六组合。稍后低点单独计算，不并入启动段，不标六组合。
 清洗规则与前端 filterStockCodes 一致：纯 6 位、去重、剔除 300/301/688/920。
 """
 from __future__ import annotations
@@ -13,6 +14,10 @@ from typing import Callable
 
 import pandas as pd
 
+from capm.later_low import MIN_BARS as LATER_MIN_BARS
+from capm.later_low import RELATED_MIN as LATER_RELATED_MIN
+from capm.later_low import _reason as later_low_reason
+from capm.later_low import score_later_low
 from capm.launch_match import (
     FETCH_START,
     RELATED_MIN,
@@ -26,7 +31,7 @@ from capm.launch_match import (
 )
 from capm.sources import OHLC_CACHE, fetch_act_bars, load_ohlc, store_ohlc
 
-SCHEMA_VERSION = "theme_review_v1"
+SCHEMA_VERSION = "theme_review_v2"
 _SPLIT = re.compile(r"[\s,，;；、]+")
 _SIX_DIGIT = re.compile(r"\d{6}")
 # 与 workflow-platform/src/api/filterStockCodes.ts 的 EXCLUDED_CODE_PREFIXES 一致
@@ -164,6 +169,22 @@ def score_members(members: list[dict], bars: pd.DataFrame) -> tuple[list[dict], 
     return related, short
 
 
+def score_later_members(members: list[dict], bars: pd.DataFrame) -> list[dict]:
+    """同一批清洗后的股票按稍后低点打分。不看百亚启动段是否入选。"""
+    related: list[dict] = []
+    for member in members:
+        frame = _symbol_frame(bars, member["symbol"])
+        if frame is None or len(frame) < LATER_MIN_BARS:
+            continue
+        scored = score_later_low(frame)
+        if not scored["related"]:
+            continue
+        scored["reason"] = later_low_reason(scored)
+        related.append({**member, **scored})
+    related.sort(key=lambda item: (-item["similarity"], item["symbol"]))
+    return related
+
+
 def combo_from_turnover(combo_name: str, turnover: float | None) -> tuple[str, str]:
     """换手率缺失时不标六组合。分类规则本身不在这里改。"""
     if turnover is None:
@@ -225,8 +246,9 @@ def review_themes(
     except Exception as exc:
         return _payload(None, f"没有取到日线：{exc}", ok=False)
     related, short = score_members(pool, bars)
+    later_related = score_later_members(pool, bars)
     if short:
-        notes.append(f"{len(short)} 只日线不足 80 根，没有对照百亚启动段。")
+        notes.append(f"{len(short)} 只日线不足 80 根，没有对照百亚启动段，也没有计算稍后低点。")
     labels: dict[str, tuple[str, str]] = {}
     if related:
         try:
@@ -234,26 +256,21 @@ def review_themes(
         except Exception as exc:
             notes.append(f"六组合没有标上：{exc}")
             labels = {}
-    rows = []
-    for item in related:
-        combo_name, combo_note = labels.get(item["symbol"], ("", "未标形态"))
-        rows.append(
-            {
-                "themes": "、".join(item["themes"]),
-                "symbol": item["symbol"],
-                "stock_name": item["stock_name"],
-                "similarity": item["similarity"],
-                "combo_name": combo_name,
-                "combo_note": combo_note,
-                "reason": item.get("reason", ""),
-            }
-        )
+    rows = [_launch_row(item, labels) for item in related]
+    later_rows = [_later_row(item) for item in later_related]
     if not rows and pool:
-        notes.append(f"清洗后的股票里没有相似度达到 {RELATED_MIN:.2f} 的股票。")
-    report = _report(trade_date, names, matched, missing, rows, notes)
+        notes.append(f"清洗后的股票里没有百亚启动段相似度达到 {RELATED_MIN:.2f} 的股票。")
+    if not later_rows and pool:
+        notes.append(f"清洗后的股票里没有稍后低点相似度达到 {LATER_RELATED_MIN:.2f} 的股票。")
+    report = _report(trade_date, names, matched, missing, rows, notes, later_rows)
     _apply_clean(report, members, clean)
-    message = None if rows else f"没有相似度达到 {RELATED_MIN:.2f} 的股票。"
-    return _payload(report, message, empty=not rows)
+    message = None
+    if not rows and not later_rows:
+        message = (
+            f"没有百亚启动段相似度达到 {RELATED_MIN:.2f}、"
+            f"也没有稍后低点相似度达到 {LATER_RELATED_MIN:.2f} 的股票。"
+        )
+    return _payload(report, message, empty=not rows and not later_rows)
 
 
 def list_concepts(index: pd.DataFrame, trade_date: str = "") -> dict:
@@ -378,6 +395,32 @@ def _label_combos(rows: list[dict]) -> dict[str, tuple[str, str]]:
     return labels
 
 
+def _launch_row(item: dict, labels: dict[str, tuple[str, str]]) -> dict:
+    combo_name, combo_note = labels.get(item["symbol"], ("", "未标形态"))
+    return {
+        "themes": "、".join(item["themes"]),
+        "symbol": item["symbol"],
+        "stock_name": item["stock_name"],
+        "similarity": item["similarity"],
+        "combo_name": combo_name,
+        "combo_note": combo_note,
+        "reason": item.get("reason", ""),
+    }
+
+
+def _later_row(item: dict) -> dict:
+    return {
+        "themes": "、".join(item["themes"]),
+        "symbol": item["symbol"],
+        "stock_name": item["stock_name"],
+        "similarity": item["similarity"],
+        "gain": item.get("gain"),
+        "low_date": item.get("low_date") or "",
+        "low_price": item.get("low_price"),
+        "reason": item.get("reason", ""),
+    }
+
+
 def _report(
     trade_date: str,
     names: list[str],
@@ -385,7 +428,9 @@ def _report(
     missing: list[str],
     rows: list[dict],
     notes: list[str],
+    later_rows: list[dict] | None = None,
 ) -> dict:
+    later_rows = [] if later_rows is None else later_rows
     by_name = {item["name"]: item for item in matched}
     themes = []
     for name in names:
@@ -407,8 +452,11 @@ def _report(
         "prefix_skipped": 0,
         "pool_count": 0,
         "tracked_count": len(rows),
+        "later_threshold": LATER_RELATED_MIN,
+        "later_tracked_count": len(later_rows),
         "themes": themes,
         "rows": rows,
+        "later_rows": later_rows,
         "notes": notes,
         "unmatched": missing,
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -423,10 +471,16 @@ def _apply_clean(report: dict, members: list[dict], clean: dict) -> None:
     report["pool_count"] = int(clean["pool_count"])
 
 
+def _has_tracking(report: dict | None) -> bool:
+    if not report:
+        return False
+    return bool(report.get("rows") or report.get("later_rows"))
+
+
 def _payload(report: dict | None, message: str | None, *, ok: bool = True, empty: bool = False) -> dict:
     return {
         "ok": ok,
-        "empty": empty or report is None or not report.get("rows"),
+        "empty": empty or not _has_tracking(report),
         "error": None if ok else message,
         "message": message,
         "report": report,

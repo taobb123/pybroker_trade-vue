@@ -11,6 +11,12 @@ function num(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function numOrNull(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export type ThemeReviewRow = {
   themes: string
   symbol: string
@@ -18,6 +24,17 @@ export type ThemeReviewRow = {
   similarity: number
   comboName: string
   comboNote: string
+  reason: string
+}
+
+export type ThemeLaterRow = {
+  themes: string
+  symbol: string
+  stockName: string
+  similarity: number
+  gain: number | null
+  lowDate: string
+  lowPrice: number | null
   reason: string
 }
 
@@ -36,8 +53,11 @@ export type ThemeReviewReport = {
   prefixSkipped: number
   poolCount: number
   trackedCount: number
+  laterThreshold: number
+  laterTrackedCount: number
   themes: ThemeSlot[]
   rows: ThemeReviewRow[]
+  laterRows: ThemeLaterRow[]
   notes: string[]
 }
 
@@ -54,6 +74,7 @@ function mapReport(value: unknown): ThemeReviewReport | null {
   const row = value as Raw
   const themes = Array.isArray(row.themes) ? row.themes : []
   const rows = Array.isArray(row.rows) ? row.rows : []
+  const laterRows = Array.isArray(row.later_rows) ? row.later_rows : []
   return {
     tradeDate: str(row.trade_date),
     threshold: num(row.threshold),
@@ -63,6 +84,8 @@ function mapReport(value: unknown): ThemeReviewReport | null {
     prefixSkipped: num(row.prefix_skipped),
     poolCount: num(row.pool_count),
     trackedCount: num(row.tracked_count),
+    laterThreshold: row.later_threshold == null ? 0.5 : num(row.later_threshold),
+    laterTrackedCount: num(row.later_tracked_count),
     themes: themes.map((item) => {
       const theme = item as Raw
       return {
@@ -80,6 +103,19 @@ function mapReport(value: unknown): ThemeReviewReport | null {
         similarity: num(line.similarity),
         comboName: str(line.combo_name),
         comboNote: str(line.combo_note),
+        reason: str(line.reason),
+      }
+    }),
+    laterRows: laterRows.map((item) => {
+      const line = item as Raw
+      return {
+        themes: str(line.themes),
+        symbol: str(line.symbol),
+        stockName: str(line.stock_name),
+        similarity: num(line.similarity),
+        gain: numOrNull(line.gain),
+        lowDate: str(line.low_date),
+        lowPrice: numOrNull(line.low_price),
         reason: str(line.reason),
       }
     }),
