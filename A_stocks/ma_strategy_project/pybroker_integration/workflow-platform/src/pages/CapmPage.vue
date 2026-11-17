@@ -31,7 +31,7 @@ import {
 } from '@/api/capm'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 
-const tab = ref('sleeves')
+const tab = ref('stocks')
 const sleeves = ref<CapmReport | null>(null)
 const stocks = ref<CapmReport | null>(null)
 const sleeveMessage = ref('')
@@ -615,10 +615,10 @@ onUnmounted(() => {
 })
 
 watch(tab, (value) => {
-  if (value === 'desk' && !desk.value && !loadingDesk.value) void loadDesk()
   if (value === 'desk' && !launch.value && !loadingLaunch.value) void loadLaunch(false)
   if (value === 'desk' && !laterLow.value && !loadingLaterLow.value) void loadLaterLow(false)
-  if (value === 'desk' && !tip.value && !loadingTip.value) void loadTip(false)
+  // Alpha 状态机和山尖都暂停：进入交易部门不再自动计算。
+  // 状态机与收敛速度同一次请求，只在卡片上点「重新计算」才跑。山尖只在「对照」时跑。
 })
 
 watch([tab, desk], async () => {
@@ -655,9 +655,9 @@ watch(deskReasonOptions, (options) => {
 
     <Tabs v-model="tab" class="w-full">
       <TabsList>
-        <TabsTrigger value="sleeves">信号组复盘</TabsTrigger>
         <TabsTrigger value="stocks">个股对比</TabsTrigger>
         <TabsTrigger value="desk">交易部门</TabsTrigger>
+        <TabsTrigger value="sleeves">信号组复盘</TabsTrigger>
       </TabsList>
 
       <TabsContent value="sleeves" class="space-y-3">
@@ -919,7 +919,7 @@ watch(deskReasonOptions, (options) => {
               候选是 250 日 β 在 0 到 0.5，并且年化 120 日 α 减年化 250 日 α 小于 0。
               120 日 α 比 20 个交易日前更高才离开「禁止买入」。连续两次改善，并且收盘突破前 20 日最高价、不再创新低、放量 1.3 倍、收盘高于开盘，才记下买入。
               买入日记在下一交易日。不加仓，不止盈，不止损。
-              本地收盘若晚于 2024-01-02，打开这一页会自动把更早的收盘补进缓存。
+              本地收盘若晚于 2024-01-02，点「重新计算」时会把更早的收盘补进缓存。
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
