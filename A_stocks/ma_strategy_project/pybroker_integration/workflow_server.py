@@ -699,6 +699,133 @@ def api_daily_briefs():
     return _no_store_json({"items": items})
 
 
+class RerunBriefBody(BaseModel):
+    date: str = ""
+
+
+def _brief_day(raw: str) -> str:
+    day = (raw or "").strip()
+    if not _BRIEF_NAME.match(f"{day}.md"):
+        raise HTTPException(status_code=400, detail="日期须为 YYYY-MM-DD")
+    return day
+
+
+def run_daily_brief(cfg: dict[str, Any], day: str) -> dict[str, Any]:
+    """重跑指定日期的收盘复盘简报。与其它步骤共用同一把执行锁。"""
+    global _active_proc
+    day = _brief_day(day)
+    root = resolve_project_root(cfg)
+    script_path = root / "lianban_daily_brief.py"
+    if not script_path.is_file():
+        raise HTTPException(status_code=400, detail="找不到 lianban_daily_brief.py")
+    py = str(cfg.get("python_executable") or "").strip()
+    if not py or py in ("python", "python3"):
+        py = sys.executable
+    cmd = [py, str(script_path), "--date", day]
+    env = build_env(cfg)
+    proc: subprocess.Popen[bytes] | None = None
+    try:
+        with _active_proc_lock:
+            if _active_proc is not None and _active_proc.poll() is None:
+                raise HTTPException(status_code=409, detail="已有步骤正在执行，请先停止后再重跑复盘简报。")
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=str(root),
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            except OSError as e:
+                raise HTTPException(status_code=500, detail=f"无法启动复盘简报: {e}") from e
+            _active_proc = proc
+        assert proc.stdout is not None and proc.stderr is not None
+        out_b, err_b = proc.communicate()
+    finally:
+        with _active_proc_lock:
+            if proc is not None and _active_proc is proc:
+                _active_proc = None
+    out = _compact_subprocess_log(_strip_ansi(_decode_pipe_output(out_b or b"")))
+    err = _compact_subprocess_log(_strip_ansi(_decode_pipe_output(err_b or b"")))
+    code = int(proc.returncode) if proc is not None and proc.returncode is not None else 1
+    merged = "\n".join(part for part in (out, err) if part)
+    return {
+        "step_id": "daily_brief",
+        "date": day,
+        "path": f"reports/{day}.md",
+        "exit_code": code,
+        "merged_log": merged,
+        "ok": code == 0,
+    }
+
+
+def _run_brief_job(job_id: str, cfg: dict[str, Any], day: str) -> None:
+    from datetime import datetime, timezone
+
+    _job_set(job_id, status="running", started_at=datetime.now(timezone.utc).isoformat())
+    try:
+        result = run_daily_brief(cfg, day)
+        _job_set(
+            job_id,
+            status="done",
+            result=result,
+            error="" if result.get("ok") else str(result.get("merged_log") or "复盘简报没有完成"),
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        _job_set(
+            job_id,
+            status="done",
+            result={"step_id": "daily_brief", "date": day, "exit_code": 1, "merged_log": detail, "ok": False},
+            error=detail,
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception as exc:
+        _job_set(
+            job_id,
+            status="done",
+            result={"step_id": "daily_brief", "date": day, "exit_code": 1, "merged_log": str(exc), "ok": False},
+            error=str(exc),
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+
+def _shanghai_today() -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
+
+
+@app.post("/api/daily-briefs/rerun")
+def api_rerun_daily_brief(body: RerunBriefBody | None = None):
+    """手动重跑收盘复盘简报。立即返回 job_id，结果用 /api/run/jobs/{id} 查询。"""
+    import secrets
+    from datetime import datetime, timezone
+
+    cfg = load_config()
+    raw = (body.date if body else "") or ""
+    day = _brief_day(raw.strip() or _shanghai_today())
+    with _active_proc_lock:
+        if _active_proc is not None and _active_proc.poll() is None:
+            raise HTTPException(status_code=409, detail="已有步骤正在执行，请先停止后再重跑复盘简报。")
+    job_id = secrets.token_urlsafe(12)
+    _job_set(
+        job_id,
+        status="queued",
+        step_id="daily_brief",
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    threading.Thread(
+        target=_run_brief_job,
+        args=(job_id, cfg, day),
+        name=f"brief-job-{job_id}",
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "status": "queued", "date": day, "path": f"reports/{day}.md"}
+
+
 @app.get("/api/workspace/column-text")
 def api_workspace_column_text(
     path: str,

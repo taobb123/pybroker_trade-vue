@@ -1536,6 +1536,7 @@
         <div id="mdModalMount" class="preview-md-wrap" style="display:none"></div>
       </div>
       <div class="modal-bar">
+        <button type="button" class="primary" id="briefRerunBtn" style="display:none">重跑复盘简报</button>
         <button type="button" id="tableModalClose">关闭</button>
       </div>
     </div>
@@ -3359,6 +3360,94 @@
         }
         var panel = document.querySelector("#tableModal .modal-panel");
         if (panel) panel.classList.remove("brief-wide");
+        setBriefRerunVisible(false);
+      }
+
+      function briefPathDate(relPath) {
+        var match = String(relPath || "").match(/^reports\/(\d{4}-\d{2}-\d{2})\.md$/);
+        return match ? match[1] : "";
+      }
+
+      function setBriefRerunVisible(show) {
+        var btn = document.getElementById("briefRerunBtn");
+        if (!btn) return;
+        btn.style.display = show ? "" : "none";
+        if (!show && !briefRerunBusy) {
+          btn.disabled = false;
+          btn.textContent = "重跑复盘简报";
+        }
+      }
+
+      var briefRerunBusy = false;
+
+      function finishBriefRerun(note) {
+        briefRerunBusy = false;
+        var btn = document.getElementById("briefRerunBtn");
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "重跑复盘简报";
+        }
+        if (note) document.getElementById("tableModalNote").textContent = note;
+      }
+
+      function pollBriefJob(jobId, relPath, tries) {
+        if (!briefRerunBusy) return;
+        if (tries > 1200) {
+          finishBriefRerun("重跑超时，请稍后重新打开这份简报。");
+          return;
+        }
+        fetch("/api/run/jobs/" + encodeURIComponent(jobId))
+          .then(function (r) { return r.json(); })
+          .then(function (job) {
+            if (!briefRerunBusy) return;
+            if (!job || job.status !== "done") {
+              window.setTimeout(function () { pollBriefJob(jobId, relPath, tries + 1); }, 1500);
+              return;
+            }
+            var result = job.result || {};
+            if (result.ok && Number(result.exit_code || 0) === 0) {
+              finishBriefRerun("");
+              if (tableModalRelPath === relPath) openMarkdownPreview(relPath);
+              return;
+            }
+            var log = String(result.merged_log || job.error || "复盘简报没有完成");
+            finishBriefRerun(log.slice(-800));
+          })
+          .catch(function () {
+            window.setTimeout(function () { pollBriefJob(jobId, relPath, tries + 1); }, 1500);
+          });
+      }
+
+      function rerunOpenBrief() {
+        if (briefRerunBusy) return;
+        var relPath = tableModalRelPath;
+        var day = briefPathDate(relPath);
+        if (!day) return;
+        briefRerunBusy = true;
+        var btn = document.getElementById("briefRerunBtn");
+        btn.disabled = true;
+        btn.textContent = "正在重跑…";
+        document.getElementById("tableModalNote").textContent =
+          "正在重跑 " + day + " 的复盘简报，通常需要一两分钟。";
+        fetch("/api/daily-briefs/rerun", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: day })
+        })
+          .then(function (r) {
+            return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+          })
+          .then(function (ref) {
+            if (!ref.ok) {
+              var detail = ref.j && typeof ref.j.detail === "string" ? ref.j.detail : "无法启动重跑";
+              finishBriefRerun(detail);
+              return;
+            }
+            pollBriefJob(ref.j.job_id, relPath, 0);
+          })
+          .catch(function (e) {
+            finishBriefRerun(String(e));
+          });
       }
 
       var DAILY_BRIEF_SECTIONS = ["行情 KPI", "连板天梯前三档", "涨停家数最多的三个题材", "龙虎榜净买额前五"];
@@ -3765,6 +3854,7 @@
         noteEl.textContent = "加载中…";
         noteEl.removeAttribute("data-base-note");
         resetPreviewMounts("md");
+        setBriefRerunVisible(!!briefPathDate(relPath));
         document.getElementById("tableModal").classList.add("show");
 
         fetch("/api/workspace/file?path=" + encodeURIComponent(relPath))
@@ -4203,6 +4293,7 @@
       document.getElementById("fileModalSave").addEventListener("click", saveFileModal);
       document.getElementById("fileModalCancel").addEventListener("click", closeFileModal);
       document.getElementById("tableModalClose").addEventListener("click", closeTableModal);
+      document.getElementById("briefRerunBtn").addEventListener("click", rerunOpenBrief);
       document.getElementById("tableModalCopyCodes").addEventListener("click", tableModalDoCopyCodes);
       document.getElementById("tableModalCopyNews").addEventListener("click", tableModalDoCopyNews);
       document.getElementById("fileModal").addEventListener("click", function (ev) {

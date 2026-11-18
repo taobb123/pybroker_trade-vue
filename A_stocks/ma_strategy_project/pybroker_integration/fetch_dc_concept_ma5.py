@@ -69,6 +69,9 @@ DEFAULT_POOL_TOP_N = 0
 DEFAULT_HIT_TOP_N = 3
 DC_IDX_TYPE = "概念板块"
 REQUEST_SLEEP_SEC = 0.13
+_DC_INDEX_FALLBACK_WARNED = False
+_DC_MEMBER_FALLBACK_WARNED = False
+_EM_BOARD_MEMBER_URL = "https://push2.eastmoney.com/api/qt/clist/get"
 
 CONCEPT_LAUNCH_CONFIG = {
     "history_calendar_days": 200,
@@ -489,15 +492,45 @@ def prefilter_fund_flow_launch(
     return kept, cache, pre_meta
 
 
-def fetch_dc_concept_index(pro, trade_date_compact: str) -> pd.DataFrame:
-    df = pro.dc_index(trade_date=trade_date_compact, idx_type=DC_IDX_TYPE)
-    if df is None or df.empty:
+def _as_concept_index(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or getattr(df, "empty", True) or "ts_code" not in df.columns:
         return pd.DataFrame()
     out = df.copy()
     out["ts_code"] = out["ts_code"].astype(str).str.strip()
+    out = out[out["ts_code"] != ""]
+    if out.empty:
+        return pd.DataFrame()
     if "name" in out.columns:
         out["name"] = out["name"].astype(str).str.strip()
     return out.drop_duplicates(subset=["ts_code"], keep="last")
+
+
+def fetch_dc_concept_index(pro, trade_date_compact: str) -> pd.DataFrame:
+    """概念列表。dc_index 返回「指定数据不存在」时，改用当日概念资金横截面。"""
+    global _DC_INDEX_FALLBACK_WARNED
+    err = ""
+    try:
+        df = pro.dc_index(trade_date=trade_date_compact, idx_type=DC_IDX_TYPE)
+    except Exception as exc:
+        err = str(exc).strip() or exc.__class__.__name__
+        df = None
+    out = _as_concept_index(df)
+    if not out.empty:
+        return out
+    alt = _as_concept_index(fetch_moneyflow_ind_dc_day(pro, trade_date_compact))
+    if not alt.empty:
+        if err and not _DC_INDEX_FALLBACK_WARNED:
+            print(
+                f"dc_index 不可用（{err}），概念列表改用 moneyflow_ind_dc。",
+                file=sys.stderr,
+            )
+            _DC_INDEX_FALLBACK_WARNED = True
+        return alt
+    try:
+        daily = pro.dc_daily(trade_date=trade_date_compact, idx_type=DC_IDX_TYPE)
+    except Exception:
+        daily = None
+    return _as_concept_index(daily)
 
 
 def resolve_dc_index_trade_date(pro, end_date: str, *, max_back_sessions: int = 8) -> Tuple[str, pd.DataFrame]:
@@ -1107,18 +1140,88 @@ def _concept_diagnosis_lines(s: ConceptLaunchSnapshot) -> List[str]:
     return lines
 
 
+def _fetch_em_board_members(ts_code: str) -> pd.DataFrame:
+    """dc_member 不可用时，按东财板块代码取当前成分。"""
+    board = str(ts_code or "").split(".")[0].strip().upper()
+    if not board.startswith("BK"):
+        return pd.DataFrame()
+    import requests
+
+    session = requests.Session()
+    session.trust_env = False
+    rows: List[Dict[str, str]] = []
+    try:
+        page = 1
+        while page <= 30:
+            payload = None
+            for attempt in range(3):
+                try:
+                    resp = session.get(
+                        _EM_BOARD_MEMBER_URL,
+                        params={
+                            "pn": page,
+                            "pz": 100,
+                            "po": 1,
+                            "np": 1,
+                            "fltt": 2,
+                            "invt": 2,
+                            "fid": "f12",
+                            "fs": f"b:{board}",
+                            "fields": "f12,f14",
+                        },
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=20,
+                    )
+                    payload = resp.json()
+                    break
+                except Exception:
+                    if attempt == 2:
+                        payload = None
+                    else:
+                        time.sleep(0.4 * (attempt + 1))
+            if payload is None:
+                break
+            data = (payload or {}).get("data") or {}
+            diff = data.get("diff") or []
+            if isinstance(diff, dict):
+                diff = list(diff.values())
+            if not diff:
+                break
+            for item in diff:
+                code = str((item or {}).get("f12") or "").strip()
+                name = str((item or {}).get("f14") or "").strip()
+                if code:
+                    rows.append({"con_code": code, "name": name})
+            total = int(data.get("total") or 0)
+            if total and len(rows) >= total:
+                break
+            page += 1
+    finally:
+        session.close()
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).drop_duplicates(subset=["con_code"], keep="last")
+
+
 def fetch_members_for_concepts(
     pro,
     concept_codes: List[str],
     trade_date_compact: str,
     sleep_sec: float,
 ) -> pd.DataFrame:
+    global _DC_MEMBER_FALLBACK_WARNED
     rows: List[Dict[str, Any]] = []
     for code in concept_codes:
         try:
             df = pro.dc_member(trade_date=trade_date_compact, ts_code=code)
-        except Exception:
+        except Exception as exc:
+            if not _DC_MEMBER_FALLBACK_WARNED:
+                msg = str(exc).strip() or exc.__class__.__name__
+                print(f"dc_member 不可用（{msg}），成分股改用东财板块行情。", file=sys.stderr)
+                _DC_MEMBER_FALLBACK_WARNED = True
             df = None
+        if df is None or df.empty:
+            df = _fetch_em_board_members(code)
         time.sleep(sleep_sec)
         if df is None or df.empty:
             continue
@@ -1128,7 +1231,7 @@ def fetch_members_for_concepts(
                     "trade_date": trade_date_compact,
                     "concept_code": code,
                     "con_code": str(r.get("con_code", "")).strip(),
-                    "con_name": str(r.get("name", "")).strip(),
+                    "con_name": str(r.get("name", "") or r.get("con_name", "")).strip(),
                 }
             )
     return pd.DataFrame(rows)

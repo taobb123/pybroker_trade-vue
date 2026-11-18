@@ -774,6 +774,116 @@ def _fmt_num(value, digits: int = 1) -> str:
     return f"{float(value):.{digits}f}"
 
 
+def vix_band(close) -> str:
+    """按 CBOE VIX 收盘对照公开参考区间。边界：20 与 30 归入 20–30，40 归入高于 30。"""
+    if not _ok(close):
+        return "无法计算"
+    value = float(close)
+    if value < 20:
+        return "低于 20：市场比较平静，恐慌情绪较低"
+    if value <= 30:
+        return "20–30：市场担忧上升，波动预期增强"
+    if value <= 40:
+        return "高于 30：市场出现明显恐慌"
+    return "高于 40：通常意味着重大危机级别，市场处于极度恐慌"
+
+
+def _vix_pre_close(ordered: pd.DataFrame):
+    """只用接口返回的 pre_close。没有该字段就不拿上一根收盘顶上。"""
+    row = ordered.iloc[-1]
+    if "pre_close" in ordered.columns and _ok(row.get("pre_close")):
+        return float(row["pre_close"])
+    return None
+
+
+def fetch_vix(pro, day: str) -> tuple[dict, str]:
+    """取不晚于 A 股数据日的最近一根 VIX。失败只返回空行情和原因，不向外抛。"""
+    end = _ymd(day)
+    if len(end) != 8:
+        return {}, "美股恐慌指数无法计算：数据日无效"
+    start = (datetime.strptime(end, "%Y%m%d") - timedelta(days=21)).strftime("%Y%m%d")
+    try:
+        frame = _call(pro.vix_index, start_date=start, end_date=end)
+    except Exception as exc:
+        return {}, f"美股恐慌指数无法计算：{exc}"
+    if frame is None or frame.empty or "trade_date" not in frame.columns:
+        return {}, "美股恐慌指数无法计算：vix_index 为空"
+    work = frame.copy()
+    work["_day"] = work["trade_date"].map(_iso)
+    work = work[(work["_day"].astype(str) != "") & (work["_day"].astype(str) <= day)]
+    if work.empty:
+        return {}, "美股恐慌指数无法计算：没有不晚于数据日的行情"
+    ordered = work.sort_values("_day")
+    row = ordered.iloc[-1]
+    payload = {
+        "trade_date": str(row["_day"]),
+        "open": float(row["open"]) if "open" in ordered.columns and _ok(row.get("open")) else None,
+        "high": float(row["high"]) if "high" in ordered.columns and _ok(row.get("high")) else None,
+        "low": float(row["low"]) if "low" in ordered.columns and _ok(row.get("low")) else None,
+        "close": float(row["close"]) if "close" in ordered.columns and _ok(row.get("close")) else None,
+        "pre_close": _vix_pre_close(ordered),
+        "pct_change": float(row["pct_change"]) if "pct_change" in ordered.columns and _ok(row.get("pct_change")) else None,
+    }
+    if not _ok(payload["close"]):
+        return payload, "美股恐慌指数无法计算：收盘价缺失"
+    if not _ok(payload["pre_close"]):
+        return payload, "美股恐慌指数未返回 pre_close，前收无法计算"
+    return payload, ""
+
+
+def _vix_lines(ctx: dict) -> list[str]:
+    vix = ctx.get("vix") or {}
+    day = ctx.get("day") or ""
+    trade_date = str(vix.get("trade_date") or "")
+    if trade_date and day and trade_date != day:
+        align = f"美股最近一根是 {trade_date}，不晚于 A 股数据日 {day}。"
+    elif trade_date:
+        align = f"美股交易日与 A 股数据日同为 {trade_date}。"
+    else:
+        align = "本次没有取到不晚于 A 股数据日的 VIX 行情。"
+    return [
+        "## 美股恐慌指数",
+        "",
+        "CBOE VIX，标的是标普 500 期权，是波动率指数。来源：Tushare Pro vix_index。只取不晚于 A 股数据日的最近一根。前收只使用接口的 pre_close；当前返回没有该字段时记为无法计算。",
+        align,
+        "",
+        "| 项目 | 数值 |",
+        "| --- | --- |",
+        f"| 交易日 | {trade_date or '无法计算'} |",
+        f"| 开盘 | {_fmt_num(vix.get('open'), 2)} |",
+        f"| 最高 | {_fmt_num(vix.get('high'), 2)} |",
+        f"| 最低 | {_fmt_num(vix.get('low'), 2)} |",
+        f"| 收盘 | {_fmt_num(vix.get('close'), 2)} |",
+        f"| 前收 | {_fmt_num(vix.get('pre_close'), 2)} |",
+        f"| 涨跌幅 | {_fmt_pct(vix.get('pct_change'))} |",
+        f"| 区间 | {vix_band(vix.get('close'))} |",
+        "",
+        "区间只按收盘对照公开参考：低于 20 偏平静，20–30 担忧上升，高于 30 明显恐慌，高于 40 极端恐慌。这不是买卖指令。",
+        "",
+    ]
+
+
+def _attach_vix(ctx: dict) -> dict:
+    if ctx.get("vix_loaded"):
+        return ctx
+    day = str(ctx.get("day") or "")
+    payload: dict = {}
+    note = ""
+    try:
+        from market_radar import get_tushare_bundle
+
+        _ts, pro = get_tushare_bundle()
+        payload, note = fetch_vix(pro, day)
+    except Exception as exc:
+        note = f"美股恐慌指数无法计算：{exc}"
+    ctx = dict(ctx)
+    ctx["vix"] = payload
+    ctx["vix_loaded"] = True
+    if note:
+        ctx["missing"] = _unique(list(ctx.get("missing") or []) + [note])
+    return ctx
+
+
 def _fmt_score(value) -> str:
     if not _ok(value):
         return "无法计算"
@@ -835,6 +945,7 @@ def failure_ctx(day: str, reason: str, lianban_phase: str, calendar_note: str) -
         "breadth": {},
         "promotion": "无法计算",
         "sentiment": {},
+        "vix": {},
         "phase": phase,
         "conclusion": "量化数据不足，无法与前一交易日比较。",
         "missing": [reason] if reason else ["量化段落无法计算"],
@@ -926,6 +1037,8 @@ def render_markdown(ctx: dict) -> str:
     lines.append(
         "申万一级。区间收益率 = 当日收盘 / N 个交易日前收盘 - 1，且最后一根收盘必须落在数据日。名次 1 为区间涨幅最高。名次变化相对前一交易日同窗口，正数表示名次上升。内部上涨占比、当日成交额、活跃度（当日成交额 / 近 20 日均额）都是当日值。成分用当前申万一级，未按历史调样回溯。单日涨跌不单独作为主线结论。"
     )
+    if ctx.get("sw_source") == "constituent":
+        lines.append("本次申万官方指数没有落在数据日，下表改用本地个股日线和已保存的申万一级成分。行业日收益是成分股涨跌幅等权平均后连乘，成交额是成分股合计。这不是申万官方指数，不能和昨日的官方指数点位直接对比。")
     lines.append("")
     sectors = list(ctx.get("sectors") or [])
     if not sectors:
@@ -1003,6 +1116,11 @@ def render_markdown(ctx: dict) -> str:
             "",
             "晋级率来自连板网天梯行头，不纳入下面的情绪指数。近 5 日均值不含当日。",
             "",
+        ]
+    )
+    lines.extend(_vix_lines(ctx))
+    lines.extend(
+        [
             "## 情绪指数",
             "",
             "权重是研究参数，不代表已经验证有效：追涨赚钱效应 40%，板块强弱结构 35%，市场风险偏好 25%。支柱内部对已有成分等权。标准化用滚动分位数，窗口最多 250 个交易日且含当日，至少 60 个有效值。任一支柱无法计算时，综合分记为无法计算，不把剩余权重重新归一。速度 = 当日综合分 − 前一交易日综合分；加速度 = 当日速度 − 前一交易日速度。速度用未四舍五入的分数相减。",
@@ -1135,6 +1253,23 @@ def _call(fn, retries: int = 3, **kwargs):
     return None
 
 
+def _local_open_days() -> list[str]:
+    """交易日历接口失败时，用已经落地的个股日线日期。这些文件名就是已确认的交易日。"""
+    path = CACHE / "sse_open_days.txt"
+    days = []
+    if path.is_file():
+        days.extend(line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+    if CROSS.is_dir():
+        days.extend(_iso(item.stem) for item in CROSS.glob("*.csv") if item.stem.isdigit())
+    return sorted({day for day in days if day})
+
+
+def _save_open_days(days: list[str]) -> None:
+    path = CACHE / "sse_open_days.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(days) + "\n", encoding="utf-8")
+
+
 def sse_open_days(now: datetime, explicit: str | None = None, lookback_days: int = 80) -> list[str]:
     from market_radar import get_tushare_bundle
 
@@ -1149,19 +1284,25 @@ def sse_open_days(now: datetime, explicit: str | None = None, lookback_days: int
             end_point = explicit_day
     end_point = end_point + timedelta(days=15)
     start = (end_point - timedelta(days=lookback_days + 15)).strftime("%Y%m%d")
-    frame = _call(
-        pro.trade_cal,
-        exchange="SSE",
-        start_date=start,
-        end_date=end_point.strftime("%Y%m%d"),
-        is_open="1",
-    )
-    if frame is None or frame.empty or "cal_date" not in frame.columns:
-        raise RuntimeError("上交所交易日历为空")
-    days = sorted({_iso(item) for item in frame["cal_date"].tolist() if _iso(item)})
-    if not days:
-        raise RuntimeError("上交所交易日历为空")
-    return days
+    frame = None
+    try:
+        frame = pro.trade_cal(
+            exchange="SSE",
+            start_date=start,
+            end_date=end_point.strftime("%Y%m%d"),
+            is_open="1",
+        )
+    except Exception:
+        frame = None
+    if frame is not None and not frame.empty and "cal_date" in frame.columns:
+        days = sorted({_iso(item) for item in frame["cal_date"].tolist() if _iso(item)})
+        if days:
+            _save_open_days(days)
+            return days
+    local = _local_open_days()
+    if local:
+        return local
+    raise RuntimeError("上交所交易日历为空")
 
 
 def _cross_path(day: str) -> Path:
@@ -1324,57 +1465,232 @@ def _load_suspend(pro, start: str, end: str) -> tuple[dict[str, set[str]], str]:
     return found, ""
 
 
-def _load_sw(pro, start: str, end: str, logger) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
+SW_L1_CACHE = CACHE / "sw_l1.csv"
+
+
+def _read_sw_l1() -> pd.DataFrame:
+    if not SW_L1_CACHE.is_file():
+        return pd.DataFrame()
+    try:
+        frame = pd.read_csv(SW_L1_CACHE, dtype=str)
+    except Exception:
+        return pd.DataFrame()
+    if frame.empty or "index_code" not in frame.columns:
+        return pd.DataFrame()
+    return frame
+
+
+def _classify_l1(pro) -> tuple[pd.DataFrame, list[str]]:
+    """申万一级。空表且没有 index_code 字段时，视为接口没交出列表，不当成行业数为 0。"""
     notes = []
-    meta = None
     for src in ("SW2021", "SW2014"):
-        try:
-            meta = _call(pro.index_classify, level="L1", src=src)
-        except Exception as exc:
-            notes.append(f"申万行业列表 {src} 失败：{exc}")
-            meta = None
-        if meta is not None and not meta.empty and "index_code" in meta.columns:
-            break
-    empty = pd.DataFrame()
-    if meta is None or meta.empty:
-        notes.append("申万一级行业列表为空")
-        return empty, empty, empty, notes
-    closes = {}
-    amounts = {}
-    member_rows = []
-    for record in meta.itertuples(index=False):
-        code = str(getattr(record, "index_code", "") or "").strip()
-        name = str(getattr(record, "industry_name", "") or "").strip() or code
-        if not code:
-            continue
-        try:
-            daily = _call(pro.sw_daily, ts_code=code, start_date=_ymd(start), end_date=_ymd(end))
-        except Exception as exc:
-            notes.append(f"{name} 行情失败：{exc}")
-            daily = None
-        time.sleep(0.12)
-        if daily is not None and not daily.empty and "trade_date" in daily.columns and "close" in daily.columns:
-            piece = daily.copy()
-            piece["date"] = piece["trade_date"].map(_iso)
-            piece = piece[piece["date"] != ""].drop_duplicates("date", keep="last").set_index("date").sort_index()
-            closes[name] = pd.to_numeric(piece["close"], errors="coerce")
-            if "amount" in piece.columns:
-                amounts[name] = pd.to_numeric(piece["amount"], errors="coerce")
+        last_error = ""
+        for attempt in range(3):
+            try:
+                frame = pro.index_classify(level="L1", src=src)
+            except Exception as exc:
+                last_error = str(exc)
+                frame = None
+            if frame is not None and not frame.empty and "index_code" in getattr(frame, "columns", []):
+                kept = frame.copy()
+                kept["src"] = src
+                _write_frame(SW_L1_CACHE, kept)
+                return kept, [f"申万一级使用 {src}，{len(kept)} 个"]
+            if attempt < 2:
+                time.sleep(1.2 * (attempt + 1))
+        if last_error:
+            notes.append(f"index_classify {src} 失败：{last_error}")
         else:
-            notes.append(f"{name} 无收盘价")
-        members = _members(pro, code)
-        time.sleep(0.12)
-        if members is None or members.empty:
-            notes.append(f"{name} 无成分")
+            notes.append(f"index_classify {src} 返回空表，没有 index_code 字段")
+    cached = _read_sw_l1()
+    if not cached.empty:
+        notes.append(f"本次行业列表接口为空，沿用上次成功的申万一级 {len(cached)} 个")
+        return cached, notes
+    notes.append("申万一级行业列表为空")
+    return pd.DataFrame(), notes
+
+
+def _sw_coverage_note(closes: dict[str, pd.Series], day: str) -> str:
+    """只描述实测覆盖，不把缺失收盘补成 0。"""
+    if not closes:
+        return ""
+    on_day = 0
+    ready5 = 0
+    ready20 = 0
+    ready60 = 0
+    latest = ""
+    for series in closes.values():
+        values = pd.to_numeric(series, errors="coerce").dropna()
+        if values.empty:
             continue
-        symbol_col = "con_code" if "con_code" in members.columns else "ts_code" if "ts_code" in members.columns else ""
-        if not symbol_col:
-            notes.append(f"{name} 成分缺少代码")
+        last = str(values.index[-1])
+        if last > latest:
+            latest = last
+        if last != day:
             continue
-        for raw in members[symbol_col].astype(str):
-            symbol = re.sub(r"\D", "", raw)[:6]
-            if len(symbol) == 6:
-                member_rows.append({"symbol": symbol, "industry_name": name})
+        on_day += 1
+        if len(values) > 5:
+            ready5 += 1
+        if len(values) > 20:
+            ready20 += 1
+        if len(values) > 60:
+            ready60 += 1
+    if on_day == 0:
+        return f"申万行情最新日期是 {latest or '无法计算'}，没有落在数据日 {day}，区间收益率无法计算"
+    return (
+        f"申万一级 {len(closes)} 个有收盘，{on_day} 个最后一根落在 {day}。"
+        f"可算 5 日 {ready5} 个，20 日 {ready20} 个，60 日 {ready60} 个"
+    )
+
+
+def _on_day_count(closes: dict[str, pd.Series], day: str) -> int:
+    count = 0
+    for series in closes.values():
+        values = pd.to_numeric(series, errors="coerce").dropna()
+        if not values.empty and str(values.index[-1]) == day:
+            count += 1
+    return count
+
+
+def _exposure_members() -> pd.DataFrame:
+    path = ROOT / "industry_factor" / "output" / "sw_l1_exposure.csv"
+    if not path.is_file():
+        return pd.DataFrame(columns=["symbol", "industry_name"])
+    try:
+        frame = pd.read_csv(path, dtype=str)
+    except Exception:
+        return pd.DataFrame(columns=["symbol", "industry_name"])
+    if "symbol" not in frame.columns or "industry_name" not in frame.columns:
+        return pd.DataFrame(columns=["symbol", "industry_name"])
+    work = frame.loc[:, ["symbol", "industry_name"]].copy()
+    work["symbol"] = work["symbol"].map(lambda value: re.sub(r"\D", "", str(value))[:6])
+    work["industry_name"] = work["industry_name"].fillna("").astype(str).str.strip()
+    work = work[(work["symbol"].str.len() == 6) & (work["industry_name"] != "")]
+    return work.drop_duplicates("symbol", keep="first")
+
+
+def _chain_equal_weight(levels: dict[str, float], day_pct: dict[str, float]) -> dict[str, float]:
+    """上一日指数乘以当日等权涨跌幅。没有上一日时从 100 起算。"""
+    out = dict(levels)
+    for name, pct in day_pct.items():
+        if not _ok(pct):
+            continue
+        out[str(name)] = float(out.get(str(name), 100.0)) * (1.0 + float(pct) / 100.0)
+    return out
+
+
+def _constituent_panels(day: str, members: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    """用本地个股日线合成行业指数。某日有效成分不足 8 只则该行业该日不入序列。"""
+    note = "备用：申万官方指数没有落在数据日。板块收益改用本地个股日线和已保存的申万一级成分，行业日收益是成分股涨跌幅等权平均后连乘。成交额是成分股成交额合计。这不是申万官方指数。"
+    symbol_to_name = dict(zip(members["symbol"].astype(str), members["industry_name"].astype(str)))
+    files = sorted(
+        path for path in CROSS.glob("*.csv") if path.stem.isdigit() and _iso(path.stem) and _iso(path.stem) <= day
+    )
+    if not files:
+        return pd.DataFrame(), pd.DataFrame(), "本地没有个股日线，成分股备用无法计算"
+    levels: dict[str, float] = {}
+    index_rows: list[dict[str, float]] = []
+    amount_rows: list[dict[str, float]] = []
+    dates: list[str] = []
+    for path in files:
+        iso = _iso(path.stem)
+        try:
+            frame = pd.read_csv(path, usecols=lambda column: column in {"ts_code", "pct_chg", "amount", "vol"})
+        except Exception:
+            continue
+        if frame.empty or "ts_code" not in frame.columns or "pct_chg" not in frame.columns:
+            continue
+        work = frame.copy()
+        work["symbol"] = work["ts_code"].astype(str).str.slice(0, 6)
+        work["industry_name"] = work["symbol"].map(symbol_to_name)
+        work = work[work["industry_name"].notna()].copy()
+        work["pct_chg"] = pd.to_numeric(work["pct_chg"], errors="coerce")
+        if "vol" in work.columns:
+            work["vol"] = pd.to_numeric(work["vol"], errors="coerce")
+            work = work[work["vol"] > 0]
+        work = work[work["pct_chg"].notna()]
+        if work.empty:
+            continue
+        day_pct: dict[str, float] = {}
+        day_amount: dict[str, float] = {}
+        for name, part in work.groupby("industry_name"):
+            if len(part) < 8:
+                continue
+            day_pct[str(name)] = float(part["pct_chg"].mean())
+            if "amount" in part.columns:
+                amount = pd.to_numeric(part["amount"], errors="coerce").sum(min_count=1)
+                if _ok(amount):
+                    day_amount[str(name)] = float(amount) / 10.0
+        if not day_pct:
+            continue
+        levels = _chain_equal_weight(levels, day_pct)
+        dates.append(iso)
+        index_rows.append({name: levels[name] for name in day_pct})
+        amount_rows.append(day_amount)
+    if not index_rows:
+        return pd.DataFrame(), pd.DataFrame(), "成分股日线没有形成行业收益"
+    close_df = pd.DataFrame(index_rows, index=dates).sort_index()
+    amount_df = pd.DataFrame(amount_rows, index=dates).sort_index()
+    return close_df, amount_df, note
+
+
+def _load_sw(pro, start: str, end: str, logger) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str], str]:
+    meta, notes = _classify_l1(pro)
+    empty = pd.DataFrame()
+    if meta.empty or "index_code" not in meta.columns:
+        closes = {}
+        amounts = {}
+        member_rows = []
+    else:
+        sample = [str(item).strip() for item in meta["index_code"].head(3).tolist()]
+        _log(logger, f"申万一级 {len(meta)} 个，代码样例 {'、'.join(sample)}")
+        closes = {}
+        amounts = {}
+        member_rows = []
+        miss_streak = 0
+        for record in meta.itertuples(index=False):
+            code = str(getattr(record, "index_code", "") or "").strip()
+            name = str(getattr(record, "industry_name", "") or "").strip() or code
+            if not code:
+                continue
+            try:
+                daily = _call(pro.sw_daily, ts_code=code, start_date=_ymd(start), end_date=_ymd(end))
+            except Exception as exc:
+                notes.append(f"{name} 行情失败：{exc}")
+                daily = None
+            time.sleep(0.12)
+            if daily is not None and not daily.empty and "trade_date" in daily.columns and "close" in daily.columns:
+                piece = daily.copy()
+                piece["date"] = piece["trade_date"].map(_iso)
+                piece = piece[piece["date"] != ""].drop_duplicates("date", keep="last").set_index("date").sort_index()
+                closes[name] = pd.to_numeric(piece["close"], errors="coerce")
+                if "amount" in piece.columns:
+                    amounts[name] = pd.to_numeric(piece["amount"], errors="coerce")
+                miss_streak = 0
+            else:
+                notes.append(f"{name} 无收盘价")
+                miss_streak += 1
+                if miss_streak >= 2 and not closes:
+                    notes.append("连续行业行情失败，停止其余行业请求")
+                    break
+                continue
+            members = _members(pro, code)
+            time.sleep(0.12)
+            if members is None or members.empty:
+                notes.append(f"{name} 无成分")
+                continue
+            symbol_col = "con_code" if "con_code" in members.columns else "ts_code" if "ts_code" in members.columns else ""
+            if not symbol_col:
+                notes.append(f"{name} 成分缺少代码")
+                continue
+            for raw in members[symbol_col].astype(str):
+                symbol = re.sub(r"\D", "", raw)[:6]
+                if len(symbol) == 6:
+                    member_rows.append({"symbol": symbol, "industry_name": name})
+    coverage = _sw_coverage_note(closes, end)
+    if coverage:
+        notes.append(coverage)
+        _log(logger, coverage)
     close_df = pd.DataFrame(closes).sort_index() if closes else empty
     amount_df = pd.DataFrame(amounts).sort_index() if amounts else empty
     member_df = pd.DataFrame(member_rows)
@@ -1383,7 +1699,25 @@ def _load_sw(pro, start: str, end: str, logger) -> tuple[pd.DataFrame, pd.DataFr
         if duplicated:
             notes.append(f"{duplicated} 只股票落在多个一级行业，保留先出现的行业")
             member_df = member_df.drop_duplicates("symbol", keep="first")
-    return close_df, amount_df, member_df, notes
+    if _on_day_count(closes, end) >= 2:
+        return close_df, amount_df, member_df, notes, "sw_daily"
+    backup_members = member_df if not member_df.empty else _exposure_members()
+    if backup_members.empty:
+        notes.append("没有已保存的申万一级成分，不能改用个股日线")
+        return close_df, amount_df, member_df, notes, "sw_daily"
+    b_close, b_amount, b_note = _constituent_panels(end, backup_members)
+    notes.append(b_note)
+    _log(logger, b_note)
+    if b_close.empty:
+        return close_df, amount_df, member_df, notes, "sw_daily"
+    covered = _sw_coverage_note(
+        {column: b_close[column] for column in b_close.columns},
+        end,
+    )
+    if covered:
+        notes.append(covered)
+        _log(logger, covered)
+    return b_close, b_amount, backup_members, notes, "constituent"
 
 
 def _members(pro, index_code: str) -> pd.DataFrame | None:
@@ -1755,6 +2089,9 @@ def assemble(
 
     _ts, pro = get_tushare_bundle()
     missing = []
+    vix, vix_note = fetch_vix(pro, day)
+    if vix_note:
+        missing.append(vix_note)
     if calendar_note:
         missing.append(calendar_note)
     if prev_day_hint and prev_day_hint != previous_open(open_days, day):
@@ -1771,9 +2108,10 @@ def assemble(
     suspend, suspend_note = _load_suspend(pro, start, day)
     if suspend_note:
         missing.append(suspend_note)
-    close_df, amount_df, members, sw_notes = _load_sw(pro, start, day, log)
+    close_df, amount_df, members, sw_notes, sw_source = _load_sw(pro, start, day, log)
     missing.extend(sw_notes)
-    features = ensure_features(feature_days, open_days, close_df, members, basic, suspend, log)
+    feature_span = [day] if sw_source == "constituent" else feature_days
+    features = ensure_features(feature_span, open_days, close_df, members, basic, suspend, log)
     features = features[features["date"].astype(str) <= day] if not features.empty else features
     prev = previous_open(open_days, day)
     today_chase = None
@@ -1915,9 +2253,12 @@ def assemble(
         "next_drawdown_note": next_note,
         "sectors": sectors,
         "labels": labels,
+        "sw_source": sw_source,
         "breadth": breadth,
         "promotion": _promotion_text(promotion_levels),
         "sentiment": sentiment,
+        "vix": vix,
+        "vix_loaded": True,
         "phase": phase,
         "missing": _unique(missing),
         "conclusion": _conclusion(
@@ -1972,6 +2313,7 @@ def render_quant_report(
     except Exception as exc:
         _log(log, f"量化复盘失败：{exc}")
         ctx = failure_ctx(day, str(exc), lianban_phase, calendar_note)
+    ctx = _attach_vix(ctx)
     return render_markdown(ctx)
 
 
@@ -2097,8 +2439,50 @@ def self_test() -> None:
     assert unknown["limit_up"] is None
     assert unknown["mean"] is not None
 
+    assert vix_band(19.99).startswith("低于 20")
+    assert vix_band(20).startswith("20–30")
+    assert vix_band(30).startswith("20–30")
+    assert vix_band(30.01).startswith("高于 30")
+    assert vix_band(40).startswith("高于 30")
+    assert vix_band(40.01).startswith("高于 40")
+    assert vix_band(None) == "无法计算"
+    stale = {"银行": pd.Series([1.0, 1.1, 1.2, 1.3, 1.4, 1.5], index=["2026-11-11", "2026-11-12", "2026-11-13", "2026-11-16", "2026-11-17", "2026-11-17"])}
+    assert "2026-11-17" in _sw_coverage_note(stale, "2026-11-18")
+    fresh = {"银行": pd.Series([1.0] * 6 + [1.2], index=["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-16", "2026-11-17", "2026-11-18"])}
+    covered = _sw_coverage_note(fresh, "2026-11-18")
+    assert "可算 5 日 1 个" in covered
+    assert "20 日 0 个" in covered
+    chained = _chain_equal_weight({}, {"银行": 10.0})
+    chained = _chain_equal_weight(chained, {"银行": -10.0})
+    assert abs(chained["银行"] - 99.0) < 1e-9
+    missing_pre = pd.DataFrame(
+        [
+            {"trade_date": "20261116", "close": 23.66},
+            {"trade_date": "20261117", "close": 25.46},
+        ]
+    )
+    assert _vix_pre_close(missing_pre) is None
+    explicit = missing_pre.copy()
+    explicit["pre_close"] = [19.3, 22.5]
+    assert _vix_pre_close(explicit) == 22.5
+    filled = failure_ctx("2026-11-13", "测试中断", "冰点期", "")
+    filled["vix"] = {
+        "trade_date": "2026-11-12",
+        "open": 16.81,
+        "high": 18.94,
+        "low": 16.4,
+        "close": 18.1,
+        "pre_close": 17.2,
+        "pct_change": 2.97,
+    }
+    filled_text = render_markdown(filled)
+    assert "## 美股恐慌指数" in filled_text
+    assert "18.10" in filled_text
+    assert "+2.97%" in filled_text
+    assert "低于 20" in filled_text
+    assert "美股最近一根是 2026-11-12" in filled_text
     text = render_markdown(failure_ctx("2026-11-13", "测试中断", "冰点期", ""))
-    for title in ("## 柏拉爱空", "## 板块强弱", "## 市场广度与风险偏好", "## 情绪指数", "## 市场阶段", "## 明日观察", "## 简短复盘结论"):
+    for title in ("## 柏拉爱空", "## 板块强弱", "## 市场广度与风险偏好", "## 美股恐慌指数", "## 情绪指数", "## 市场阶段", "## 明日观察", "## 简短复盘结论"):
         assert title in text
     assert "无法计算" in text
     assert "研究参数" in text

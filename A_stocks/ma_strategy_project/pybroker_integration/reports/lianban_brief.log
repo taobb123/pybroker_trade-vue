@@ -68,3 +68,40 @@
 2026-11-17 18:36:12 量化复盘更新特征 3 日
 2026-11-17 18:36:14 2026-11-16.md 未取到 2026-11-17 开盘，第一票保持待定
 2026-11-17 18:36:14 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-17.md
+2026-11-18 18:35:17 上交所交易日历不可用，改用连板网日历：上交所交易日历为空
+2026-11-18 18:35:59 量化复盘失败：查询数据失败，请确认参数！可以反馈管理员协助您排查问题, Error 1045 (28000): Access denied for user 'tushare'@'10.255.255.27' (using password: YES)
+2026-11-18 18:36:00 2026-11-17.md 次日开盘高开，已改第一票
+2026-11-18 18:36:00 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 19:31:25 量化复盘补齐日线 1/1 2026-11-18
+2026-11-18 19:31:59 量化复盘更新特征 2 日
+2026-11-18 19:31:59 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 19:34:29 量化复盘补齐日线 1/1 2026-11-18
+2026-11-18 19:35:04 量化复盘更新特征 2 日
+2026-11-18 19:35:04 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 19:37:30 量化复盘补齐日线 1/1 2026-11-18
+2026-11-18 19:38:03 量化复盘更新特征 2 日
+2026-11-18 19:38:04 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 19:48:27 上交所交易日历不可用，改用连板网日历：HTTPConnectionPool(host='127.0.0.1', port=7897): Read timed out. (read timeout=30)
+2026-11-18 19:49:07 量化复盘失败：上交所交易日历为空
+2026-11-18 19:49:07 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:04:54 上交所交易日历不可用，改用连板网日历：上交所交易日历为空
+2026-11-18 20:06:24 量化复盘补齐日线 1/1 2026-11-18
+2026-11-18 20:09:13 量化复盘更新特征 3 日
+2026-11-18 20:09:18 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:24:18 上交所交易日历不可用，改用连板网日历：上交所交易日历为空
+2026-11-18 20:25:42 量化复盘失败：上交所交易日历为空
+2026-11-18 20:25:42 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:26:26 上交所交易日历不可用，改用连板网日历：上交所交易日历为空
+2026-11-18 20:27:29 量化复盘失败：上交所交易日历为空
+2026-11-18 20:27:29 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:41:02 上交所交易日历不可用，改用连板网日历：HTTPConnectionPool(host='api.waditu.com', port=80): Read timed out. (read timeout=30)
+2026-11-18 20:43:00 量化复盘失败：上交所交易日历为空
+2026-11-18 20:43:00 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:45:09 备用：申万官方指数没有落在数据日。板块收益改用本地个股日线和已保存的申万一级成分，行业日收益是成分股涨跌幅等权平均后连乘。成交额是成分股成交额合计。这不是申万官方指数。
+2026-11-18 20:45:09 申万一级 31 个有收盘，31 个最后一根落在 2026-11-18。可算 5 日 31 个，20 日 31 个，60 日 31 个
+2026-11-18 20:45:09 量化复盘更新特征 1 日
+2026-11-18 20:45:10 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md
+2026-11-18 20:54:51 申万一级 31 个，代码样例 801010.SI、801030.SI、801040.SI
+2026-11-18 20:55:12 申万一级 31 个有收盘，31 个最后一根落在 2026-11-18。可算 5 日 31 个，20 日 31 个，60 日 31 个
+2026-11-18 20:55:13 量化复盘更新特征 3 日
+2026-11-18 20:55:14 已写入 C:\Users\111\Desktop\PybtradeVue\pybroker_trade-vue\A_stocks\ma_strategy_project\pybroker_integration\reports\2026-11-18.md

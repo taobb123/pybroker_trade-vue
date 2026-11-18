@@ -472,6 +472,61 @@ export async function fetchDailyBriefs(): Promise<DailyBriefItem[]> {
   }
 }
 
+export async function rerunDailyBrief(date: string): Promise<{ ok: boolean; message: string; path: string }> {
+  const res = await fetch(apiUrl('/api/daily-briefs/rerun'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date }),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    let message = text.slice(0, 500)
+    try {
+      const parsed = JSON.parse(text) as { detail?: unknown }
+      if (typeof parsed.detail === 'string') message = parsed.detail
+    } catch {
+      /* 保留原文 */
+    }
+    return { ok: false, message, path: '' }
+  }
+  let jobId = ''
+  let path = ''
+  try {
+    const start = JSON.parse(text) as { job_id?: string; path?: string }
+    jobId = String(start.job_id ?? '')
+    path = String(start.path ?? '')
+  } catch {
+    return { ok: false, message: '启动响应不是 JSON', path: '' }
+  }
+  if (!jobId) return { ok: false, message: '未返回任务编号', path }
+  const deadline = Date.now() + 30 * 60 * 1000
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1500))
+    let poll: Response
+    try {
+      poll = await fetch(apiUrl(`/api/run/jobs/${encodeURIComponent(jobId)}`))
+    } catch {
+      continue
+    }
+    if (!poll.ok) continue
+    const job = (await poll.json()) as {
+      status?: string
+      error?: string
+      result?: { ok?: boolean; exit_code?: number; merged_log?: string; path?: string }
+    }
+    if (job.status !== 'done') continue
+    const result = job.result
+    const ok = Boolean(result?.ok) && Number(result?.exit_code ?? 1) === 0
+    const log = String(result?.merged_log || job.error || '')
+    return {
+      ok,
+      message: ok ? '复盘简报已重跑' : log.slice(-800) || '复盘简报没有完成',
+      path: String(result?.path || path),
+    }
+  }
+  return { ok: false, message: '重跑超时，请稍后查看简报文件', path }
+}
+
 export async function fetchWorkspaceFile(path: string): Promise<{ exists: boolean; content: string }> {
   try {
     const q = new URLSearchParams({ path })

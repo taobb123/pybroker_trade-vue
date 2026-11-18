@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { copyTextToClipboard, stockCodesToCopyText } from '@/api/tableCopy'
 import { fetchThemeCatalog, runThemeReview, type ThemeReviewReport } from '@/api/themeReview'
-import { fetchDailyBriefs, fetchWorkspaceFile, type DailyBriefItem } from '@/api/workflow'
+import { fetchDailyBriefs, fetchWorkspaceFile, rerunDailyBrief, type DailyBriefItem } from '@/api/workflow'
 import {
   Select,
   SelectContent,
@@ -29,6 +29,10 @@ import {
 const tab = ref('daily')
 const dailyPath = ref('')
 const briefs = ref<DailyBriefItem[]>([])
+const briefRunning = ref(false)
+const briefMessage = ref('')
+const briefError = ref('')
+const briefReload = ref(0)
 
 function shanghaiDay(offsetDays = 0): string {
   const today = new Intl.DateTimeFormat('en-CA', {
@@ -141,6 +145,35 @@ async function loadCatalog() {
   }
 }
 
+function briefDate(): string {
+  const fromPath = dailyPath.value.replace(/^reports\//, '').replace(/\.md$/, '')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fromPath)) return fromPath
+  return shanghaiDay(0)
+}
+
+async function rerunBrief() {
+  if (briefRunning.value) return
+  briefRunning.value = true
+  briefMessage.value = ''
+  briefError.value = ''
+  const date = briefDate()
+  try {
+    const result = await rerunDailyBrief(date)
+    if (!result.ok) {
+      briefError.value = result.message || '复盘简报没有完成'
+      return
+    }
+    briefMessage.value = `${date} 复盘简报已重跑`
+    await loadBriefs()
+    dailyPath.value = result.path || `reports/${date}.md`
+    briefReload.value += 1
+  } catch (exc) {
+    briefError.value = exc instanceof Error ? exc.message : '复盘简报没有完成'
+  } finally {
+    briefRunning.value = false
+  }
+}
+
 onMounted(() => {
   void loadCatalog()
   void loadBriefs()
@@ -198,11 +231,16 @@ function pct(value: number | null): string {
             </SelectContent>
           </Select>
           <span class="text-xs text-muted-foreground">{{ briefs.length }} 份</span>
+          <Button size="sm" class="h-8" :disabled="briefRunning" @click="rerunBrief">
+            {{ briefRunning ? '正在重跑…' : '重跑复盘简报' }}
+          </Button>
+          <span v-if="briefMessage" class="text-xs text-muted-foreground">{{ briefMessage }}</span>
+          <span v-if="briefError" class="text-xs text-destructive">{{ briefError }}</span>
         </div>
         <Card size="sm" class="bg-transparent py-0 shadow-none ring-0 data-[size=sm]:py-0">
           <CardContent class="px-0 group-data-[size=sm]/card:px-0">
             <p v-if="!dailyPath" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
-            <MarkdownReportPanel v-else :path="dailyPath" compact />
+            <MarkdownReportPanel v-else :path="dailyPath" :reload-token="briefReload" compact />
           </CardContent>
         </Card>
       </TabsContent>

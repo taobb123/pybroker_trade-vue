@@ -180,6 +180,14 @@ def _pct_from_row(row: Any, *, sanity_abs: Optional[float] = None) -> Optional[f
     return None
 
 
+def _clean_token(value) -> str:
+    """只保留 token 字符。去掉首尾空白和成对引号，空串不当成已配置。"""
+    text = str(value or "").strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+        text = text[1:-1].strip()
+    return text
+
+
 def _token_from_settings_file(path: Path) -> str:
     """按文件路径加载 DATA_CONFIG，避免 import config 命中 pybroker_integration/config。"""
     if not path.is_file():
@@ -190,7 +198,7 @@ def _token_from_settings_file(path: Path) -> str:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     cfg = getattr(mod, "DATA_CONFIG", None) or {}
-    return str(cfg.get("tushare_token") or "").strip()
+    return _clean_token(cfg.get("tushare_token"))
 
 
 def _token_from_workflow_yaml() -> str:
@@ -202,14 +210,14 @@ def _token_from_workflow_yaml() -> str:
 
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         extra = (data.get("data_sources") or {}).get("extra_env") or {}
-        return str(extra.get("TUSHARE_TOKEN") or "").strip()
+        return _clean_token(extra.get("TUSHARE_TOKEN"))
     except Exception:
         return ""
 
 
 def resolve_tushare_token() -> str:
     for candidate in (
-        (os.getenv("TUSHARE_TOKEN") or "").strip(),
+        _clean_token(os.getenv("TUSHARE_TOKEN")),
         _token_from_workflow_yaml(),
         _token_from_settings_file(_MA_PROJECT_ROOT / "config" / "settings.py"),
         _token_from_settings_file(_SCRIPT_DIR / "config" / "settings.py"),

@@ -1,3 +1,2 @@
 ﻿stock_name,t1_pred_direction_label,predicted_direction_label,anchor_t,t1_date,compare_dates,real_sequence,pred_sequence,same_count,diff_count,regime_label,predicted_direction,t1_pred_direction,regime,symbol
-苏泊尔,红柱,跌,2026-11-16,2026-11-17,2026-11-12|2026-11-13|2026-11-16,绿红红,绿绿红,2,1,后续不同概率偏高,down,red,diff_bias,002032
-飞科电器,红柱,涨,2026-11-16,2026-11-17,2026-11-12|2026-11-13|2026-11-16,红绿红,绿红绿,0,3,后续相同概率偏高,up,red,same_bias,603868
+莲花控股,红柱,跌,2026-11-17,2026-11-18,2026-11-13|2026-11-16|2026-11-17,绿绿红,绿绿绿,2,1,后续不同概率偏高,down,red,diff_bias,600186

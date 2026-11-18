@@ -6,6 +6,7 @@ import { isDailyBriefMarkdown, renderMarkdownToHtml } from '@/api/workspacePrevi
 const props = defineProps<{
   path: string
   compact?: boolean
+  reloadToken?: number
 }>()
 
 const loading = ref(false)
@@ -34,9 +35,9 @@ async function load(path: string) {
 }
 
 watch(
-  () => props.path,
-  (p) => {
-    void load(p)
+  () => [props.path, props.reloadToken] as const,
+  () => {
+    void load(props.path)
   },
   { immediate: true },
 )
